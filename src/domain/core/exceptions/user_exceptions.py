@@ -1,0 +1,15 @@
+from src.domain.core.exceptions.base import DomainError
+
+
+
+class UserInvalidStateError(DomainError): ...
+    
+
+class InvalidEmailFormatError(DomainError): ...
+    
+
+class EmailAlreadyExistsError(DomainError): ...
+    
+
+class UserNotFoundError(DomainError): ...
+    
