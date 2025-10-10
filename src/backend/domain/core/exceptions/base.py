@@ -27,12 +27,6 @@ class CorruptedInvariantError(DomainError):
     ...
 
 
-class ItemNotFoundError(DomainError):
-    """Requested entity not found."""
-
-    ...
-
-
 class ForbiddenOperationError(DomainError):
     """Operation forbidden for current object state or user."""
 
