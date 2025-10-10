@@ -4,7 +4,6 @@ from datetime import datetime
 from src.application.common.dtos.base_dto import DTO
 
 
-
 class UserCreateDTO(DTO):
     email: str
     phone: str
@@ -22,4 +21,3 @@ class UserResponseDTO(DTO):
 class UserUpdateDTO(DTO):
     email: str | None = None
     phone: str | None = None
-    
