@@ -3,13 +3,12 @@ from datetime import datetime
 from uuid import UUID
 
 
-
 class UserCreateRequest(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
     phone: str
-    
+
 
 class UserResponse(BaseModel):
     id: UUID
