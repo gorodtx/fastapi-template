@@ -5,3 +5,25 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = []
+
+
+[tool.rope]
+autoimport.aliases = []
+automatic_soa = true
+soa_followed_calls = true
+perform_doa = true
+
+ignored_resources = [
+    "*.pyc",
+    "__pycache__",
+    ".git",
+    ".ropeproject",
+    "venv",
+    "env",
+    ".env",
+    "node_modules",
+    ".env.example"
+]
+
+split_imports = true
+pull_imports_to_top = true

@@ -1,3 +1,6 @@
 .venv
 .mypy_cache
 .env\
+.ropeproject
+.ruff_cache
+.vscode
