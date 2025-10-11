@@ -1,7 +1,7 @@
-from uuid import UUID
 from datetime import datetime
+from backend.domain.core.entities.base import TypeID
 
-from src.application.common.dtos.base_dto import DTO
+from src.backend.application.common.dtos.base_dto import DTO
 
 
 class UserCreateDTO(DTO):
@@ -10,7 +10,7 @@ class UserCreateDTO(DTO):
 
 
 class UserResponseDTO(DTO):
-    id: UUID
+    id: TypeID
     email: str
     phone: str
     is_active: bool
