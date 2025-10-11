@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-from backend.domain.core.value_objects.base import value_object, ValueObject
+
+from backend.domain.core.value_objects.base import ValueObject, value_object
 
 
-def validate_password(password: "Password") -> None:  # forward reference
+def validate_password(password: Password) -> None:
     val = password.value
     if not isinstance(val, str):
         raise TypeError("Password.value must be str")
@@ -20,6 +21,6 @@ def validate_password(password: "Password") -> None:  # forward reference
         raise ValueError("Password must include symbol")
 
 
-@value_object(validate=validate_password)
+@value_object(validate_password)
 class Password(ValueObject):
     value: str

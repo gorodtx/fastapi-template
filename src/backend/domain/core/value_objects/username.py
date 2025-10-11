@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from backend.domain.core.value_objects.base import value_object, ValueObject
+from backend.domain.core.value_objects.base import ValueObject, value_object
 
 
-def validate_username(username: "Username") -> None:  # forward reference
+def validate_username(username: Username) -> None:
     val = username.value
     if not isinstance(val, str):
         raise TypeError("Username.value must be str")
@@ -13,6 +13,6 @@ def validate_username(username: "Username") -> None:  # forward reference
         raise ValueError("Username contains invalid characters")
 
 
-@value_object(validate=validate_username)
+@value_object(validate_username)
 class Username(ValueObject):
     value: str

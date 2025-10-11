@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
 from dataclasses import field
+from typing import Any
 
-from backend.domain.core.entities.base import entity, TypeID, Entity
+from backend.domain.core.entities.base import Entity, TypeID, entity
+from backend.domain.core.exceptions.base import CorruptedInvariantError, DomainError
 from backend.domain.core.value_objects.email import Email
 from backend.domain.core.value_objects.login import Login
 from backend.domain.core.value_objects.password import Password
 from backend.domain.core.value_objects.username import Username
-from backend.domain.core.value_objects.user_id import UserId
-from backend.domain.core.exceptions.base import CorruptedInvariantError, DomainError
 
 
 @entity
@@ -36,7 +35,7 @@ class User(Entity):
         self.password = new_password  # type: ignore
 
     def ensure_invariants(self) -> None:
-        if not isinstance(self.id, UserId):
+        if not isinstance(self.id, TypeID):
             raise CorruptedInvariantError(f"User id is invalid: {self.id!r}")
 
     def asdict(self) -> dict[str, Any]:

@@ -1,4 +1,5 @@
 from typing import Any, Self
+
 from msgspec import Struct, convert, to_builtins
 
 
