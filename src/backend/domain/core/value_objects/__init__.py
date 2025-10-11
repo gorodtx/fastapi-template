@@ -1,4 +1,4 @@
-from .base import ValueObject, SingleValueObject
+from .base import SingleValueObject, ValueObject
 from .email import Email
 from .user_id import UserId
 

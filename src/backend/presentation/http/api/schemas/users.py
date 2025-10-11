@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from uuid import UUID
+
+from pydantic import BaseModel, EmailStr
+
+from backend.domain.core.entities.base import TypeID
 
 
 class UserCreateRequest(BaseModel):
@@ -11,7 +13,7 @@ class UserCreateRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: UUID
+    id: TypeID
     first_name: str
     last_name: str
     email: EmailStr

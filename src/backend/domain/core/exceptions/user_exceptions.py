@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from src.backend.domain.core.exceptions.base import DomainError, CorruptedInvariantError
+from src.backend.domain.core.exceptions.base import CorruptedInvariantError, DomainError
+from src.backend.domain.core.value_objects.email import Email
 from src.backend.domain.core.value_objects.user_id import UserId
 from src.backend.domain.core.value_objects.username import Username
-from src.backend.domain.core.value_objects.email import Email
 
 
 class UserAlreadyExistsError(DomainError):
