@@ -25,5 +25,14 @@ ignored_resources = [
     ".env.example"
 ]
 
+[tool.pyright]
+reportGeneralTypeIssues = "warning"
+
+
+[tool.mypy]
+files = ["fastapi_backend"]
+namespace_packages = true
+
+
 split_imports = true
 pull_imports_to_top = true
