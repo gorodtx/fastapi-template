@@ -4,20 +4,30 @@ from fastapi_backend.application.common.dtos.base_dto import DTO
 from fastapi_backend.domain.core.entities.base import TypeID
 
 
-class UserCreateDTO(DTO):
-    email: str
-    phone: str
-
-
 class UserResponseDTO(DTO):
     id: TypeID
     email: str
-    phone: str
     is_active: bool
     created_at: datetime
     updated_at: datetime
 
 
+class UserCreateDTO(DTO):
+    email: str
+    login: str
+    username: str
+    password_hash: str
+
+
 class UserUpdateDTO(DTO):
+    user_id: str
     email: str | None = None
-    phone: str | None = None
+    password: str | None = None
+
+
+class DeleteUserDTO(DTO):
+    user_id: str
+
+
+class GetUserDTO(DTO):
+    user_id: str

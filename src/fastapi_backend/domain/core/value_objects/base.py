@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import dataclass_transform
@@ -24,4 +23,4 @@ def value_object[V: "ValueObject"](*validate: Callable[[V], None]) -> Callable[[
     return decorator
 
 
-class ValueObject(ABC): ...
+class ValueObject: ...
