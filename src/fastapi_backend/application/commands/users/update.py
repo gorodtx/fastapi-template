@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi_backend.application.common.dtos.users.users_dto import (
+from fastapi_backend.application.common.dtos.users_dto import (
     UserResponseDTO,
     UserUpdateDTO,
 )

@@ -14,8 +14,8 @@ from fastapi_backend.application.commands.users.update import (
 __all__ = [
     "CreateUserCommand",
     "CreateUserHandler",
-    "UpdateUserCommand",
-    "UpdateUserHandler",
     "DeleteUserCommand",
     "DeleteUserHandler",
+    "UpdateUserCommand",
+    "UpdateUserHandler",
 ]

@@ -1,32 +1,74 @@
-fix = true
+target-version = "py313"
 line-length = 100
-exclude = ["tests", "migrations", "*.html"]
+indent-width = 4
 
-lint.select = [
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+    ".pytest_cache",
+    ".ruff_cache",
+    "migrations/",
+]
+
+[lint]
+select = [
     "E",
-    "F", 
+    "W",
+    "F",
     "I",
-    "UP",
     "B",
-    "PERF",
-    "FIX002",
-    "PLE",
-    "PLW",
-    "F822",
+    "C4",
+    "UP",
+    "ARG",
+    "SIM",
+    "PTH",
+    "PL",
+    "RUF",
+    "ASYNC",
+    "S",
+    "T20",
+    "TID",
+    "ANN",
 ]
-
-lint.ignore = [
+ignore = [
     "E501",
-    "D104", 
-    "D100",
+    "ANN101",
+    "ANN102",
+    "ANN401",
+    "PLR0913",
+    "S101",
+    "B008",
+    "TC001",
+    "TC002",
+    "TC003",
 ]
-lint.exclude = [".git", "__pycache__", "venv", ".venv", "tests"]
 
-lint.flake8-quotes.docstring-quotes = "double"
+fixable = ["ALL"]
+unfixable = []
 
-format.quote-style = "double"
-format.indent-style = "space"
-format.line-ending = "auto"
-format.exclude = ["tests"]
-format.skip-magic-trailing-comma = false
-format.docstring-code-format = true
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**/*.py" = ["S101", "ARG", "PLR2004"]
+"conftest.py" = ["ARG001"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+
+[lint.isort]
+known-first-party = ["src"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[lint.pylint]
+max-args = 8
+max-branches = 15
+max-returns = 8
+max-statements = 60
