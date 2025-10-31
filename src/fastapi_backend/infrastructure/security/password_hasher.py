@@ -65,10 +65,7 @@ class Argon2PasswordHasher:
                 return True
             if memory_cost < MIN_MEMORY_COST:
                 return True
-            if time_cost < ARGON2_TIME_COST:
-                return True
-
-            return False
+            return time_cost < ARGON2_TIME_COST
 
         except (ValueError, AttributeError):
             return True
