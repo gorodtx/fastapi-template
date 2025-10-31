@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from fastapi_backend.domain.core.value_objects.identity.email import Email
+from fastapi_backend.domain.core.value_objects.identity.login import Login
+from fastapi_backend.domain.core.value_objects.identity.username import Username
 from src.fastapi_backend.domain.core.entities.base import TypeID
 from src.fastapi_backend.domain.core.entities.user import User
-from src.fastapi_backend.domain.core.value_objects.email import Email
-from src.fastapi_backend.domain.core.value_objects.login import Login
-from src.fastapi_backend.domain.core.value_objects.username import Username
 
 
 class UserRepositoryPort(Protocol):

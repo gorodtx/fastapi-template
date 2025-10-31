@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+from fastapi_backend.domain.core.entities.base import TypeID
+from fastapi_backend.domain.core.entities.role import Role
+from fastapi_backend.domain.core.value_objects.access.permission_code import PermissionCode
+from fastapi_backend.domain.core.value_objects.access.role_name import RoleName
+
+
+class RBACRepositoryPort(Protocol):
+    # roles
+    async def find_role_by_id(self, role_id: TypeID) -> Role | None: ...
+
+    async def find_role_by_name(self, name: RoleName) -> Role | None: ...
+
+    async def exists_role_name(self, name: RoleName, exclude_id: TypeID | None = None) -> bool: ...
+
+    async def save_role(self, role: Role) -> None: ...
+
+    async def delete_role(self, role: Role) -> None: ...
+
+    async def list_roles(self, limit: int = 100, offset: int = 0) -> list[Role]: ...
+
+    # role - permission
+    async def list_role_permissions(self, role_id: TypeID) -> list[PermissionCode]: ...
+
+    # role - user
+    async def assign_role_to_user(self, role_id: TypeID, user_id: TypeID) -> None: ...
+
+    async def revoke_role_from_user(self, role_id: TypeID, user_id: TypeID) -> None: ...
+
+    async def list_user_roles(self, user_id: TypeID) -> list[Role]: ...

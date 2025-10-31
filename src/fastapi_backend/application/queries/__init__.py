@@ -1,3 +1,3 @@
-from fastapi_backend.application.common.services.handler_base import QueryHandler
+from fastapi_backend.application.common.tools.handler_base import QueryHandler
 
 __all__ = ["QueryHandler"]

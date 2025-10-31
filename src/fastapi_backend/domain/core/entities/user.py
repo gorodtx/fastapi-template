@@ -5,10 +5,10 @@ from typing import Any
 
 from fastapi_backend.domain.core.entities.base import Entity, TypeID, entity
 from fastapi_backend.domain.core.exceptions.base import CorruptedInvariantError, DomainError
-from fastapi_backend.domain.core.value_objects.email import Email
-from fastapi_backend.domain.core.value_objects.login import Login
+from fastapi_backend.domain.core.value_objects.identity.email import Email
+from fastapi_backend.domain.core.value_objects.identity.login import Login
+from fastapi_backend.domain.core.value_objects.identity.username import Username
 from fastapi_backend.domain.core.value_objects.password import Password
-from fastapi_backend.domain.core.value_objects.username import Username
 from fastapi_backend.domain.events.user.email_changed import UserEmailChanged
 from fastapi_backend.domain.events.user.password_changed import UserPasswordChanged
 from fastapi_backend.domain.events.user.registered import UserRegistered
