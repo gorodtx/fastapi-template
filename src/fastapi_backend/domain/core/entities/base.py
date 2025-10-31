@@ -9,7 +9,7 @@ from msgspec import to_builtins
 TypeID = uuid.UUID
 
 
-@dataclass_transform()
+@dataclass_transform(kw_only_default=True)
 def entity[E](cls: type[E]) -> type[E]:
     return dataclass(kw_only=True)(cls)
 

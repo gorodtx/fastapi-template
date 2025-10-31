@@ -12,7 +12,13 @@
   "venv": ".venv",
   "reportMissingImports": true,
   "reportMissingTypeStubs": false,
+  "reportUnusedCoroutine": "error",
+  "reportUnknownParameterType": "warning",
   "pythonVersion": "3.13",
-  "typeCheckingMode": "basic"
+  "typeCheckingMode": "strict",
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportUnusedCoroutine": "error",
+    "reportArgumentType": "error"
+  }
 }
 

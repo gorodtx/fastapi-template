@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import UTC
 
 from fastapi_backend.application.common.dtos.users.users_dto import GetUserDTO, UserResponseDTO
-from fastapi_backend.application.common.services.handler_transform import handler
-from fastapi_backend.application.common.services.handler_base import QueryHandler
+from fastapi_backend.application.common.tools.handler_base import QueryHandler
+from fastapi_backend.application.common.tools.handler_transform import handler
 from fastapi_backend.domain.core.entities.base import TypeID
 from fastapi_backend.domain.ports.repositories.user_repository import UserRepositoryPort
 
@@ -22,12 +22,8 @@ class GetUserHandler(QueryHandler[GetUserQuery, UserResponseDTO]):
         if not user:
             raise LookupError(f"User {query.user_id!r} not found")
 
-        from datetime import datetime
-
         return UserResponseDTO(
             id=user.id,
             email=user.email.value,
-            is_active=True,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
+            is_active=True
         )
