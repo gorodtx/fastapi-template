@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import re
+from typing import Final
 
 from fastapi_backend.domain.core.value_objects.base import ValueObject, value_object
 
+MIN_HASH_LENGTH: Final[int] = 20
+
 
 def _validate_password_hash(pwd: Password) -> None:
-    """Validate password hash (PHC string format)."""
     val = pwd.value
     if not isinstance(val, str):
         raise TypeError("Password.value must be str")
@@ -17,15 +19,12 @@ def _validate_password_hash(pwd: Password) -> None:
             "(e.g., $argon2id$v=19$m=65536,t=3,p=4$salt$hash)"
         )
 
-    if len(val) < 20:
+    if len(val) < MIN_HASH_LENGTH:
         raise ValueError("Password hash too short")
 
 
 @value_object(_validate_password_hash)
 class Password(ValueObject):
-    """Password Value Object storing ONLY hashed password.
-
-    Domain layer never sees raw password.
-    Application layer hashes before creating this VO."""
+    """Password Value Object storing ONLY hashed password (PHC string)."""
 
     value: str
