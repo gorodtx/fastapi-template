@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC
-
 from fastapi_backend.application.common.dtos.users_dto import GetUserDTO, UserResponseDTO
 from fastapi_backend.application.common.tools.handler_base import QueryHandler
 from fastapi_backend.application.common.tools.handler_transform import handler
@@ -22,8 +20,4 @@ class GetUserHandler(QueryHandler[GetUserQuery, UserResponseDTO]):
         if not user:
             raise LookupError(f"User {query.user_id!r} not found")
 
-        return UserResponseDTO(
-            id=user.id,
-            email=user.email.value,
-            is_active=True
-        )
+        return UserResponseDTO(id=user.id, email=user.email.value, is_active=True)

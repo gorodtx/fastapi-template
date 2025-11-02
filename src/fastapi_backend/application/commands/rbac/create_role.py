@@ -9,7 +9,7 @@ from fastapi_backend.application.common.tools.handler_base import CommandHandler
 from fastapi_backend.application.common.tools.handler_transform import handler
 from fastapi_backend.domain.core.exceptions.base import DomainError, DomainTypeError
 from fastapi_backend.domain.core.exceptions.rbac import RoleAlreadyExistsError
-from fastapi_backend.domain.core.value_objects.access.role_name import RoleName
+from fastapi_backend.domain.core.value_objects.identity.role_name import RoleName
 from fastapi_backend.domain.ports.repositories.rbac_repository import RBACRepositoryPort
 from fastapi_backend.domain.ports.unit_of_work import UnitOfWorkPort
 from fastapi_backend.domain.services.rbac_domain_service import RBACDomainService

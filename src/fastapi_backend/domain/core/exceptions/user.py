@@ -51,7 +51,7 @@ class UserAlreadyInactiveError(UserStateViolationError):
 
 
 class InactiveUserOperationError(UserStateViolationError):
-    __slots__ = ("_username", "_operation")
+    __slots__ = ("_operation", "_username")
 
     def __init__(self, username: Username, operation: str) -> None:
         self._username = username
@@ -66,7 +66,7 @@ class UserPermissionError(DomainError):
 
 
 class InsufficientPermissionsError(UserPermissionError):
-    __slots__ = ("_username", "_required_permission")
+    __slots__ = ("_required_permission", "_username")
 
     def __init__(self, username: Username, required_permission: str) -> None:
         self._username = username
@@ -77,7 +77,7 @@ class InsufficientPermissionsError(UserPermissionError):
 
 
 class RoleAssignmentNotAllowedError(UserPermissionError):
-    __slots__ = ("_username", "_role", "_reason")
+    __slots__ = ("_reason", "_role", "_username")
 
     def __init__(self, username: Username, role: str, reason: str) -> None:
         self._username = username
@@ -97,7 +97,7 @@ class SelfOperationNotAllowedError(UserPermissionError):
 class UserDataCorruptedError(CorruptedInvariantError):
     """Critical user data integrity violation."""
 
-    __slots__ = ("_user_id", "_details")
+    __slots__ = ("_details", "_user_id")
 
     def __init__(self, user_id: UserId, details: str) -> None:
         self._user_id = user_id
@@ -118,7 +118,7 @@ class DuplicateUserIdError(CorruptedInvariantError):
 class UserInvariantViolationError(CorruptedInvariantError):
     """Critical user business invariant violation."""
 
-    __slots__ = ("_user_id", "_invariant")
+    __slots__ = ("_invariant", "_user_id")
 
     def __init__(self, user_id: UserId, invariant: str) -> None:
         self._user_id = user_id

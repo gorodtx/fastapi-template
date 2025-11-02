@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi_backend.domain.core.entities.base import TypeID
 from fastapi_backend.domain.core.exceptions.base import DomainError
 from fastapi_backend.domain.core.value_objects.access.permission_code import PermissionCode
-from fastapi_backend.domain.core.value_objects.access.role_name import RoleName
+from fastapi_backend.domain.core.value_objects.identity.role_name import RoleName
 
 
 class RoleError(DomainError):

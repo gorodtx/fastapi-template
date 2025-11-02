@@ -5,7 +5,7 @@ from typing import Protocol
 from fastapi_backend.domain.core.entities.base import TypeID
 from fastapi_backend.domain.core.entities.role import Role
 from fastapi_backend.domain.core.value_objects.access.permission_code import PermissionCode
-from fastapi_backend.domain.core.value_objects.access.role_name import RoleName
+from fastapi_backend.domain.core.value_objects.identity.role_name import RoleName
 
 
 class RBACRepositoryPort(Protocol):

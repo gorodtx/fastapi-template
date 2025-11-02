@@ -4,7 +4,7 @@ from dataclasses import field
 
 from fastapi_backend.domain.core.entities.base import Entity, TypeID, entity
 from fastapi_backend.domain.core.value_objects.access.permission_code import PermissionCode
-from fastapi_backend.domain.core.value_objects.access.role_name import RoleName
+from fastapi_backend.domain.core.value_objects.identity.role_name import RoleName
 from fastapi_backend.domain.events.rbac.create import RoleCreated
 from fastapi_backend.domain.events.rbac.delete import RoleDeleted
 from fastapi_backend.domain.events.rbac.permissions import (
