@@ -30,7 +30,7 @@ reportGeneralTypeIssues = "warning"
 
 
 [tool.mypy]
-files = ["fastapi_backend"]
+files = ["backend"]
 namespace_packages = true
 
 
