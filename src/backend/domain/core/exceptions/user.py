@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from backend.domain.core.entities.base import TypeID
 from backend.domain.core.exceptions.base import CorruptedInvariantError, DomainError
 from backend.domain.core.value_objects.identity.email import Email
-from backend.domain.core.value_objects.identity.user_id import UserId
 from backend.domain.core.value_objects.identity.username import Username
 
 
@@ -99,10 +99,10 @@ class UserDataCorruptedError(CorruptedInvariantError):
 
     __slots__ = ("_details", "_user_id")
 
-    def __init__(self, user_id: UserId, details: str) -> None:
+    def __init__(self, user_id: TypeID, details: str) -> None:
         self._user_id = user_id
         self._details = details
-        super().__init__(f"CRITICAL: User data corrupted for user {user_id.value!r}: {details}")
+        super().__init__(f"CRITICAL: User data corrupted for user {user_id!s}: {details}")
 
 
 class DuplicateUserIdError(CorruptedInvariantError):
@@ -110,9 +110,9 @@ class DuplicateUserIdError(CorruptedInvariantError):
 
     __slots__ = ("_user_id",)
 
-    def __init__(self, user_id: UserId) -> None:
+    def __init__(self, user_id: TypeID) -> None:
         self._user_id = user_id
-        super().__init__(f"CRITICAL: Multiple users found with same ID {user_id.value!r}")
+        super().__init__(f"CRITICAL: Multiple users found with same ID {user_id!s}")
 
 
 class UserInvariantViolationError(CorruptedInvariantError):
@@ -120,7 +120,7 @@ class UserInvariantViolationError(CorruptedInvariantError):
 
     __slots__ = ("_invariant", "_user_id")
 
-    def __init__(self, user_id: UserId, invariant: str) -> None:
+    def __init__(self, user_id: TypeID, invariant: str) -> None:
         self._user_id = user_id
         self._invariant = invariant
-        super().__init__(f"CRITICAL: User {user_id.value!r} invariant violated: {invariant}")
+        super().__init__(f"CRITICAL: User {user_id!s} invariant violated: {invariant}")

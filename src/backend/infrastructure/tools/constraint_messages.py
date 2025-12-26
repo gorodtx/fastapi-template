@@ -5,11 +5,7 @@ from dataclasses import dataclass
 from typing import Final, Protocol
 
 from sqlalchemy import MetaData
-from sqlalchemy.sql.schema import (
-    Constraint,
-    PrimaryKeyConstraint,
-    UniqueConstraint,
-)
+from sqlalchemy.sql.schema import Constraint, PrimaryKeyConstraint, UniqueConstraint
 
 
 class ConstraintMessageProvider(Protocol):
@@ -42,15 +38,15 @@ def build_constraint_index(
 def _extract_constraint_columns(
     constraint: Constraint,
 ) -> tuple[str, ...] | None:
-    if isinstance(constraint, UniqueConstraint):
-        cols = tuple(col.name for col in constraint.columns)
-        return cols or None
+    if not isinstance(constraint, (UniqueConstraint, PrimaryKeyConstraint)):
+        return None
 
-    if isinstance(constraint, PrimaryKeyConstraint):
-        cols = tuple(col.name for col in constraint.columns)
-        return cols or None
+    column_source = constraint.columns
+    if not column_source:
+        return None
 
-    return None
+    names = tuple(column.name for column in column_source)
+    return names or None
 
 
 @dataclass(frozen=True, slots=True)

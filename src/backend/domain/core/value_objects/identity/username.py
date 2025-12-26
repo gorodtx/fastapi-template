@@ -10,8 +10,6 @@ _MAX_USERNAME_LENGTH: Final[int] = 20
 
 def _validate_username(u: Username) -> None:
     val = u.value
-    if not isinstance(val, str):
-        raise TypeError("Username.value must be str")
     if not (_MIN_USERNAME_LENGTH <= len(val) <= _MAX_USERNAME_LENGTH):
         raise ValueError(
             f"Username must be {_MIN_USERNAME_LENGTH}-{_MAX_USERNAME_LENGTH} characters"
@@ -20,6 +18,6 @@ def _validate_username(u: Username) -> None:
         raise ValueError("Username contains invalid characters")
 
 
-@value_object(_validate_username)
+@value_object(validator=_validate_username)
 class Username(ValueObject):
     value: str
