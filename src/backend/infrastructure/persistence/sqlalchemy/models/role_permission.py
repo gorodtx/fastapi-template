@@ -1,76 +1,57 @@
 from __future__ import annotations
 
-import uuid
-from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy import Column, ForeignKey, String, Table
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
-from .base import mapper_registry, metadata
+from backend.infrastructure.persistence.sqlalchemy.models.base import metadata
+from backend.infrastructure.persistence.sqlalchemy.models.role import role_id_column
+from backend.infrastructure.persistence.sqlalchemy.models.users import user_id_column
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import InstrumentedAttribute
+role_permission_role_id_column: Column[UUID] = Column(
+    "role_id",
+    PG_UUID(as_uuid=True),
+    ForeignKey(role_id_column, ondelete="CASCADE"),
+    primary_key=True,
+    nullable=False,
+)
 
+role_permission_code_column: Column[str] = Column(
+    "permission_code",
+    String(64),
+    primary_key=True,
+    nullable=False,
+)
 
+# TODO: Seed from ROLE_PERMISSIONS once a project seeding pattern is defined.
 role_permissions_table = Table(
     "role_permissions",
     metadata,
-    Column(
-        "role_id",
-        PG_UUID(as_uuid=True),
-        ForeignKey("roles.id", ondelete="CASCADE"),
-        primary_key=True,
-        nullable=False,
-    ),
-    Column("code", String(64), primary_key=True, nullable=False),
+    role_permission_role_id_column,
+    role_permission_code_column,
+)
+
+user_roles_user_id_column: Column[UUID] = Column(
+    "user_id",
+    PG_UUID(as_uuid=True),
+    ForeignKey(user_id_column, ondelete="CASCADE"),
+    primary_key=True,
+    nullable=False,
+)
+
+user_roles_role_id_column: Column[UUID] = Column(
+    "role_id",
+    PG_UUID(as_uuid=True),
+    ForeignKey(role_id_column, ondelete="CASCADE"),
+    primary_key=True,
+    nullable=False,
 )
 
 
 user_roles_table = Table(
     "user_roles",
     metadata,
-    Column(
-        "user_id",
-        PG_UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        primary_key=True,
-        nullable=False,
-    ),
-    Column(
-        "role_id",
-        PG_UUID(as_uuid=True),
-        ForeignKey("roles.id", ondelete="CASCADE"),
-        primary_key=True,
-        nullable=False,
-    ),
+    user_roles_user_id_column,
+    user_roles_role_id_column,
 )
-
-
-class RolePermissionModel:
-    if TYPE_CHECKING:
-        role_id: InstrumentedAttribute[uuid.UUID]
-        code: InstrumentedAttribute[str]
-
-    def __init__(self, *, role_id: uuid.UUID, code: str) -> None:
-        self.role_id = role_id
-        self.code = code
-
-    def __repr__(self) -> str:
-        return f"RolePermissionModel(role_id={self.role_id!r}, code={self.code!r})"
-
-
-class UserRoleModel:
-    if TYPE_CHECKING:
-        user_id: InstrumentedAttribute[uuid.UUID]
-        role_id: InstrumentedAttribute[uuid.UUID]
-
-    def __init__(self, *, user_id: uuid.UUID, role_id: uuid.UUID) -> None:
-        self.user_id = user_id
-        self.role_id = role_id
-
-    def __repr__(self) -> str:
-        return f"UserRoleModel(user_id={self.user_id!r}, role_id={self.role_id!r})"
-
-
-mapper_registry.map_imperatively(RolePermissionModel, role_permissions_table)
-mapper_registry.map_imperatively(UserRoleModel, user_roles_table)

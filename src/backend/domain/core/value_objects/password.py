@@ -10,9 +10,6 @@ MIN_HASH_LENGTH: Final[int] = 20
 
 def _validate_password_hash(pwd: Password) -> None:
     val = pwd.value
-    if not isinstance(val, str):
-        raise TypeError("Password.value must be str")
-
     if not re.match(r"^\$[a-z0-9-]+\$", val):
         raise ValueError(
             "Invalid password hash format. Expected PHC string "
@@ -23,7 +20,7 @@ def _validate_password_hash(pwd: Password) -> None:
         raise ValueError("Password hash too short")
 
 
-@value_object(_validate_password_hash)
+@value_object(validator=_validate_password_hash)
 class Password(ValueObject):
     """Password Value Object storing ONLY hashed password (PHC string)."""
 

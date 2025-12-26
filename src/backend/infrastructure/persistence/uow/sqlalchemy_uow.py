@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Final, Self
+from typing import Final, Protocol, Self, cast
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,23 +24,32 @@ class _DbViolation:
 
 
 def _parse_unique_violation(err: IntegrityError) -> _DbViolation | None:
-    orig = getattr(err, "orig", None)
-    if not orig:
+    orig = cast(_IntegrityErrorOrigin | None, getattr(err, "orig", None))
+    if orig is None:
         return None
 
-    sqlstate = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+    sqlstate = orig.pgcode or orig.sqlstate
     if sqlstate != _UNIQUE_VIOLATION_SQLSTATE:
         return None
 
-    diag = getattr(orig, "diag", None)
-    constraint = (getattr(diag, "constraint_name", None) if diag is not None else None) or getattr(
-        orig, "constraint_name", None
-    )
+    diag = orig.diag
+    constraint = (diag.constraint_name if diag is not None else None) or orig.constraint_name
 
     if not constraint:
         return None
 
     return _DbViolation(sqlstate=sqlstate, constraint=constraint)
+
+
+class _ConstraintInfo(Protocol):
+    constraint_name: str | None
+
+
+class _IntegrityErrorOrigin(Protocol):
+    pgcode: str | None
+    sqlstate: str | None
+    constraint_name: str | None
+    diag: _ConstraintInfo | None
 
 
 class SQLAlchemyUnitOfWork:

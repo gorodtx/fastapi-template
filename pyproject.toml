@@ -1,10 +1,133 @@
 [project]
 name = "template"
+
 version = "0.1.0"
-description = "Add your description here"
+
+description = "FastAPI + SQLAlchemy + Postgres + Redis template"
+
 readme = "README.md"
+
 requires-python = ">=3.13"
-dependencies = []
+
+dependencies = [
+    "fastapi>=0.125,<1.0",
+    "uvicorn[standard]>=0.40,<1.0",
+
+    "pydantic-settings>=2.0,<3.0",
+
+    "sqlalchemy[mypy]>=2.0.45,<3.0",
+    "alembic>=1.13,<2.0",
+    "asyncpg>=0.29,<1.0",
+
+    "redis>=5.0,<6.0",
+
+    "argon2-cffi>=25.1.0,<26.0",
+]
+
+
+[dependency-groups]
+dev = [
+    # Testing
+    "pytest>=9,<10",
+    "pytest-asyncio>=1.3,<2",
+    "pytest-cov>=7,<8",
+    "httpx>=0.28,<1.0",
+
+    "ruff>=0.14,<1.0",
+    "mypy>=1.19,<2.0",
+    "pyright>=1.1.390",
+
+    "pre-commit>=4,<5",
+]
+
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+  "E", "W", "F", "I", "B", "C4", "UP", "ARG", "SIM", "PTH",
+  "PL", "RUF", "ASYNC", "S", "T20", "TID", "ANN", "PLR2004",
+]
+ignore = [
+  "E501",
+  "ANN401",
+  "PLR0913",
+  "S101",
+  "B008",
+  "TC001",
+  "TC002",
+  "TC003",
+]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**/*.py" = ["S101", "ARG", "PLR2004"]
+"conftest.py" = ["ARG001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["template"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.pylint]
+max-args = 8
+max-branches = 15
+max-returns = 8
+max-statements = 60
+
+
+[tool.pyright]
+include = ["src"]
+extraPaths = ["src"]
+exclude = [
+  "**/node_modules",
+  "**/__pycache__",
+  "**/.venv",
+  "**/.git",
+  "**/.idea",
+  "**/migrations",
+  "src/backend/presentation/**",
+]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+
+reportMissingImports = true
+reportUnusedCoroutine = "error"
+reportUnknownParameterType = "warning"
+reportGeneralTypeIssues = "error"
+
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src"]
+namespace_packages = true
+strict = true
+show_error_codes = true
+pretty = true
+warn_unused_ignores = true
+
+disallow_any_generics = true
+disallow_any_explicit = true
+
+no_implicit_optional = true
+warn_return_any = true
+
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+
+exclude = [
+  "src/backend/presentation/.*",
+]
 
 
 [tool.rope]
@@ -24,15 +147,3 @@ ignored_resources = [
     "node_modules",
     ".env.example"
 ]
-
-[tool.pyright]
-reportGeneralTypeIssues = "warning"
-
-
-[tool.mypy]
-files = ["backend"]
-namespace_packages = true
-
-
-split_imports = true
-pull_imports_to_top = true

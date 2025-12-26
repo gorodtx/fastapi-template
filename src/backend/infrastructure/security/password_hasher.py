@@ -27,22 +27,12 @@ class Argon2PasswordHasher:
         )
 
     async def hash(self, raw_password: str) -> str:
-        """Hash password using Argon2id.
-
-        Returns PHC string:
-        $argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA
-
-        Raises HashingError if hashing fails.
-        """
         try:
             return self._hasher.hash(raw_password)
         except HashingError as e:
             raise RuntimeError(f"Password hashing failed: {e}") from e
 
     async def verify(self, raw_password: str, hashed: str) -> bool:
-        """Verify password against hash.
-        Returns False on mismatch, raises on invalid hash format.
-        """
         try:
             self._hasher.verify(hashed, raw_password)
             return True
@@ -53,13 +43,19 @@ class Argon2PasswordHasher:
 
     async def needs_rehash(self, hashed: str) -> bool:
         try:
-            match = re.match(r"\$(argon2(?:id|i|d))\$v=(\d+)\$m=(\d+),t=(\d+),p=(\d+)\$", hashed)
-            if not match:
+            pattern: re.Pattern[str] = re.compile(
+                r"\$(argon2(?:id|i|d))\$v=(\d+)\$m=(\d+),t=(\d+),p=(\d+)\$"
+            )
+            match = pattern.match(hashed)
+            if match is None:
                 return True
 
-            algo, version, memory, time, parallelism = match.groups()
-            memory_cost = int(memory)
-            time_cost = int(time)
+            algo: str = match.group(1)
+            memory_raw: str = match.group(3)
+            time_cost_raw: str = match.group(4)
+
+            memory_cost = int(memory_raw)
+            time_cost = int(time_cost_raw)
 
             if algo != "argon2id":
                 return True

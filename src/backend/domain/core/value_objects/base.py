@@ -2,42 +2,61 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, cast, dataclass_transform
+from typing import dataclass_transform, overload
 
 
-class ValueObject: ...
+class ValueObject:
+    def __post_init__(self) -> None:
+        return None
 
 
 @dataclass_transform(frozen_default=True, eq_default=True)
-def value_object[V: ValueObject](
-    *validate: Callable[[V], None],
-) -> Callable[[type[V]], type[V]]:
-    """A decorator for dataclass-based object values with optional validators."""
+@overload
+def value_object[T: ValueObject](cls: type[T]) -> type[T]: ...
 
-    def decorator(cls: type[V]) -> type[V]:
-        namespace = dict(cls.__dict__)
-        namespace.pop("__dict__", None)
-        namespace.pop("__weakref__", None)
 
-        if validate:
+@overload
+def value_object[T: ValueObject](
+    *,
+    validator: Callable[[T], None],
+) -> Callable[[type[T]], type[T]]: ...
 
-            def __post_init__(self: Any) -> None:
-                instance = cast(V, self)
-                for validator_fn in validate:
-                    validator_fn(instance)
 
-            namespace["__post_init__"] = __post_init__
+@dataclass_transform(frozen_default=True, eq_default=True)
+def value_object[T: ValueObject](
+    cls: type[T] | None = None,
+    *,
+    validator: Callable[[T], None] | None = None,
+) -> type[T] | Callable[[type[T]], type[T]]:
+    """Decorator for dataclass-based value objects with optional validator."""
 
-        new_cls = type(cls.__name__, cls.__bases__, namespace)
-
-        return cast(
-            type[V],
-            dataclass(
+    def decorate(inner_cls: type[T]) -> type[T]:
+        if validator is None:
+            return dataclass(
                 frozen=True,
                 eq=True,
                 slots=True,
                 repr=False,
-            )(new_cls),
-        )
+            )(inner_cls)
 
-    return decorator
+        original_post_init: Callable[[T], None] = inner_cls.__post_init__
+        validator_fn: Callable[[T], None] = validator
+
+        def __post_init__(self: T) -> None:
+            original_post_init(self)
+            validator_fn(self)
+
+        post_init_attr = "__post_init__"
+        setattr(inner_cls, post_init_attr, __post_init__)
+
+        return dataclass(
+            frozen=True,
+            eq=True,
+            slots=True,
+            repr=False,
+        )(inner_cls)
+
+    if cls is not None:
+        return decorate(cls)
+
+    return decorate
