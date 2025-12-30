@@ -47,6 +47,11 @@ class UsersRepo(BaseRepository[User]):
         await self._sync_user_roles(user=user)
         return user
 
+    async def replace_roles(self, user: User) -> User:
+        await self._flush()
+        await self._sync_user_roles(user=user)
+        return user
+
     async def delete(self, *, user_id: TypeID) -> User:
         user = await self._get_or_raise(user_id)
 
@@ -60,9 +65,16 @@ class UsersRepo(BaseRepository[User]):
         await self._hydrate_user_roles(user)
         return user
 
+    async def list_by_role(self, *, role: SystemRole) -> list[User]:
+        user_ids = await self._list_user_ids_by_role(role=role)
+        users: list[User] = []
+        for user_id in user_ids:
+            users.append(await self.get_one(user_id=user_id))
+        return users
+
     async def _hydrate_user_roles(self, user: User) -> None:
         roles = await self._list_user_roles(user_id=user.id)
-        user.hydrate_roles_for_persistence(roles)
+        user.replace_roles(roles)
 
     async def _list_user_roles(self, *, user_id: TypeID) -> set[SystemRole]:
         stmt = (
@@ -72,6 +84,13 @@ class UsersRepo(BaseRepository[User]):
         )
         result = await self._session.execute(stmt)
         return set(result.scalars().all())
+
+    async def _list_user_ids_by_role(self, *, role: SystemRole) -> list[TypeID]:
+        role_ids = await self._get_role_ids({role})
+        role_id = role_ids[role]
+        stmt = select(user_roles_user_id_column).where(user_roles_role_id_column == role_id)
+        result = await self._session.execute(stmt)
+        return [row[0] for row in result.all()]
 
     async def _sync_user_roles(self, *, user: User) -> None:
         desired_roles = set(user.roles)

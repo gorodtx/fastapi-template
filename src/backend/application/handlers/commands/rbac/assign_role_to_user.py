@@ -6,6 +6,8 @@ from backend.application.common.exceptions.application import (
     ResourceNotFoundError,
     RoleHierarchyViolationError,
 )
+from backend.application.common.exceptions.db import ConstraintViolationError
+from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
 from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
 from backend.application.common.services.authorization import AuthorizationService
 from backend.application.handlers.base import CommandHandler
@@ -16,7 +18,13 @@ from backend.domain.core.entities.base import TypeID
 from backend.domain.core.exceptions.rbac import (
     RoleHierarchyViolationError as DomainRoleHierarchyViolationError,
 )
-from backend.domain.core.services.access_control import ensure_can_assign_role
+from backend.domain.core.exceptions.rbac import (
+    RoleSelfModificationError as DomainRoleSelfModificationError,
+)
+from backend.domain.core.services.access_control import (
+    ensure_can_assign_role,
+    ensure_not_self_role_change,
+)
 
 
 class AssignRoleToUserCommand(AssignRoleToUserDTO):
@@ -49,16 +57,25 @@ class AssignRoleToUserHandler(CommandHandler[AssignRoleToUserCommand, RoleAssign
                     target_role=role,
                 ) from exc
             try:
-                await self.uow.users.get_one(user_id=cmd.user_id)
+                user = await self.uow.users.get_one(user_id=cmd.user_id)
             except LookupError as exc:
                 raise ResourceNotFoundError("User", str(cmd.user_id)) from exc
-            roles = await self.uow.rbac.list_user_roles(user_id=cmd.user_id)
-            already_assigned = role in roles
             try:
-                if not already_assigned:
-                    await self.uow.rbac.assign_role_to_user(user_id=cmd.user_id, role=role)
+                ensure_not_self_role_change(
+                    actor_id=cmd.actor_id,
+                    target_user_id=user.id,
+                    action=RoleAction.ASSIGN,
+                )
+            except DomainRoleSelfModificationError as exc:
+                raise ConflictError("User cannot assign roles to self") from exc
+            try:
+                user.assign_role(role)
+                await self.uow.users.replace_roles(user)
             except LookupError as exc:
                 raise ConflictError(f"Role {role.value!r} is not provisioned") from exc
-            await self.uow.commit()
+            try:
+                await self.uow.commit()
+            except ConstraintViolationError as exc:
+                raise map_infra_error_to_application(exc) from exc
 
         return RoleAssignmentResultDTO(user_id=cmd.user_id, role=role.value)

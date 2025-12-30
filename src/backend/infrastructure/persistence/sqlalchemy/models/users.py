@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 from sqlalchemy import Boolean, Column, Table, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from uuid_utils.compat import UUID
 
 from backend.domain.core.entities.user import User
 from backend.domain.core.value_objects.identity.email import Email

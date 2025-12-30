@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import field
-
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.base import Entity, TypeID, entity
 from backend.domain.core.exceptions.base import DomainError
@@ -14,12 +12,12 @@ from backend.domain.core.value_objects.password import Password
 
 @entity
 class User(Entity):
-    _email: Email = field(init=False, repr=False)
-    _login: Login = field(init=False, repr=False)
-    _username: Username = field(init=False, repr=False)
-    _password: Password = field(init=False, repr=False)
-    _is_active: bool = field(init=False, repr=False)
-    _roles: set[SystemRole] = field(init=False, repr=False)
+    _email: Email
+    _login: Login
+    _username: Username
+    _password: Password
+    _is_active: bool
+    _roles: set[SystemRole]
 
     def __init__(
         self,
@@ -129,5 +127,13 @@ class User(Entity):
     def has_role(self, role: SystemRole) -> bool:
         return role in self._roles
 
-    def hydrate_roles_for_persistence(self, roles: set[SystemRole]) -> None:
-        self._roles = set(roles)
+    def replace_roles(self, roles: set[SystemRole]) -> None:
+        desired_roles = set(roles)
+        current_roles = set(self._roles)
+        roles_to_remove = current_roles - desired_roles
+        roles_to_add = desired_roles - current_roles
+
+        for role in roles_to_remove:
+            self.revoke_role(role)
+        for role in roles_to_add:
+            self.assign_role(role)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from backend.application.common.dtos.users import DeleteUserDTO, UserResponseDTO
+from backend.application.common.exceptions.db import ConstraintViolationError
+from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
 from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
 from backend.application.common.services.authorization import AuthorizationService
 from backend.application.handlers.base import CommandHandler
@@ -28,6 +30,9 @@ class DeleteUserHandler(CommandHandler[DeleteUserCommand, UserResponseDTO]):
                 rbac=self.uow.rbac,
             )
             result = await self.uow.users.delete(user_id=cmd.user_id)
-            await self.uow.commit()
+            try:
+                await self.uow.commit()
+            except ConstraintViolationError as exc:
+                raise map_infra_error_to_application(exc) from exc
 
         return UserMapper.to_dto(result)

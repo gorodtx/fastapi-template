@@ -1,1 +1,0 @@
-Attempt to develop a **universal** fastapi template, trying to stick to a **clean architecture**.
