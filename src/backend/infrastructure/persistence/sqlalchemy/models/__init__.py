@@ -5,6 +5,7 @@ from backend.infrastructure.persistence.sqlalchemy.models.base import (
     mapper_registry,
     metadata,
 )
+from backend.infrastructure.persistence.sqlalchemy.models.permission import permissions_table
 from backend.infrastructure.persistence.sqlalchemy.models.role import roles_table
 from backend.infrastructure.persistence.sqlalchemy.models.role_permission import (
     role_permissions_table,
@@ -16,6 +17,7 @@ __all__ = [
     "NAMING_CONVENTION",
     "mapper_registry",
     "metadata",
+    "permissions_table",
     "role_permissions_table",
     "roles_table",
     "user_roles_table",

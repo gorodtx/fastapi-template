@@ -4,6 +4,8 @@ import uuid_utils.compat as uuid
 
 from backend.application.common.dtos.users import UserCreateDTO, UserResponseDTO
 from backend.application.common.exceptions.application import ConflictError
+from backend.application.common.exceptions.db import ConstraintViolationError
+from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
 from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
 from backend.application.common.services.authorization import AuthorizationService
 from backend.application.common.tools.password_validator import RawPasswordValidator
@@ -11,6 +13,7 @@ from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.mappers import UserMapper
 from backend.application.handlers.transform import handler
 from backend.domain.core.constants.permission_codes import USERS_CREATE
+from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.base import TypeID
 from backend.domain.core.entities.user import User
 from backend.domain.core.exceptions.base import DomainError, DomainTypeError
@@ -62,7 +65,11 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
                 )
             except (ValueError, DomainTypeError, DomainError) as e:
                 raise ConflictError(f"Invalid input: {e}") from e
+            user.assign_role(SystemRole.USER)
             result = await self.uow.users.create(user)
-            await self.uow.commit()
+            try:
+                await self.uow.commit()
+            except ConstraintViolationError as exc:
+                raise map_infra_error_to_application(exc) from exc
 
         return UserMapper.to_dto(result)

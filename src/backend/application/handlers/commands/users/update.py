@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from backend.application.common.dtos.users import UserResponseDTO, UserUpdateDTO
 from backend.application.common.exceptions.application import ConflictError
+from backend.application.common.exceptions.db import ConstraintViolationError
+from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
 from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
 from backend.application.common.services.authorization import AuthorizationService
 from backend.application.common.tools.password_validator import RawPasswordValidator
@@ -66,6 +68,9 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
                 email=email_vo,
                 password=password_vo,
             )
-            await self.uow.commit()
+            try:
+                await self.uow.commit()
+            except ConstraintViolationError as exc:
+                raise map_infra_error_to_application(exc) from exc
 
         return UserMapper.to_dto(result)

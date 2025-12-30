@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 from sqlalchemy import Column, Enum, String, Table, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from uuid_utils.compat import UUID
 
 from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.sqlalchemy.models.base import metadata

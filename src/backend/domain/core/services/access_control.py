@@ -4,7 +4,12 @@ from collections.abc import Iterable, Set
 
 from backend.domain.core.constants.rbac import RoleAction, SystemRole
 from backend.domain.core.constants.rbac_registry import ROLE_PERMISSIONS
-from backend.domain.core.exceptions.rbac import RoleHierarchyViolationError
+from backend.domain.core.entities.base import TypeID
+from backend.domain.core.exceptions.rbac import (
+    LastSuperAdminRemovalError,
+    RoleHierarchyViolationError,
+    RoleSelfModificationError,
+)
 from backend.domain.core.value_objects.access.permission_code import PermissionCode
 
 _EMPTY_PERMISSIONS: frozenset[PermissionCode] = frozenset[PermissionCode]()
@@ -31,6 +36,25 @@ def ensure_can_revoke_role(actor_roles: Set[SystemRole], target_role: SystemRole
     if _can_manage_role(actor_roles, target_role):
         return
     raise RoleHierarchyViolationError(action=RoleAction.REVOKE, target_role=target_role)
+
+
+def ensure_not_self_role_change(
+    *,
+    actor_id: TypeID,
+    target_user_id: TypeID,
+    action: RoleAction,
+) -> None:
+    if actor_id == target_user_id:
+        raise RoleSelfModificationError(action=action, user_id=actor_id)
+
+
+def ensure_not_last_super_admin(
+    *,
+    target_user_id: TypeID,
+    remaining_super_admins: int,
+) -> None:
+    if remaining_super_admins <= 0:
+        raise LastSuperAdminRemovalError(user_id=target_user_id)
 
 
 def _can_manage_role(actor_roles: Set[SystemRole], target_role: SystemRole) -> bool:

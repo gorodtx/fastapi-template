@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 from sqlalchemy import Column, ForeignKey, String, Table
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from uuid_utils.compat import UUID
 
 from backend.infrastructure.persistence.sqlalchemy.models.base import metadata
+from backend.infrastructure.persistence.sqlalchemy.models.permission import permission_code_column
 from backend.infrastructure.persistence.sqlalchemy.models.role import role_id_column
 from backend.infrastructure.persistence.sqlalchemy.models.users import user_id_column
 
@@ -20,6 +20,7 @@ role_permission_role_id_column: Column[UUID] = Column(
 role_permission_code_column: Column[str] = Column(
     "permission_code",
     String(64),
+    ForeignKey(permission_code_column, ondelete="CASCADE"),
     primary_key=True,
     nullable=False,
 )

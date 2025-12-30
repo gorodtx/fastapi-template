@@ -6,6 +6,8 @@ from backend.application.common.exceptions.application import (
     ResourceNotFoundError,
     RoleHierarchyViolationError,
 )
+from backend.application.common.exceptions.db import ConstraintViolationError
+from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
 from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
 from backend.application.common.services.authorization import AuthorizationService
 from backend.application.handlers.base import CommandHandler
@@ -14,9 +16,22 @@ from backend.domain.core.constants.permission_codes import RBAC_REVOKE_ROLE
 from backend.domain.core.constants.rbac import RoleAction, SystemRole
 from backend.domain.core.entities.base import TypeID
 from backend.domain.core.exceptions.rbac import (
+    LastSuperAdminRemovalError as DomainLastSuperAdminRemovalError,
+)
+from backend.domain.core.exceptions.rbac import (
     RoleHierarchyViolationError as DomainRoleHierarchyViolationError,
 )
-from backend.domain.core.services.access_control import ensure_can_revoke_role
+from backend.domain.core.exceptions.rbac import (
+    RoleNotAssignedError as DomainRoleNotAssignedError,
+)
+from backend.domain.core.exceptions.rbac import (
+    RoleSelfModificationError as DomainRoleSelfModificationError,
+)
+from backend.domain.core.services.access_control import (
+    ensure_can_revoke_role,
+    ensure_not_last_super_admin,
+    ensure_not_self_role_change,
+)
 
 
 class RevokeRoleFromUserCommand(RevokeRoleFromUserDTO):
@@ -49,16 +64,40 @@ class RevokeRoleFromUserHandler(CommandHandler[RevokeRoleFromUserCommand, RoleAs
                     target_role=role,
                 ) from exc
             try:
-                await self.uow.users.get_one(user_id=cmd.user_id)
+                user = await self.uow.users.get_one(user_id=cmd.user_id)
             except LookupError as exc:
                 raise ResourceNotFoundError("User", str(cmd.user_id)) from exc
-            roles = await self.uow.rbac.list_user_roles(user_id=cmd.user_id)
-            if role not in roles:
-                raise ConflictError(f"Role {role.value!r} is not assigned to user {cmd.user_id!r}")
             try:
-                await self.uow.rbac.revoke_role_from_user(user_id=cmd.user_id, role=role)
+                ensure_not_self_role_change(
+                    actor_id=cmd.actor_id,
+                    target_user_id=user.id,
+                    action=RoleAction.REVOKE,
+                )
+            except DomainRoleSelfModificationError as exc:
+                raise ConflictError("User cannot revoke roles from self") from exc
+            try:
+                if role == SystemRole.SUPER_ADMIN and user.has_role(role):
+                    super_admin_count = await self.uow.rbac.count_users_with_role(
+                        role=SystemRole.SUPER_ADMIN
+                    )
+                    ensure_not_last_super_admin(
+                        target_user_id=user.id,
+                        remaining_super_admins=super_admin_count - 1,
+                    )
+            except DomainLastSuperAdminRemovalError as exc:
+                raise ConflictError("Cannot revoke last super_admin role") from exc
+            try:
+                user.revoke_role(role)
+                await self.uow.users.replace_roles(user)
+            except DomainRoleNotAssignedError as exc:
+                raise ConflictError(
+                    f"Role {role.value!r} is not assigned to user {cmd.user_id!r}"
+                ) from exc
             except LookupError as exc:
                 raise ConflictError(f"Role {role.value!r} is not provisioned") from exc
-            await self.uow.commit()
+            try:
+                await self.uow.commit()
+            except ConstraintViolationError as exc:
+                raise map_infra_error_to_application(exc) from exc
 
         return RoleAssignmentResultDTO(user_id=cmd.user_id, role=role.value)
