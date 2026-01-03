@@ -29,10 +29,13 @@ class DeleteUserHandler(CommandHandler[DeleteUserCommand, UserResponseDTO]):
                 permission=USERS_DELETE,
                 rbac=self.uow.rbac,
             )
-            result = await self.uow.users.delete(user_id=cmd.user_id)
+            user = await self.uow.users.get(cmd.user_id)
+            if user is None:
+                raise LookupError(f"User {cmd.user_id!r} not found")
+            await self.uow.users.delete(user)
             try:
                 await self.uow.commit()
             except ConstraintViolationError as exc:
                 raise map_infra_error_to_application(exc) from exc
 
-        return UserMapper.to_dto(result)
+        return UserMapper.to_dto(user)

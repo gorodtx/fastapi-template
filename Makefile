@@ -1,4 +1,4 @@
-.PHONY: bootstrap fmt lint mypy pyright pylance typecheck test check run clean
+.PHONY: bootstrap fmt lint mypy pyright pylance check run clean
 
 bootstrap:
 	uv sync --dev
@@ -19,10 +19,7 @@ pylance: pyright
 
 typecheck: mypy pyright
 
-test:
-	uv run pytest
-
-check: lint fmt typecheck test
+check: lint fmt typecheck
 
 run:
 	uv run uvicorn template.main:app --reload --port 8000

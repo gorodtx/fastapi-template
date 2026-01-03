@@ -57,9 +57,11 @@ class AssignRoleToUserHandler(CommandHandler[AssignRoleToUserCommand, RoleAssign
                     target_role=role,
                 ) from exc
             try:
-                user = await self.uow.users.get_one(user_id=cmd.user_id)
+                user = await self.uow.users.get(cmd.user_id)
             except LookupError as exc:
                 raise ResourceNotFoundError("User", str(cmd.user_id)) from exc
+            if user is None:
+                raise ResourceNotFoundError("User", str(cmd.user_id))
             try:
                 ensure_not_self_role_change(
                     actor_id=cmd.actor_id,
@@ -69,8 +71,7 @@ class AssignRoleToUserHandler(CommandHandler[AssignRoleToUserCommand, RoleAssign
             except DomainRoleSelfModificationError as exc:
                 raise ConflictError("User cannot assign roles to self") from exc
             try:
-                user.assign_role(role)
-                await self.uow.users.replace_roles(user)
+                await self.uow.users.assign_role_to_user(user_id=user.id, role=role)
             except LookupError as exc:
                 raise ConflictError(f"Role {role.value!r} is not provisioned") from exc
             try:

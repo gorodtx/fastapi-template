@@ -63,10 +63,11 @@ class RevokeRoleFromUserHandler(CommandHandler[RevokeRoleFromUserCommand, RoleAs
                     action=RoleAction.REVOKE,
                     target_role=role,
                 ) from exc
-            try:
-                user = await self.uow.users.get_one(user_id=cmd.user_id)
-            except LookupError as exc:
-                raise ResourceNotFoundError("User", str(cmd.user_id)) from exc
+            user = await self.uow.users.get(cmd.user_id)
+            if user is None:
+                raise ResourceNotFoundError("User", str(cmd.user_id))
+            roles = await self.uow.users.get_user_roles(user_id=user.id)
+            user.replace_roles(roles)
             try:
                 ensure_not_self_role_change(
                     actor_id=cmd.actor_id,
@@ -88,7 +89,7 @@ class RevokeRoleFromUserHandler(CommandHandler[RevokeRoleFromUserCommand, RoleAs
                 raise ConflictError("Cannot revoke last super_admin role") from exc
             try:
                 user.revoke_role(role)
-                await self.uow.users.replace_roles(user)
+                await self.uow.users.revoke_role_from_user(user_id=user.id, role=role)
             except DomainRoleNotAssignedError as exc:
                 raise ConflictError(
                     f"Role {role.value!r} is not assigned to user {cmd.user_id!r}"

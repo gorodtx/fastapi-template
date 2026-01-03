@@ -28,9 +28,8 @@ class GetUserHandler(QueryHandler[GetUserQuery, UserResponseDTO]):
                 permission=USERS_READ,
                 rbac=self.uow.rbac,
             )
-            try:
-                entity = await self.uow.users.get_one(user_id=query.user_id)
-            except LookupError as exc:
-                raise ResourceNotFoundError("User", str(query.user_id)) from exc
+            entity = await self.uow.users.get(query.user_id)
+            if entity is None:
+                raise ResourceNotFoundError("User", str(query.user_id))
 
         return UserMapper.to_dto(entity)

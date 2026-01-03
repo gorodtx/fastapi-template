@@ -106,4 +106,16 @@ class SQLAlchemyUnitOfWork:
         await self._session.rollback()
 
     async def flush(self) -> None:
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError as err:
+            violation = _parse_unique_violation(err)
+            if violation is not None:
+                field, message = self._msg_provider.resolve(violation.constraint)
+                raise ConstraintViolationError(
+                    constraint=violation.constraint,
+                    message=message,
+                    field=field,
+                ) from err
+
+            raise

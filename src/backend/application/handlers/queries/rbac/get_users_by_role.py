@@ -10,6 +10,7 @@ from backend.application.handlers.transform import handler
 from backend.domain.core.constants.permission_codes import RBAC_READ_ROLES
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.base import TypeID
+from backend.domain.core.entities.user import User
 
 
 class GetUsersByRoleQuery(GetUsersByRoleDTO):
@@ -34,8 +35,14 @@ class GetUsersByRoleHandler(QueryHandler[GetUsersByRoleQuery, UsersByRoleRespons
             except ValueError as exc:
                 raise ConflictError(f"Unknown role {query.role!r}") from exc
             try:
-                users = await self.uow.users.list_by_role(role=role)
+                user_ids = await self.uow.users.list_user_ids_by_role(role=role)
             except LookupError as exc:
                 raise ConflictError(f"Role {role.value!r} is not provisioned") from exc
+            users: list[User] = []
+            for user_id in user_ids:
+                user = await self.uow.users.get(user_id)
+                if user is None:
+                    raise LookupError(f"User {user_id!r} not found")
+                users.append(user)
 
         return UsersByRoleResponseDTO(role=role.value, users=UserMapper.to_many_dto(users))
