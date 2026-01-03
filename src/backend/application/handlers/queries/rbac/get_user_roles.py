@@ -28,11 +28,10 @@ class GetUserRolesHandler(QueryHandler[GetUserRolesQuery, UserRolesResponseDTO])
                 permission=RBAC_READ_ROLES,
                 rbac=self.uow.rbac,
             )
-            try:
-                await self.uow.users.get_one(user_id=query.user_id)
-            except LookupError as exc:
-                raise ResourceNotFoundError("User", str(query.user_id)) from exc
-            roles = await self.uow.rbac.list_user_roles(user_id=query.user_id)
+            user = await self.uow.users.get(query.user_id)
+            if user is None:
+                raise ResourceNotFoundError("User", str(query.user_id))
+            roles = await self.uow.users.get_user_roles(user_id=query.user_id)
 
         permissions = permissions_for_roles(roles)
         return UserRolesResponseDTO(

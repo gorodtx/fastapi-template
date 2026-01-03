@@ -66,10 +66,15 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
             except (ValueError, DomainTypeError, DomainError) as e:
                 raise ConflictError(f"Invalid input: {e}") from e
             user.assign_role(SystemRole.USER)
-            result = await self.uow.users.create(user)
+            await self.uow.users.add(user)
             try:
+                await self.uow.flush()
+                await self.uow.users.assign_role_to_user(
+                    user_id=user.id,
+                    role=SystemRole.USER,
+                )
                 await self.uow.commit()
             except ConstraintViolationError as exc:
                 raise map_infra_error_to_application(exc) from exc
 
-        return UserMapper.to_dto(result)
+        return UserMapper.to_dto(user)

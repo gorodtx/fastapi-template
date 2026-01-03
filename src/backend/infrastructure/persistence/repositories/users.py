@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.base import TypeID
 from backend.domain.core.entities.user import User
-from backend.domain.core.value_objects.identity.email import Email
-from backend.domain.core.value_objects.password import Password
 from backend.infrastructure.persistence.repositories.base import BaseRepository
 from backend.infrastructure.persistence.sqlalchemy.models.role import (
     role_code_column,
@@ -20,63 +20,31 @@ from backend.infrastructure.persistence.sqlalchemy.models.role_permission import
 
 
 class UsersRepo(BaseRepository[User]):
-    _model_class = User
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, entity=User)
 
-    async def create(self, user: User) -> User:
-        self._session.add(user)
-        await self._flush()
-        await self._sync_user_roles(user=user)
-        return user
+    async def assign_role_to_user(self, *, user_id: TypeID, role: SystemRole) -> None:
+        role_ids = await self._get_role_ids({role})
+        role_id = role_ids[role]
+        stmt = (
+            pg_insert(user_roles_table)
+            .values({"user_id": user_id, "role_id": role_id})
+            .on_conflict_do_nothing(
+                index_elements=[user_roles_user_id_column, user_roles_role_id_column]
+            )
+        )
+        await self._session.execute(stmt)
 
-    async def update(
-        self,
-        *,
-        user_id: TypeID,
-        email: Email | None,
-        password: Password | None,
-    ) -> User:
-        user = await self._get_or_raise(user_id)
-        await self._hydrate_user_roles(user)
+    async def revoke_role_from_user(self, *, user_id: TypeID, role: SystemRole) -> None:
+        role_ids = await self._get_role_ids({role})
+        role_id = role_ids[role]
+        stmt = delete(user_roles_table).where(
+            user_roles_user_id_column == user_id,
+            user_roles_role_id_column == role_id,
+        )
+        await self._session.execute(stmt)
 
-        if email is not None:
-            user.change_email(email)
-        if password is not None:
-            user.change_password(password)
-
-        await self._flush()
-        await self._sync_user_roles(user=user)
-        return user
-
-    async def replace_roles(self, user: User) -> User:
-        await self._flush()
-        await self._sync_user_roles(user=user)
-        return user
-
-    async def delete(self, *, user_id: TypeID) -> User:
-        user = await self._get_or_raise(user_id)
-
-        await self._session.delete(user)
-        await self._flush()
-
-        return user
-
-    async def get_one(self, *, user_id: TypeID) -> User:
-        user = await self._get_or_raise(user_id)
-        await self._hydrate_user_roles(user)
-        return user
-
-    async def list_by_role(self, *, role: SystemRole) -> list[User]:
-        user_ids = await self._list_user_ids_by_role(role=role)
-        users: list[User] = []
-        for user_id in user_ids:
-            users.append(await self.get_one(user_id=user_id))
-        return users
-
-    async def _hydrate_user_roles(self, user: User) -> None:
-        roles = await self._list_user_roles(user_id=user.id)
-        user.replace_roles(roles)
-
-    async def _list_user_roles(self, *, user_id: TypeID) -> set[SystemRole]:
+    async def get_user_roles(self, *, user_id: TypeID) -> set[SystemRole]:
         stmt = (
             select(role_code_column)
             .join(user_roles_table, role_id_column == user_roles_role_id_column)
@@ -85,36 +53,12 @@ class UsersRepo(BaseRepository[User]):
         result = await self._session.execute(stmt)
         return set(result.scalars().all())
 
-    async def _list_user_ids_by_role(self, *, role: SystemRole) -> list[TypeID]:
+    async def list_user_ids_by_role(self, *, role: SystemRole) -> list[TypeID]:
         role_ids = await self._get_role_ids({role})
         role_id = role_ids[role]
         stmt = select(user_roles_user_id_column).where(user_roles_role_id_column == role_id)
         result = await self._session.execute(stmt)
         return [row[0] for row in result.all()]
-
-    async def _sync_user_roles(self, *, user: User) -> None:
-        desired_roles = set(user.roles)
-        current_roles = await self._list_user_roles(user_id=user.id)
-        if desired_roles == current_roles:
-            return
-
-        roles_to_add = desired_roles - current_roles
-        roles_to_remove = current_roles - desired_roles
-        if not roles_to_add and not roles_to_remove:
-            return
-
-        role_ids = await self._get_role_ids(roles_to_add | roles_to_remove)
-        if roles_to_add:
-            rows = [{"user_id": user.id, "role_id": role_ids[role]} for role in roles_to_add]
-            await self._session.execute(insert(user_roles_table).values(rows))
-        if roles_to_remove:
-            role_ids_to_remove = [role_ids[role] for role in roles_to_remove]
-            delete_stmt = delete(user_roles_table).where(
-                user_roles_user_id_column == user.id,
-                user_roles_role_id_column.in_(role_ids_to_remove),
-            )
-            await self._session.execute(delete_stmt)
-        await self._flush()
 
     async def _get_role_ids(self, roles: set[SystemRole]) -> dict[SystemRole, TypeID]:
         if not roles:

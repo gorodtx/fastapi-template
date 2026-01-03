@@ -63,14 +63,16 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
                     password_vo = Password(password_hash)
                 except (ValueError, DomainTypeError) as e:
                     raise ConflictError(f"Invalid password hash: {e}") from e
-            result = await self.uow.users.update(
-                user_id=cmd.user_id,
-                email=email_vo,
-                password=password_vo,
-            )
+            user = await self.uow.users.get(cmd.user_id)
+            if user is None:
+                raise LookupError(f"User {cmd.user_id!r} not found")
+            if email_vo is not None:
+                user.change_email(email_vo)
+            if password_vo is not None:
+                user.change_password(password_vo)
             try:
                 await self.uow.commit()
             except ConstraintViolationError as exc:
                 raise map_infra_error_to_application(exc) from exc
 
-        return UserMapper.to_dto(result)
+        return UserMapper.to_dto(user)
