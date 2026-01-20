@@ -1,35 +1,25 @@
 from __future__ import annotations
 
 from backend.application.common.dtos.users import GetUserDTO, UserResponseDTO
-from backend.application.common.exceptions.application import ResourceNotFoundError
-from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
-from backend.application.common.services.authorization import AuthorizationService
+from backend.application.common.exceptions.application import AppError
+from backend.application.common.exceptions.error_mappers.storage import map_storage_error_to_app
+from backend.application.common.interfaces.infra.persistence.gateway import PersistenceGateway
+from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import QueryHandler
-from backend.application.handlers.mappers import UserMapper
+from backend.application.handlers.result import Result
 from backend.application.handlers.transform import handler
-from backend.domain.core.constants.permission_codes import USERS_READ
-from backend.domain.core.entities.base import TypeID
 
 
-class GetUserQuery(GetUserDTO):
-    actor_id: TypeID
-    user_id: TypeID
+class GetUserQuery(GetUserDTO): ...
 
 
 @handler(mode="read")
 class GetUserHandler(QueryHandler[GetUserQuery, UserResponseDTO]):
-    uow: UnitOfWorkPort
-    authorization_service: AuthorizationService
+    gateway: PersistenceGateway
 
-    async def _execute(self, query: GetUserQuery, /) -> UserResponseDTO:
-        async with self.uow:
-            await self.authorization_service.require_permission(
-                user_id=query.actor_id,
-                permission=USERS_READ,
-                rbac=self.uow.rbac,
-            )
-            entity = await self.uow.users.get(query.user_id)
-            if entity is None:
-                raise ResourceNotFoundError("User", str(query.user_id))
-
-        return UserMapper.to_dto(entity)
+    async def __call__(self, query: GetUserQuery, /) -> Result[UserResponseDTO, AppError]:
+        return (
+            (await self.gateway.users.get_by_id(query.user_id))
+            .map_err(map_storage_error_to_app)
+            .map(present_user_response)
+        )

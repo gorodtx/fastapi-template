@@ -1,32 +1,38 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Final
 
 MIN_PASSWORD_LENGTH: Final[int] = 8
-MAX_PASSWORD_LENGTH: Final[int] = 128
+MAX_PASSWORD_LENGTH: Final[int] = 64
+
+
+def normalize_password(raw_password: str) -> str:
+    return unicodedata.normalize("NFKC", raw_password)
 
 
 class RawPasswordValidator:
-    @staticmethod
-    def validate(raw_password: str) -> None:
-        if len(raw_password) < MIN_PASSWORD_LENGTH:
-            raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+    _UPPER_RE: Final[re.Pattern[str]] = re.compile(r"[A-Z]")
+    _LOWER_RE: Final[re.Pattern[str]] = re.compile(r"[a-z]")
+    _DIGIT_RE: Final[re.Pattern[str]] = re.compile(r"\d")
+    _SPECIAL_RE: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9]")
 
-        if len(raw_password) > MAX_PASSWORD_LENGTH:
+    @classmethod
+    def validate(cls, raw_password: str) -> str:
+        normalized = normalize_password(raw_password)
+        if len(normalized) < MIN_PASSWORD_LENGTH:
+            raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+        if len(normalized) > MAX_PASSWORD_LENGTH:
             raise ValueError(f"Password too long (max {MAX_PASSWORD_LENGTH} characters)")
 
-        if not re.search(r"[A-Z]", raw_password):
-            raise ValueError("Password must include at least one uppercase letter")
+        if cls._UPPER_RE.search(normalized) is None:
+            raise ValueError("Password must contain at least one uppercase letter")
+        if cls._LOWER_RE.search(normalized) is None:
+            raise ValueError("Password must contain at least one lowercase letter")
+        if cls._DIGIT_RE.search(normalized) is None:
+            raise ValueError("Password must contain at least one digit")
+        if cls._SPECIAL_RE.search(normalized) is None:
+            raise ValueError("Password must contain at least one special character")
 
-        if not re.search(r"[a-z]", raw_password):
-            raise ValueError("Password must include at least one lowercase letter")
-
-        if not re.search(r"\d", raw_password):
-            raise ValueError("Password must include at least one digit")
-
-        if not re.search(r"[^A-Za-z0-9]", raw_password):
-            raise ValueError("Password must include at least one special character")
-
-        if re.search(r"(.)\1{2,}", raw_password):
-            raise ValueError("Password contains too many repeated characters")
+        return normalized

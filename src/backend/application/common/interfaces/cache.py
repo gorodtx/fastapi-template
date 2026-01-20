@@ -1,0 +1,13 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+
+class StrCache(Protocol):
+    async def get(self, key: str) -> str | None: ...
+
+    async def set(self, key: str, value: str, *, ttl_s: int | None = None) -> None: ...
+
+    async def delete(self, key: str) -> None: ...
+
+    async def increment(self, key: str, *, delta: int = 1) -> int: ...

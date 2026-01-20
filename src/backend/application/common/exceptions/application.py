@@ -1,34 +1,81 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from uuid_utils.compat import UUID
+
 from backend.domain.core.constants.rbac import RoleAction, SystemRole
-from backend.domain.core.entities.base import TypeID
 from backend.domain.core.value_objects.access.permission_code import PermissionCode
 
 
-class ApplicationError(Exception): ...
+@dataclass(frozen=True, slots=True)
+class AppError(Exception):
+    code: str
+    message: str
+    detail: str | None = None
+    meta: dict[str, object] | None = None
 
 
-class ResourceNotFoundError(ApplicationError):
-    def __init__(self, resource: str, identifier: str) -> None:
-        super().__init__(f"{resource} with identifier {identifier!r} not found")
+class ConflictError(AppError):
+    def __init__(
+        self, message: str, *, detail: str | None = None, meta: dict[str, object] | None = None
+    ) -> None:
+        super().__init__(code="conflict", message=message, detail=detail, meta=meta)
 
 
-class ConflictError(ApplicationError):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
+class ResourceNotFoundError(AppError):
+    def __init__(
+        self,
+        resource: str,
+        identifier: str,
+        *,
+        detail: str | None = None,
+        meta: dict[str, object] | None = None,
+    ) -> None:
+        message = f"{resource} with identifier {identifier!r} not found"
+        code = f"{resource}.not_found"
+        super().__init__(code=code, message=message, detail=detail, meta=meta)
 
 
-class PermissionDeniedError(ApplicationError):
-    def __init__(self, *, user_id: TypeID, missing_permission: PermissionCode) -> None:
-        self.user_id = user_id
-        self.missing_permission = missing_permission
-        super().__init__(f"User {user_id} lacks permission {missing_permission.value!r}")
-
-
-class RoleHierarchyViolationError(ApplicationError):
-    def __init__(self, *, action: RoleAction, target_role: SystemRole) -> None:
-        self.action = action
-        self.target_role = target_role
+class PermissionDeniedError(AppError):
+    def __init__(
+        self,
+        *,
+        user_id: UUID,
+        missing_permission: PermissionCode,
+        detail: str | None = None,
+    ) -> None:
+        message = f"User {user_id} lacks permission {missing_permission.value!r}"
         super().__init__(
-            f"Cannot {action.value} role {target_role.value!r} with current privileges"
+            code="auth.forbidden",
+            message=message,
+            detail=detail,
+            meta={"user_id": str(user_id), "permission": missing_permission.value},
         )
+
+
+class RoleHierarchyViolationError(AppError):
+    def __init__(
+        self,
+        *,
+        action: RoleAction,
+        target_role: SystemRole,
+        detail: str | None = None,
+    ) -> None:
+        message = f"Cannot {action.value} role {target_role.value!r} with current privileges"
+        super().__init__(
+            code="rbac.hierarchy_violation",
+            message=message,
+            detail=detail,
+            meta={"action": action.value, "role": target_role.value},
+        )
+
+
+class UnauthenticatedError(AppError):
+    def __init__(self, message: str = "Authentication required") -> None:
+        super().__init__(code="auth.unauthenticated", message=message)
+
+
+class AuthorizationError(AppError):
+    def __init__(self, message: str = "Forbidden") -> None:
+        super().__init__(code="auth.forbidden", message=message)

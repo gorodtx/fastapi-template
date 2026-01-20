@@ -1,80 +1,69 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable
+
 import uuid_utils.compat as uuid
 
 from backend.application.common.dtos.users import UserCreateDTO, UserResponseDTO
-from backend.application.common.exceptions.application import ConflictError
-from backend.application.common.exceptions.db import ConstraintViolationError
-from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
-from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
-from backend.application.common.services.authorization import AuthorizationService
-from backend.application.common.tools.password_validator import RawPasswordValidator
+from backend.application.common.exceptions.application import AppError
+from backend.application.common.exceptions.error_mappers.storage import map_storage_error_to_app
+from backend.application.common.exceptions.error_mappers.users import map_user_input_error
+from backend.application.common.interfaces.infra.persistence.gateway import PersistenceGateway
+from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import CommandHandler
-from backend.application.handlers.mappers import UserMapper
+from backend.application.handlers.result import Result, ResultImpl, capture, capture_async
 from backend.application.handlers.transform import handler
-from backend.domain.core.constants.permission_codes import USERS_CREATE
 from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.entities.base import TypeID
 from backend.domain.core.entities.user import User
-from backend.domain.core.exceptions.base import DomainError, DomainTypeError
-from backend.domain.core.value_objects.identity.email import Email
-from backend.domain.core.value_objects.identity.login import Login
-from backend.domain.core.value_objects.identity.username import Username
-from backend.domain.core.value_objects.password import Password
+from backend.domain.core.factories.users import UserFactory
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 
 
-class CreateUserCommand(UserCreateDTO):
-    actor_id: TypeID
-    email: str
-    login: str
-    username: str
-    raw_password: str
+class CreateUserCommand(UserCreateDTO): ...
 
 
 @handler(mode="write")
 class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
-    uow: UnitOfWorkPort
+    gateway: PersistenceGateway
     password_hasher: PasswordHasherPort
-    authorization_service: AuthorizationService
 
-    async def _execute(self, cmd: CreateUserCommand, /) -> UserResponseDTO:
-        async with self.uow:
-            await self.authorization_service.require_permission(
-                user_id=cmd.actor_id,
-                permission=USERS_CREATE,
-                rbac=self.uow.rbac,
+    async def __call__(self, cmd: CreateUserCommand, /) -> Result[UserResponseDTO, AppError]:
+        def hash_password() -> Awaitable[str]:
+            return self.password_hasher.hash(cmd.raw_password)
+
+        hashed_result = await capture_async(hash_password, map_user_input_error)
+        if hashed_result.is_err():
+            return ResultImpl.err_from(hashed_result)
+        hashed = hashed_result.unwrap()
+
+        def register_user() -> User:
+            return UserFactory.register(
+                id=uuid.uuid7(),
+                email=cmd.email,
+                login=cmd.login,
+                username=cmd.username,
+                password_hash=hashed,
             )
-            try:
-                RawPasswordValidator.validate(cmd.raw_password)
-            except ValueError as e:
-                raise ConflictError(f"Invalid password: {e}") from e
 
-            try:
-                password_hash = await self.password_hasher.hash(cmd.raw_password)
-            except RuntimeError as e:
-                raise ConflictError(f"Password hashing failed: {e}") from e
+        user_result = capture(register_user, map_user_input_error)
+        if user_result.is_err():
+            return ResultImpl.err_from(user_result)
+        user = user_result.unwrap()
 
-            try:
-                user = User.register(
-                    id=uuid.uuid7(),
-                    email=Email(cmd.email),
-                    login=Login(cmd.login),
-                    username=Username(cmd.username),
-                    password=Password(password_hash),
-                )
-            except (ValueError, DomainTypeError, DomainError) as e:
-                raise ConflictError(f"Invalid input: {e}") from e
+        async with self.gateway.manager.transaction():
             user.assign_role(SystemRole.USER)
-            await self.uow.users.add(user)
-            try:
-                await self.uow.flush()
-                await self.uow.users.assign_role_to_user(
-                    user_id=user.id,
-                    role=SystemRole.USER,
-                )
-                await self.uow.commit()
-            except ConstraintViolationError as exc:
-                raise map_infra_error_to_application(exc) from exc
 
-        return UserMapper.to_dto(user)
+            save_result = (await self.gateway.users.save(user)).map_err(map_storage_error_to_app)
+            if save_result.is_err():
+                return ResultImpl.err_from(save_result)
+
+            role_result = (
+                await self.gateway.rbac.replace_user_roles(user.id, {SystemRole.USER})
+            ).map_err(map_storage_error_to_app)
+            if role_result.is_err():
+                return ResultImpl.err_from(role_result)
+
+            reread_result = (await self.gateway.users.get_by_id(user.id)).map_err(
+                map_storage_error_to_app
+            )
+            return reread_result.map(present_user_response)

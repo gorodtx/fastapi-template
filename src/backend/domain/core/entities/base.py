@@ -5,8 +5,6 @@ from typing import dataclass_transform
 
 from uuid_utils.compat import UUID
 
-type TypeID = UUID
-
 
 @dataclass_transform(eq_default=False)
 def entity[T](cls: type[T]) -> type[T]:
@@ -15,13 +13,13 @@ def entity[T](cls: type[T]) -> type[T]:
 
 @entity
 class Entity:
-    _id: TypeID
+    _id: UUID
 
-    def __init__(self, *, id: TypeID) -> None:
+    def __init__(self, *, id: UUID) -> None:
         object.__setattr__(self, "_id", id)
 
     @property
-    def id(self) -> TypeID:
+    def id(self) -> UUID:
         return self._id
 
     def __repr__(self) -> str:

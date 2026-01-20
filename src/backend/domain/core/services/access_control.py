@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Set
 
+from uuid_utils.compat import UUID
+
 from backend.domain.core.constants.rbac import RoleAction, SystemRole
 from backend.domain.core.constants.rbac_registry import ROLE_PERMISSIONS
-from backend.domain.core.entities.base import TypeID
 from backend.domain.core.exceptions.rbac import (
     LastSuperAdminRemovalError,
     RoleHierarchyViolationError,
@@ -40,8 +41,8 @@ def ensure_can_revoke_role(actor_roles: Set[SystemRole], target_role: SystemRole
 
 def ensure_not_self_role_change(
     *,
-    actor_id: TypeID,
-    target_user_id: TypeID,
+    actor_id: UUID,
+    target_user_id: UUID,
     action: RoleAction,
 ) -> None:
     if actor_id == target_user_id:
@@ -50,7 +51,7 @@ def ensure_not_self_role_change(
 
 def ensure_not_last_super_admin(
     *,
-    target_user_id: TypeID,
+    target_user_id: UUID,
     remaining_super_admins: int,
 ) -> None:
     if remaining_super_admins <= 0:

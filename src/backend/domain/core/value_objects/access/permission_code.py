@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import re
-
-from backend.domain.core.value_objects.base import ValueObject, value_object
+from enum import StrEnum, unique
 
 
-def _validate_permission_code(v: PermissionCode) -> None:
-    if not re.fullmatch(r"[a-z]+:[a-z_]+", v.value):
-        raise ValueError("Permission code must match 'domain:action'")
-
-
-@value_object(validator=_validate_permission_code)
-class PermissionCode(ValueObject):
-    value: str
+@unique
+class PermissionCode(StrEnum):
+    USERS_READ = "users:read"
+    USERS_CREATE = "users:create"
+    USERS_UPDATE = "users:update"
+    USERS_DELETE = "users:delete"
+    RBAC_READ_ROLES = "rbac:read_roles"
+    RBAC_ASSIGN_ROLE = "rbac:assign_role"
+    RBAC_REVOKE_ROLE = "rbac:revoke_role"

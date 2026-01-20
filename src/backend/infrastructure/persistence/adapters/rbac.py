@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from uuid_utils.compat import UUID
+
+from backend.application.common.exceptions.storage import StorageError
+from backend.application.common.interfaces.infra.persistence.rbac_adapter import RbacAdapter
+from backend.application.handlers.result import Result
+from backend.domain.core.constants.rbac import SystemRole
+from backend.infrastructure.persistence.adapters.base import UnboundAdapter
+from backend.infrastructure.persistence.mappers.users import role_records_to_set
+from backend.infrastructure.persistence.rawrepo.rbac import (
+    q_get_role_ids_by_codes,
+    q_get_user_role_codes,
+    q_list_user_ids_by_role_id,
+    q_replace_user_roles,
+)
+from backend.infrastructure.tools.as_result import as_result
+
+
+@dataclass(frozen=True, slots=True)
+class _ReplaceUserRoles:
+    user_id: UUID
+    roles: set[SystemRole]
+
+
+class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
+    __slots__ = ()
+
+    @as_result()
+    async def get_user_roles(self, user_id: UUID) -> set[SystemRole]:
+        rows = await self.manager.send(q_get_user_role_codes(user_id))
+        return role_records_to_set(rows)
+
+    @as_result()
+    async def _replace_user_roles_impl(self, payload: _ReplaceUserRoles) -> None:
+        roles = payload.roles
+        pairs = await self.manager.send(q_get_role_ids_by_codes(list(roles)))
+        got = {role.value for (role, _role_id) in pairs}
+        want = {role.value for role in roles}
+        missing = want - got
+        if missing:
+            raise StorageError(
+                code="rbac.seed_mismatch",
+                message="RBAC roles are missing in DB (seed mismatch)",
+                detail=f"missing={sorted(missing)}",
+            )
+        role_ids = [rid for (_role, rid) in pairs]
+        await self.manager.send(q_replace_user_roles(payload.user_id, role_ids))
+
+    async def replace_user_roles(
+        self, user_id: UUID, roles: set[SystemRole]
+    ) -> Result[None, StorageError]:
+        return await self._replace_user_roles_impl(_ReplaceUserRoles(user_id=user_id, roles=roles))
+
+    @as_result()
+    async def list_user_ids_by_role(self, role: SystemRole) -> list[UUID]:
+        pairs = await self.manager.send(q_get_role_ids_by_codes([role]))
+        if not pairs:
+            raise StorageError(
+                code="rbac.seed_mismatch",
+                message="RBAC roles are missing in DB (seed mismatch)",
+                detail=f"missing={[role.value]}",
+            )
+        role_id = pairs[0][1]
+        return await self.manager.send(q_list_user_ids_by_role_id(role_id))
+
+
+__all__ = ["RbacAdapter", "Result", "SqlRbacAdapter", "StorageError"]

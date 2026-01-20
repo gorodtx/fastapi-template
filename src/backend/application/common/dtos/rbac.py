@@ -14,21 +14,18 @@ class RoleAssignmentResultDTO(DTO):
 
 @dto
 class AssignRoleToUserDTO(DTO):
-    actor_id: UUID
     user_id: UUID
     role: str
 
 
 @dto
 class RevokeRoleFromUserDTO(DTO):
-    actor_id: UUID
     user_id: UUID
     role: str
 
 
 @dto
 class GetUserRolesDTO(DTO):
-    actor_id: UUID
     user_id: UUID
 
 
@@ -41,7 +38,6 @@ class UserRolesResponseDTO(DTO):
 
 @dto
 class GetUsersByRoleDTO(DTO):
-    actor_id: UUID
     role: str
 
 
