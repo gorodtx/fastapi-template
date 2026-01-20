@@ -1,104 +1,64 @@
 from __future__ import annotations
 
 from backend.application.common.dtos.rbac import RevokeRoleFromUserDTO, RoleAssignmentResultDTO
-from backend.application.common.exceptions.application import (
-    ConflictError,
-    ResourceNotFoundError,
-    RoleHierarchyViolationError,
-)
-from backend.application.common.exceptions.db import ConstraintViolationError
-from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
-from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
-from backend.application.common.services.authorization import AuthorizationService
+from backend.application.common.exceptions.application import AppError
+from backend.application.common.exceptions.error_mappers.rbac import map_role_input_error
+from backend.application.common.exceptions.error_mappers.storage import map_storage_error_to_app
+from backend.application.common.interfaces.infra.persistence.gateway import PersistenceGateway
+from backend.application.common.presenters.rbac import present_role_assignment_from
 from backend.application.handlers.base import CommandHandler
+from backend.application.handlers.result import Result, ResultImpl, capture
 from backend.application.handlers.transform import handler
-from backend.domain.core.constants.permission_codes import RBAC_REVOKE_ROLE
-from backend.domain.core.constants.rbac import RoleAction, SystemRole
-from backend.domain.core.entities.base import TypeID
-from backend.domain.core.exceptions.rbac import (
-    LastSuperAdminRemovalError as DomainLastSuperAdminRemovalError,
-)
-from backend.domain.core.exceptions.rbac import (
-    RoleHierarchyViolationError as DomainRoleHierarchyViolationError,
-)
-from backend.domain.core.exceptions.rbac import (
-    RoleNotAssignedError as DomainRoleNotAssignedError,
-)
-from backend.domain.core.exceptions.rbac import (
-    RoleSelfModificationError as DomainRoleSelfModificationError,
-)
-from backend.domain.core.services.access_control import (
-    ensure_can_revoke_role,
-    ensure_not_last_super_admin,
-    ensure_not_self_role_change,
-)
+from backend.domain.core.constants.rbac import SystemRole
 
 
-class RevokeRoleFromUserCommand(RevokeRoleFromUserDTO):
-    actor_id: TypeID
-    user_id: TypeID
-    role: str
+class RevokeRoleFromUserCommand(RevokeRoleFromUserDTO): ...
 
 
 @handler(mode="write")
 class RevokeRoleFromUserHandler(CommandHandler[RevokeRoleFromUserCommand, RoleAssignmentResultDTO]):
-    uow: UnitOfWorkPort
-    authorization_service: AuthorizationService
+    gateway: PersistenceGateway
 
-    async def _execute(self, cmd: RevokeRoleFromUserCommand, /) -> RoleAssignmentResultDTO:
-        async with self.uow:
-            context = await self.authorization_service.require_permission(
-                user_id=cmd.actor_id,
-                permission=RBAC_REVOKE_ROLE,
-                rbac=self.uow.rbac,
+    async def __call__(
+        self,
+        cmd: RevokeRoleFromUserCommand,
+        /,
+    ) -> Result[RoleAssignmentResultDTO, AppError]:
+        def parse_role() -> SystemRole:
+            return SystemRole(cmd.role)
+
+        role_result = capture(
+            parse_role,
+            map_role_input_error(cmd.role, allow_unassigned=True),
+        )
+        if role_result.is_err():
+            return ResultImpl.err_from(role_result)
+
+        async with self.gateway.manager.transaction():
+            user_result = (await self.gateway.users.get_by_id(cmd.user_id)).map_err(
+                map_storage_error_to_app
             )
-            try:
-                role = SystemRole(cmd.role)
-            except ValueError as e:
-                raise ConflictError(f"Unknown role {cmd.role!r}") from e
-            try:
-                ensure_can_revoke_role(context.roles, role)
-            except DomainRoleHierarchyViolationError as exc:
-                raise RoleHierarchyViolationError(
-                    action=RoleAction.REVOKE,
-                    target_role=role,
-                ) from exc
-            user = await self.uow.users.get(cmd.user_id)
-            if user is None:
-                raise ResourceNotFoundError("User", str(cmd.user_id))
-            roles = await self.uow.users.get_user_roles(user_id=user.id)
-            user.replace_roles(roles)
-            try:
-                ensure_not_self_role_change(
-                    actor_id=cmd.actor_id,
-                    target_user_id=user.id,
-                    action=RoleAction.REVOKE,
-                )
-            except DomainRoleSelfModificationError as exc:
-                raise ConflictError("User cannot revoke roles from self") from exc
-            try:
-                if role == SystemRole.SUPER_ADMIN and user.has_role(role):
-                    super_admin_count = await self.uow.rbac.count_users_with_role(
-                        role=SystemRole.SUPER_ADMIN
-                    )
-                    ensure_not_last_super_admin(
-                        target_user_id=user.id,
-                        remaining_super_admins=super_admin_count - 1,
-                    )
-            except DomainLastSuperAdminRemovalError as exc:
-                raise ConflictError("Cannot revoke last super_admin role") from exc
-            try:
-                user.revoke_role(role)
-                await self.uow.users.revoke_role_from_user(user_id=user.id, role=role)
-            except DomainRoleNotAssignedError as exc:
-                raise ConflictError(
-                    f"Role {role.value!r} is not assigned to user {cmd.user_id!r}"
-                ) from exc
-            except LookupError as exc:
-                raise ConflictError(f"Role {role.value!r} is not provisioned") from exc
-            try:
-                await self.uow.commit()
-            except ConstraintViolationError as exc:
-                raise map_infra_error_to_application(exc) from exc
+            if user_result.is_err():
+                return ResultImpl.err_from(user_result)
 
-        return RoleAssignmentResultDTO(user_id=cmd.user_id, role=role.value)
+            user = user_result.unwrap()
+            role = role_result.unwrap()
+
+            def revoke_role() -> None:
+                user.revoke_role(role)
+
+            revoke_result = capture(
+                revoke_role,
+                map_role_input_error(cmd.role, allow_unassigned=True),
+            )
+            if revoke_result.is_err():
+                return ResultImpl.err_from(revoke_result)
+
+            replace_result = (
+                await self.gateway.rbac.replace_user_roles(user.id, set(user.roles))
+            ).map_err(map_storage_error_to_app)
+            if replace_result.is_err():
+                return ResultImpl.err_from(replace_result)
+
+            presenter = present_role_assignment_from(user.id, role)
+            return replace_result.map(presenter)

@@ -1,78 +1,70 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable
+
 from backend.application.common.dtos.users import UserResponseDTO, UserUpdateDTO
-from backend.application.common.exceptions.application import ConflictError
-from backend.application.common.exceptions.db import ConstraintViolationError
-from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
-from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
-from backend.application.common.services.authorization import AuthorizationService
-from backend.application.common.tools.password_validator import RawPasswordValidator
+from backend.application.common.exceptions.application import AppError, ConflictError
+from backend.application.common.exceptions.error_mappers.storage import map_storage_error_to_app
+from backend.application.common.exceptions.error_mappers.users import map_user_input_error
+from backend.application.common.interfaces.infra.persistence.gateway import PersistenceGateway
+from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import CommandHandler
-from backend.application.handlers.mappers import UserMapper
+from backend.application.handlers.result import Result, ResultImpl, capture, capture_async
 from backend.application.handlers.transform import handler
-from backend.domain.core.constants.permission_codes import USERS_UPDATE
-from backend.domain.core.entities.base import TypeID
-from backend.domain.core.exceptions.base import DomainTypeError
-from backend.domain.core.value_objects.identity.email import Email
-from backend.domain.core.value_objects.password import Password
+from backend.domain.core.factories.users import UserFactory
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 
 
-class UpdateUserCommand(UserUpdateDTO):
-    actor_id: TypeID
-    user_id: TypeID
-    email: str | None = None
-    raw_password: str | None = None
+class UpdateUserCommand(UserUpdateDTO): ...
 
 
 @handler(mode="write")
 class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
-    uow: UnitOfWorkPort
+    gateway: PersistenceGateway
     password_hasher: PasswordHasherPort
-    authorization_service: AuthorizationService
 
-    async def _execute(self, cmd: UpdateUserCommand, /) -> UserResponseDTO:
-        async with self.uow:
-            await self.authorization_service.require_permission(
-                user_id=cmd.actor_id,
-                permission=USERS_UPDATE,
-                rbac=self.uow.rbac,
+    async def __call__(self, cmd: UpdateUserCommand, /) -> Result[UserResponseDTO, AppError]:
+        if cmd.email is None and cmd.raw_password is None:
+            return ResultImpl.err(ConflictError("Nothing to update"))
+
+        async with self.gateway.manager.transaction():
+            user_result = (await self.gateway.users.get_by_id(cmd.user_id)).map_err(
+                map_storage_error_to_app
             )
-            if cmd.email is None and cmd.raw_password is None:
-                raise ConflictError("Nothing to update")
+            if user_result.is_err():
+                return ResultImpl.err_from(user_result)
 
-            email_vo: Email | None = None
-            password_vo: Password | None = None
+            user = user_result.unwrap()
 
             if cmd.email is not None:
-                try:
-                    email_vo = Email(cmd.email)
-                except (ValueError, DomainTypeError) as e:
-                    raise ConflictError(f"Invalid email: {e}") from e
+
+                def apply_email() -> None:
+                    UserFactory.patch(user, email=cmd.email)
+
+                change_result = capture(apply_email, map_user_input_error)
+                if change_result.is_err():
+                    return ResultImpl.err_from(change_result)
 
             if cmd.raw_password is not None:
-                try:
-                    RawPasswordValidator.validate(cmd.raw_password)
-                except ValueError as e:
-                    raise ConflictError(f"Invalid password: {e}") from e
-                try:
-                    password_hash = await self.password_hasher.hash(cmd.raw_password)
-                except RuntimeError as e:
-                    raise ConflictError(f"Password hashing failed: {e}") from e
-                try:
-                    password_vo = Password(password_hash)
-                except (ValueError, DomainTypeError) as e:
-                    raise ConflictError(f"Invalid password hash: {e}") from e
-            user = await self.uow.users.get(cmd.user_id)
-            if user is None:
-                raise LookupError(f"User {cmd.user_id!r} not found")
-            if email_vo is not None:
-                user.change_email(email_vo)
-            if password_vo is not None:
-                user.change_password(password_vo)
-            try:
-                await self.uow.commit()
-            except ConstraintViolationError as exc:
-                raise map_infra_error_to_application(exc) from exc
+                raw_password = cmd.raw_password
 
-        return UserMapper.to_dto(user)
+                def hash_password() -> Awaitable[str]:
+                    return self.password_hasher.hash(raw_password)
+
+                hashed_result = await capture_async(hash_password, map_user_input_error)
+                if hashed_result.is_err():
+                    return ResultImpl.err_from(hashed_result)
+                hashed = hashed_result.unwrap()
+
+                def apply_password() -> None:
+                    UserFactory.patch(user, password_hash=hashed)
+
+                change_result = capture(apply_password, map_user_input_error)
+                if change_result.is_err():
+                    return ResultImpl.err_from(change_result)
+
+            save_result = (await self.gateway.users.save(user)).map_err(map_storage_error_to_app)
+            if save_result.is_err():
+                return ResultImpl.err_from(save_result)
+
+            return save_result.map(present_user_response)

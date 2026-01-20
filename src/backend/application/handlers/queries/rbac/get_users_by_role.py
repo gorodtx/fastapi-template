@@ -1,48 +1,53 @@
 from __future__ import annotations
 
 from backend.application.common.dtos.rbac import GetUsersByRoleDTO, UsersByRoleResponseDTO
-from backend.application.common.exceptions.application import ConflictError
-from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
-from backend.application.common.services.authorization import AuthorizationService
+from backend.application.common.dtos.users import UserResponseDTO
+from backend.application.common.exceptions.application import AppError
+from backend.application.common.exceptions.error_mappers.rbac import map_role_input_error
+from backend.application.common.exceptions.error_mappers.storage import map_storage_error_to_app
+from backend.application.common.interfaces.infra.persistence.gateway import PersistenceGateway
+from backend.application.common.presenters.rbac import present_users_by_role_from
+from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import QueryHandler
-from backend.application.handlers.mappers import UserMapper
+from backend.application.handlers.result import Result, ResultImpl, capture
 from backend.application.handlers.transform import handler
-from backend.domain.core.constants.permission_codes import RBAC_READ_ROLES
 from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.entities.base import TypeID
-from backend.domain.core.entities.user import User
 
 
-class GetUsersByRoleQuery(GetUsersByRoleDTO):
-    actor_id: TypeID
-    role: str
+class GetUsersByRoleQuery(GetUsersByRoleDTO): ...
 
 
 @handler(mode="read")
 class GetUsersByRoleHandler(QueryHandler[GetUsersByRoleQuery, UsersByRoleResponseDTO]):
-    uow: UnitOfWorkPort
-    authorization_service: AuthorizationService
+    gateway: PersistenceGateway
 
-    async def _execute(self, query: GetUsersByRoleQuery, /) -> UsersByRoleResponseDTO:
-        async with self.uow:
-            await self.authorization_service.require_permission(
-                user_id=query.actor_id,
-                permission=RBAC_READ_ROLES,
-                rbac=self.uow.rbac,
+    async def __call__(
+        self,
+        query: GetUsersByRoleQuery,
+        /,
+    ) -> Result[UsersByRoleResponseDTO, AppError]:
+        def parse_role() -> SystemRole:
+            return SystemRole(query.role)
+
+        role_result = capture(parse_role, map_role_input_error(query.role))
+        if role_result.is_err():
+            return ResultImpl.err_from(role_result)
+
+        role = role_result.unwrap()
+        ids_result = (await self.gateway.rbac.list_user_ids_by_role(role)).map_err(
+            map_storage_error_to_app
+        )
+        if ids_result.is_err():
+            return ResultImpl.err_from(ids_result)
+
+        users: list[UserResponseDTO] = []
+        for user_id in ids_result.unwrap():
+            user_result = (await self.gateway.users.get_by_id(user_id)).map_err(
+                map_storage_error_to_app
             )
-            try:
-                role = SystemRole(query.role)
-            except ValueError as exc:
-                raise ConflictError(f"Unknown role {query.role!r}") from exc
-            try:
-                user_ids = await self.uow.users.list_user_ids_by_role(role=role)
-            except LookupError as exc:
-                raise ConflictError(f"Role {role.value!r} is not provisioned") from exc
-            users: list[User] = []
-            for user_id in user_ids:
-                user = await self.uow.users.get(user_id)
-                if user is None:
-                    raise LookupError(f"User {user_id!r} not found")
-                users.append(user)
+            if user_result.is_err():
+                return ResultImpl.err_from(user_result)
+            users.append(present_user_response(user_result.unwrap()))
 
-        return UsersByRoleResponseDTO(role=role.value, users=UserMapper.to_many_dto(users))
+        presenter = present_users_by_role_from(role, users)
+        return ids_result.map(presenter)

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from uuid_utils.compat import UUID
+
 from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.entities.base import Entity, TypeID, entity
+from backend.domain.core.entities.base import Entity, entity
 from backend.domain.core.exceptions.base import DomainError
 from backend.domain.core.exceptions.rbac import RoleNotAssignedError
 from backend.domain.core.value_objects.identity.email import Email
@@ -22,7 +24,7 @@ class User(Entity):
     def __init__(
         self,
         *,
-        id: TypeID,
+        id: UUID,
         email: Email,
         login: Login,
         username: Username,
@@ -66,7 +68,7 @@ class User(Entity):
     def register(
         cls,
         *,
-        id: TypeID,
+        id: UUID,
         email: Email,
         login: Login,
         username: Username,
@@ -78,6 +80,28 @@ class User(Entity):
             login=login,
             username=username,
             password=password,
+        )
+
+    @classmethod
+    def rehydrate(
+        cls,
+        *,
+        id: UUID,
+        email: Email,
+        login: Login,
+        username: Username,
+        password: Password,
+        is_active: bool,
+        roles: set[SystemRole],
+    ) -> User:
+        return cls(
+            id=id,
+            email=email,
+            login=login,
+            username=username,
+            password=password,
+            is_active=is_active,
+            roles=roles,
         )
 
     def change_email(self, new_email: Email) -> None:
@@ -103,16 +127,6 @@ class User(Entity):
             raise DomainError("New password must differ from the old one")
 
         self._password = new_password
-
-    def activate(self) -> None:
-        if self._is_active:
-            return
-        self._is_active = True
-
-    def deactivate(self) -> None:
-        if not self._is_active:
-            return
-        self._is_active = False
 
     def assign_role(self, role: SystemRole) -> None:
         if role in self._roles:

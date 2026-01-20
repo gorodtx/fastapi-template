@@ -15,7 +15,6 @@ class UserResponseDTO(DTO):
 
 @dto
 class UserCreateDTO(DTO):
-    actor_id: UUID
     email: str
     login: str
     username: str
@@ -24,7 +23,6 @@ class UserCreateDTO(DTO):
 
 @dto
 class UserUpdateDTO(DTO):
-    actor_id: UUID
     user_id: UUID
     email: str | None = None
     raw_password: str | None = None
@@ -32,19 +30,16 @@ class UserUpdateDTO(DTO):
 
 @dto
 class DeleteUserDTO(DTO):
-    actor_id: UUID
     user_id: UUID
 
 
 @dto
 class GetUserDTO(DTO):
-    actor_id: UUID
     user_id: UUID
 
 
 @dto
 class GetUserWithRolesDTO(DTO):
-    actor_id: UUID
     user_id: UUID
 
 

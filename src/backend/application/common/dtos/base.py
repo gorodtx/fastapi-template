@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, fields, is_dataclass
 from typing import dataclass_transform, overload
-
-
-@dataclass(frozen=True, slots=True)
-class DTO: ...
 
 
 @dataclass_transform(
@@ -40,3 +36,22 @@ def dto[TDTO: DTO](
         return dataclass(frozen=frozen, slots=slots, kw_only=kw_only)(cls)
 
     return wrap if _cls is None else wrap(_cls)
+
+
+class DTO:
+    __slots__ = ()
+
+    def as_mapping(
+        self,
+        *,
+        exclude_none: bool = False,
+        exclude: set[str] | None = None,
+    ) -> Mapping[str, object]:
+        if not is_dataclass(self):
+            raise TypeError("DTO must be a dataclass (use @dto decorator on subclasses)")
+
+        ex = exclude or set()
+        d = {f.name: getattr(self, f.name) for f in fields(self) if f.name not in ex}
+        if exclude_none:
+            d = {k: v for k, v in d.items() if v is not None}
+        return d

@@ -1,41 +1,35 @@
 from __future__ import annotations
 
 from backend.application.common.dtos.users import DeleteUserDTO, UserResponseDTO
-from backend.application.common.exceptions.db import ConstraintViolationError
-from backend.application.common.exceptions.infra_mapper import map_infra_error_to_application
-from backend.application.common.interfaces.persistence.uow import UnitOfWorkPort
-from backend.application.common.services.authorization import AuthorizationService
+from backend.application.common.exceptions.application import AppError
+from backend.application.common.exceptions.error_mappers.storage import map_storage_error_to_app
+from backend.application.common.interfaces.infra.persistence.gateway import PersistenceGateway
+from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import CommandHandler
-from backend.application.handlers.mappers import UserMapper
+from backend.application.handlers.result import Result, ResultImpl
 from backend.application.handlers.transform import handler
-from backend.domain.core.constants.permission_codes import USERS_DELETE
-from backend.domain.core.entities.base import TypeID
 
 
-class DeleteUserCommand(DeleteUserDTO):
-    actor_id: TypeID
-    user_id: TypeID
+class DeleteUserCommand(DeleteUserDTO): ...
 
 
 @handler(mode="write")
 class DeleteUserHandler(CommandHandler[DeleteUserCommand, UserResponseDTO]):
-    uow: UnitOfWorkPort
-    authorization_service: AuthorizationService
+    gateway: PersistenceGateway
 
-    async def _execute(self, cmd: DeleteUserCommand, /) -> UserResponseDTO:
-        async with self.uow:
-            await self.authorization_service.require_permission(
-                user_id=cmd.actor_id,
-                permission=USERS_DELETE,
-                rbac=self.uow.rbac,
+    async def __call__(self, cmd: DeleteUserCommand, /) -> Result[UserResponseDTO, AppError]:
+        async with self.gateway.manager.transaction():
+            user_result = (await self.gateway.users.get_by_id(cmd.user_id)).map_err(
+                map_storage_error_to_app
             )
-            user = await self.uow.users.get(cmd.user_id)
-            if user is None:
-                raise LookupError(f"User {cmd.user_id!r} not found")
-            await self.uow.users.delete(user)
-            try:
-                await self.uow.commit()
-            except ConstraintViolationError as exc:
-                raise map_infra_error_to_application(exc) from exc
+            if user_result.is_err():
+                return ResultImpl.err_from(user_result)
+            user = user_result.unwrap()
 
-        return UserMapper.to_dto(user)
+            delete_result = (await self.gateway.users.delete(cmd.user_id)).map_err(
+                map_storage_error_to_app
+            )
+            if delete_result.is_err():
+                return ResultImpl.err_from(delete_result)
+
+            return ResultImpl.ok(present_user_response(user))
