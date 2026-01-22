@@ -23,8 +23,11 @@ if str(_SRC_DIR) not in sys.path:
 
 
 def _get_target_metadata() -> MetaData:
-    module = importlib.import_module("backend.infrastructure.persistence.sqlalchemy.models.base")
-    metadata = getattr(module, "metadata", None)
+    module = importlib.import_module("backend.infrastructure.persistence.sqlalchemy.tables.base")
+    try:
+        metadata = module.metadata
+    except AttributeError:
+        metadata = None
     if not isinstance(metadata, MetaData):
         raise RuntimeError("Failed to load SQLAlchemy metadata for Alembic")
     return metadata

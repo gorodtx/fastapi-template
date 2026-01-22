@@ -9,7 +9,7 @@ from backend.domain.core.value_objects.identity.email import Email
 from backend.domain.core.value_objects.identity.login import Login
 from backend.domain.core.value_objects.identity.username import Username
 from backend.domain.core.value_objects.password import Password
-from backend.infrastructure.persistence.sqlalchemy.models.base import mapper_registry, metadata
+from backend.infrastructure.persistence.sqlalchemy.tables.base import mapper_registry, metadata
 from backend.infrastructure.persistence.sqlalchemy.types import (
     EmailType,
     LoginType,

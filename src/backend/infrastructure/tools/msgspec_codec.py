@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TypeGuard
+from typing import Protocol, TypeGuard, runtime_checkable
 
 from backend.application.common.interfaces.infra.serialization import DTOCodec
 from backend.infrastructure.tools.msgspec_tools import (
@@ -35,6 +35,11 @@ def _is_mapping(value: object) -> TypeGuard[Mapping[object, object]]:
     return isinstance(value, Mapping)
 
 
+@runtime_checkable
+class _SupportsAsMapping(Protocol):
+    def as_mapping(self, *, exclude_none: bool, exclude: set[str]) -> Mapping[object, object]: ...
+
+
 class MsgspecDTOCodec(DTOCodec):
     def to_mapping(
         self,
@@ -45,9 +50,8 @@ class MsgspecDTOCodec(DTOCodec):
     ) -> Mapping[str, object]:
         ex = exclude or set()
 
-        mapping_fn = getattr(obj, "as_mapping", None)
-        if callable(mapping_fn):
-            raw = mapping_fn(exclude_none=False, exclude=ex)
+        if isinstance(obj, _SupportsAsMapping):
+            raw = obj.as_mapping(exclude_none=False, exclude=ex)
             if not _is_mapping(raw):
                 raise TypeError("as_mapping must return a mapping")
             return _normalize_mapping(raw, exclude_none=exclude_none, exclude=ex)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import Column, String, Table
 
-from backend.infrastructure.persistence.sqlalchemy.models.base import metadata
+from backend.infrastructure.persistence.sqlalchemy.tables.base import metadata
 
 permission_code_column: Column[str] = Column(
     "code",

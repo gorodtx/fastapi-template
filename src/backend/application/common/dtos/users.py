@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from uuid_utils.compat import UUID
 
-from backend.application.common.dtos.base import DTO, dto
+from backend.application.common.dtos.base import dto
 
 
 @dto
-class UserResponseDTO(DTO):
+class UserResponseDTO:
     id: UUID
     email: str
     login: str
@@ -14,7 +14,7 @@ class UserResponseDTO(DTO):
 
 
 @dto
-class UserCreateDTO(DTO):
+class UserCreateDTO:
     email: str
     login: str
     username: str
@@ -22,29 +22,29 @@ class UserCreateDTO(DTO):
 
 
 @dto
-class UserUpdateDTO(DTO):
+class UserUpdateDTO:
     user_id: UUID
     email: str | None = None
     raw_password: str | None = None
 
 
 @dto
-class DeleteUserDTO(DTO):
+class DeleteUserDTO:
     user_id: UUID
 
 
 @dto
-class GetUserDTO(DTO):
+class GetUserDTO:
     user_id: UUID
 
 
 @dto
-class GetUserWithRolesDTO(DTO):
+class GetUserWithRolesDTO:
     user_id: UUID
 
 
 @dto
-class UserWithRolesDTO(DTO):
+class UserWithRolesDTO:
     id: UUID
     email: str
     login: str

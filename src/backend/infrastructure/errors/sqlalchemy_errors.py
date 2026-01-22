@@ -9,22 +9,32 @@ _SQLSTATE_FK = "23503"
 _SQLSTATE_NOT_NULL = "23502"
 
 
+def _read_attr(obj: object, name: str) -> object | None:
+    try:
+        value: object = object.__getattribute__(obj, name)
+    except AttributeError:
+        return None
+    return value
+
+
 def extract_sqlstate(err: IntegrityError | DBAPIError) -> str | None:
-    orig = getattr(err, "orig", None)
+    orig = _read_attr(err, "orig")
     if orig is None:
         return None
-    sqlstate = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+    sqlstate = _read_attr(orig, "pgcode")
+    if not isinstance(sqlstate, str):
+        sqlstate = _read_attr(orig, "sqlstate")
     return sqlstate if isinstance(sqlstate, str) else None
 
 
 def extract_constraint(err: IntegrityError | DBAPIError) -> str | None:
-    orig = getattr(err, "orig", None)
+    orig = _read_attr(err, "orig")
     if orig is None:
         return None
-    diag = getattr(orig, "diag", None)
-    constraint = getattr(diag, "constraint_name", None) if diag is not None else None
+    diag = _read_attr(orig, "diag")
+    constraint = _read_attr(diag, "constraint_name") if diag is not None else None
     if not constraint:
-        constraint = getattr(orig, "constraint_name", None)
+        constraint = _read_attr(orig, "constraint_name")
     return constraint if isinstance(constraint, str) else None
 
 

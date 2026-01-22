@@ -46,8 +46,7 @@ def value_object[T: ValueObject](
             original_post_init(self)
             validator_fn(self)
 
-        post_init_attr = "__post_init__"
-        setattr(inner_cls, post_init_attr, __post_init__)
+        type.__setattr__(inner_cls, "__post_init__", __post_init__)
 
         return dataclass(
             frozen=True,

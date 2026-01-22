@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
 from backend.infrastructure.persistence.records import UserRowRecord
-from backend.infrastructure.persistence.sqlalchemy.models.users import users_table
+from backend.infrastructure.persistence.sqlalchemy.tables.users import users_table
 
 
 def q_get_user_row_by_id(

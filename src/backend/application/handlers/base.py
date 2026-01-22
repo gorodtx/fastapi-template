@@ -9,7 +9,11 @@ from backend.application.handlers.result import Result
 HandlerMode = Literal["read", "write"]
 
 
-class Handler[InDTO: DTO, OutDTO: DTO](Protocol):
+class HandlerBase(Protocol):
+    """Marker protocol for handlers."""
+
+
+class Handler[InDTO: DTO, OutDTO: DTO](HandlerBase, Protocol):
     async def __call__(self, data: InDTO, /) -> Result[OutDTO, AppError]: ...
 
 
