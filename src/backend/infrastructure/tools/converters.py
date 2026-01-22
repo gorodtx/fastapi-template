@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, TypeGuard
+from typing import Protocol, TypeGuard, runtime_checkable
 
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.value_objects.identity.email import Email
@@ -30,12 +30,17 @@ def _is_str(value: object) -> TypeGuard[str]:
     return isinstance(value, str)
 
 
+@runtime_checkable
+class _HasValue(Protocol):
+    value: object
+
+
 @dataclass(frozen=True, slots=True)
 class StrValueObjectConverter:
     vo_type: StrValueObjectCtor
 
     def encode(self, value: object) -> object:
-        raw = getattr(value, "value", None)
+        raw = value.value if isinstance(value, _HasValue) else None
         if not _is_str(raw):
             raise ConversionError(
                 f"{self.vo_type.__name__}.value must be str, got {type(raw).__name__}"
@@ -55,7 +60,7 @@ class StrEnumValueConverter[E: Enum]:
     def encode(self, value: object) -> object:
         if not isinstance(value, self.enum_type):
             raise ConversionError(f"Expected {self.enum_type.__name__}, got {type(value).__name__}")
-        raw = getattr(value, "value", None)
+        raw = value.value
         if not _is_str(raw):
             raise ConversionError(
                 f"{self.enum_type.__name__}.value must be str, got {type(raw).__name__}"

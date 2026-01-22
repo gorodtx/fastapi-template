@@ -4,10 +4,10 @@ from sqlalchemy import Column, ForeignKey, String, Table
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from uuid_utils.compat import UUID
 
-from backend.infrastructure.persistence.sqlalchemy.models.base import metadata
-from backend.infrastructure.persistence.sqlalchemy.models.permission import permission_code_column
-from backend.infrastructure.persistence.sqlalchemy.models.role import role_id_column
-from backend.infrastructure.persistence.sqlalchemy.models.users import user_id_column
+from backend.infrastructure.persistence.sqlalchemy.tables.base import metadata
+from backend.infrastructure.persistence.sqlalchemy.tables.permission import permission_code_column
+from backend.infrastructure.persistence.sqlalchemy.tables.role import role_id_column
+from backend.infrastructure.persistence.sqlalchemy.tables.users import user_id_column
 
 role_permission_role_id_column: Column[UUID] = Column(
     "role_id",

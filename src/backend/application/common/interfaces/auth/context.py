@@ -48,7 +48,10 @@ class Context:
             for raw_value in data:
                 self.collect_keys(raw_value)
             return
-        attrs: object = getattr(data, "__dict__", None)
+        try:
+            attrs: object = vars(data)
+        except TypeError:
+            attrs = None
         if _is_mapping(attrs):
             for raw_name in attrs:
                 self._keys.add(str(raw_name))

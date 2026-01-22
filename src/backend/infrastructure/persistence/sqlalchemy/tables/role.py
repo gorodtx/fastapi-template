@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from uuid_utils.compat import UUID
 
 from backend.domain.core.constants.rbac import SystemRole
-from backend.infrastructure.persistence.sqlalchemy.models.base import metadata
+from backend.infrastructure.persistence.sqlalchemy.tables.base import metadata
 
 role_id_column: Column[UUID] = Column(
     "id",

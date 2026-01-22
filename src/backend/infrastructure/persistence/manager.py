@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import AbstractAsyncContextManager
 from types import TracebackType
 
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
@@ -11,7 +12,7 @@ from backend.application.common.interfaces.infra.persistence.manager import (
 )
 
 
-class _TxScope:
+class _TxScope(AbstractAsyncContextManager["TransactionManagerImpl"]):
     __slots__ = ("_tm", "_tx")
 
     def __init__(self, tm: TransactionManagerImpl, tx: AsyncSessionTransaction) -> None:

@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Final, Literal
+from typing import Final, Literal, Protocol, runtime_checkable
 
 import msgspec
 
@@ -20,6 +20,11 @@ DEFAULT_CONVERT_TO_TYPES: Final[tuple[type, ...]] = (
     Decimal,
 )
 DEFAULT_CONVERT_FROM_TYPES: Final[tuple[type, ...]] = (*DEFAULT_CONVERT_TO_TYPES, memoryview)
+
+
+@runtime_checkable
+class _Fallback(Protocol):
+    def __call__(self, name: str) -> object: ...
 
 
 def convert_to[T](cls: type[T], value: object, *, strict: bool = False) -> T:
@@ -69,7 +74,16 @@ class ClosableProxy:
                 await res
 
     def __getattr__(self, key: str) -> object:
-        return getattr(self._target, key)
+        try:
+            return self._target.__getattribute__(key)
+        except AttributeError:
+            try:
+                fallback = object.__getattribute__(self._target, "__getattr__")
+            except AttributeError:
+                raise
+            if isinstance(fallback, _Fallback):
+                return fallback(key)
+            raise
 
     def __repr__(self) -> str:
         return f"{self._target!r}"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import overload
+from dataclasses import dataclass
 
 from uuid_utils.compat import UUID
 
@@ -15,72 +14,43 @@ from backend.domain.core.value_objects.identity.username import Username
 from backend.domain.core.value_objects.password import Password
 
 
-def _input_error(field: str, exc: Exception) -> DomainTypeError:
+def _type_error(field: str, exc: Exception) -> DomainTypeError:
     return DomainTypeError(f"{field}: {exc}")
 
 
-def _storage_error(user_id: UUID) -> Callable[[str, Exception], UserDataCorruptedError]:
-    def _mapper(field: str, exc: Exception) -> UserDataCorruptedError:
-        return UserDataCorruptedError(user_id=user_id, details=f"{field}: {exc}")
-
-    return _mapper
+def _corrupted_error(user_id: UUID, field: str, exc: Exception) -> UserDataCorruptedError:
+    return UserDataCorruptedError(user_id=user_id, details=f"{field}: {exc}")
 
 
-@overload
-def _build_vo(
-    *,
-    field: str,
-    raw: str,
-    ctor: type[Email],
-    map_error: Callable[[str, Exception], Exception],
-) -> Email: ...
-
-
-@overload
-def _build_vo(
-    *,
-    field: str,
-    raw: str,
-    ctor: type[Login],
-    map_error: Callable[[str, Exception], Exception],
-) -> Login: ...
-
-
-@overload
-def _build_vo(
-    *,
-    field: str,
-    raw: str,
-    ctor: type[Username],
-    map_error: Callable[[str, Exception], Exception],
-) -> Username: ...
-
-
-@overload
-def _build_vo(
-    *,
-    field: str,
-    raw: str,
-    ctor: type[Password],
-    map_error: Callable[[str, Exception], Exception],
-) -> Password: ...
-
-
-def _build_vo(
-    *,
-    field: str,
-    raw: str,
-    ctor: Callable[[str], Email | Login | Username | Password],
-    map_error: Callable[[str, Exception], Exception],
-) -> Email | Login | Username | Password:
-    try:
-        return ctor(raw)
-    except (TypeError, ValueError) as exc:
-        raise map_error(field, exc) from exc
-
-
+@dataclass(frozen=True, slots=True)
 class UserFactory:
-    __slots__ = ()
+    @staticmethod
+    def email(value: str) -> Email:
+        try:
+            return Email(value)
+        except (TypeError, ValueError) as exc:
+            raise _type_error("email", exc) from exc
+
+    @staticmethod
+    def login(value: str) -> Login:
+        try:
+            return Login(value)
+        except (TypeError, ValueError) as exc:
+            raise _type_error("login", exc) from exc
+
+    @staticmethod
+    def username(value: str) -> Username:
+        try:
+            return Username(value)
+        except (TypeError, ValueError) as exc:
+            raise _type_error("username", exc) from exc
+
+    @staticmethod
+    def password_from_hash(value: str) -> Password:
+        try:
+            return Password(value)
+        except (TypeError, ValueError) as exc:
+            raise _type_error("password_hash", exc) from exc
 
     @staticmethod
     def register(
@@ -91,19 +61,16 @@ class UserFactory:
         username: str,
         password_hash: str,
     ) -> User:
+        email_vo = UserFactory.email(email)
+        login_vo = UserFactory.login(login)
+        username_vo = UserFactory.username(username)
+        password_vo = UserFactory.password_from_hash(password_hash)
         return User.register(
             id=id,
-            email=_build_vo(field="email", raw=email, ctor=Email, map_error=_input_error),
-            login=_build_vo(field="login", raw=login, ctor=Login, map_error=_input_error),
-            username=_build_vo(
-                field="username", raw=username, ctor=Username, map_error=_input_error
-            ),
-            password=_build_vo(
-                field="password_hash",
-                raw=password_hash,
-                ctor=Password,
-                map_error=_input_error,
-            ),
+            email=email_vo,
+            login=login_vo,
+            username=username_vo,
+            password=password_vo,
         )
 
     @staticmethod
@@ -117,18 +84,29 @@ class UserFactory:
         is_active: bool,
         roles: set[SystemRole],
     ) -> User:
-        map_err = _storage_error(id)
-        return User.rehydrate(
+        try:
+            email_vo = Email(email)
+        except (TypeError, ValueError) as exc:
+            raise _corrupted_error(id, "email", exc) from exc
+        try:
+            login_vo = Login(login)
+        except (TypeError, ValueError) as exc:
+            raise _corrupted_error(id, "login", exc) from exc
+        try:
+            username_vo = Username(username)
+        except (TypeError, ValueError) as exc:
+            raise _corrupted_error(id, "username", exc) from exc
+        try:
+            password_vo = Password(password_hash)
+        except (TypeError, ValueError) as exc:
+            raise _corrupted_error(id, "password_hash", exc) from exc
+
+        return User(
             id=id,
-            email=_build_vo(field="email", raw=email, ctor=Email, map_error=map_err),
-            login=_build_vo(field="login", raw=login, ctor=Login, map_error=map_err),
-            username=_build_vo(field="username", raw=username, ctor=Username, map_error=map_err),
-            password=_build_vo(
-                field="password_hash",
-                raw=password_hash,
-                ctor=Password,
-                map_error=map_err,
-            ),
+            email=email_vo,
+            login=login_vo,
+            username=username_vo,
+            password=password_vo,
             is_active=is_active,
             roles=roles,
         )
@@ -143,26 +121,10 @@ class UserFactory:
         password_hash: str | None = None,
     ) -> None:
         if email is not None:
-            user.change_email(
-                _build_vo(field="email", raw=email, ctor=Email, map_error=_input_error)
-            )
+            user.change_email(UserFactory.email(email))
         if login is not None:
-            user.change_login(
-                _build_vo(field="login", raw=login, ctor=Login, map_error=_input_error)
-            )
+            user.change_login(UserFactory.login(login))
         if username is not None:
-            user.change_username(
-                _build_vo(field="username", raw=username, ctor=Username, map_error=_input_error)
-            )
+            user.change_username(UserFactory.username(username))
         if password_hash is not None:
-            user.change_password(
-                _build_vo(
-                    field="password_hash",
-                    raw=password_hash,
-                    ctor=Password,
-                    map_error=_input_error,
-                )
-            )
-
-
-__all__ = ["UserFactory"]
+            user.change_password(UserFactory.password_from_hash(password_hash))

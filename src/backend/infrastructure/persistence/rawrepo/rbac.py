@@ -8,8 +8,8 @@ from uuid_utils.compat import UUID
 
 from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.records import UserRoleCodeRecord
-from backend.infrastructure.persistence.sqlalchemy.models.role import roles_table
-from backend.infrastructure.persistence.sqlalchemy.models.role_permission import (
+from backend.infrastructure.persistence.sqlalchemy.tables.role import roles_table
+from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import (
     user_roles_table,
 )
 

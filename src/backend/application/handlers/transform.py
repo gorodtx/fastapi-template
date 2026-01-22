@@ -4,11 +4,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import dataclass_transform
 
-from backend.application.handlers.base import HandlerMode
+from backend.application.handlers.base import HandlerBase, HandlerMode
 
 
 @dataclass_transform(frozen_default=True, eq_default=True)
-def handler[H](*, mode: HandlerMode) -> Callable[[type[H]], type[H]]:
+def handler[H: HandlerBase](*, mode: HandlerMode) -> Callable[[type[H]], type[H]]:
     """Decorator for command/query handlers with frozen dataclass."""
 
     def decorate(cls: type[H]) -> type[H]:
@@ -18,7 +18,7 @@ def handler[H](*, mode: HandlerMode) -> Callable[[type[H]], type[H]]:
             slots=True,
             kw_only=True,
         )(cls)
-        wrapped.handler_mode = mode
+        type.__setattr__(wrapped, "handler_mode", mode)
         return wrapped
 
     return decorate
