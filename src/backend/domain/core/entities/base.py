@@ -1,22 +1,39 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, dataclass_transform
+from typing import dataclass_transform
 
-import uuid_utils.compat as uuid
-from msgspec import to_builtins
-
-TypeID = uuid.UUID
+from uuid_utils.compat import UUID
 
 
-@dataclass_transform()
-def entity[E](cls: type[E]) -> type[E]:
-    return dataclass()(cls)
+@dataclass_transform(eq_default=False)
+def entity[T](cls: type[T]) -> type[T]:
+    return dataclass(eq=False, init=False, repr=False)(cls)
 
 
 @entity
 class Entity:
-    id: TypeID
+    _id: UUID
 
-    def asdict(self) -> dict[str, Any]:
-        return to_builtins(self, str_keys=True)
+    def __init__(self, *, id: UUID) -> None:
+        object.__setattr__(self, "_id", id)
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "_id" and hasattr(self, "_id") and self._id != value:
+            raise AttributeError("Entity id is read-only")
+        object.__setattr__(self, name, value)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Entity):
+            return self.id == other.id
+        return False
+
+    def __hash__(self) -> int:
+        return hash(self.id)
