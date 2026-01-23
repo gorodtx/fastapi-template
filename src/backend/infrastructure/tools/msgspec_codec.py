@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Protocol, TypeGuard, runtime_checkable
 
-from backend.application.common.interfaces.infra.serialization import DTOCodec
+from backend.application.common.interfaces.ports.serialization import DTOCodec
 from backend.infrastructure.tools.msgspec_tools import (
     convert_from,
     convert_to,

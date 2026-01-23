@@ -5,7 +5,7 @@ from types import TracebackType
 
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 
-from backend.application.common.interfaces.infra.persistence.manager import (
+from backend.application.common.interfaces.ports.persistence.manager import (
     Query,
     TransactionManager,
     TransactionScope,

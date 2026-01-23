@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from uuid_utils.compat import UUID
 
 from backend.application.common.exceptions.storage import StorageError
-from backend.application.common.interfaces.infra.persistence.rbac_adapter import RbacAdapter
+from backend.application.common.interfaces.ports.persistence.rbac_adapter import RbacAdapter
 from backend.application.handlers.result import Result
 from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter

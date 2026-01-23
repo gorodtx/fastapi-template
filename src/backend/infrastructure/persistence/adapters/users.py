@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid_utils.compat import UUID
 
 from backend.application.common.exceptions.storage import StorageError
-from backend.application.common.interfaces.infra.persistence.users_adapter import UsersAdapter
+from backend.application.common.interfaces.ports.persistence.users_adapter import UsersAdapter
 from backend.application.handlers.result import Result
 from backend.domain.core.entities.user import User
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter

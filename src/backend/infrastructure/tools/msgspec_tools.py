@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import inspect
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Final, Literal, Protocol, runtime_checkable
 
 import msgspec
+from uuid_utils.compat import UUID
+
+from backend.infrastructure.tools.converters import CONVERTERS, ConversionError
 
 DEFAULT_CONVERT_TO_TYPES: Final[tuple[type, ...]] = (
     bytes,
@@ -56,6 +59,47 @@ def msgspec_encoder(obj: object, *, order: Literal["deterministic", "sorted"] | 
 
 def msgspec_decoder(obj: str, *, strict: bool = False) -> object:
     return msgspec.json.decode(obj, strict=strict)
+
+
+def _row_dec_hook(tp: type[object], obj: object) -> object:
+    if tp is UUID:
+        if isinstance(obj, UUID):
+            return obj
+        return UUID(str(obj))
+    if tp is bool:
+        if isinstance(obj, bool):
+            return obj
+        return bool(obj)
+    if tp is str:
+        if isinstance(obj, str):
+            return obj
+        encoded = CONVERTERS.encode(obj)
+        if not isinstance(encoded, str):
+            raise TypeError("Expected str")
+        return encoded
+    try:
+        decoded = CONVERTERS.decode(obj, tp)
+    except ConversionError as exc:
+        raise NotImplementedError from exc
+    if decoded is None:
+        raise TypeError(f"Expected {tp.__name__}")
+    return decoded
+
+
+def _coerce_record_mapping(row: Mapping[str, object]) -> dict[str, object]:
+    out: dict[str, object] = {}
+    for key, value in row.items():
+        out[key] = value
+    return out
+
+
+def convert_record[T](row: Mapping[str, object], record_type: type[T]) -> T:
+    return msgspec.convert(
+        _coerce_record_mapping(row),
+        record_type,
+        strict=True,
+        dec_hook=_row_dec_hook,
+    )
 
 
 class ClosableProxy:

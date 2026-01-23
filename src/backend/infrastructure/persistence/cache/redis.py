@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from redis.asyncio import Redis
 
-from backend.application.common.interfaces.cache import StrCache
+from backend.application.common.interfaces.ports.cache import StrCache
 
 
 @dataclass(slots=True)

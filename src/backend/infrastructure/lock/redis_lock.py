@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock
 
-from backend.application.common.interfaces.shared_lock import SharedLock
+from backend.application.common.interfaces.ports.shared_lock import SharedLock
 
 
 @dataclass(slots=True)

@@ -4,7 +4,7 @@ from backend.application.common.dtos.rbac import RevokeRoleFromUserDTO, RoleAssi
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.error_mappers.rbac import map_role_input_error
 from backend.application.common.exceptions.error_mappers.storage import map_storage_error_to_app
-from backend.application.common.interfaces.infra.persistence.gateway import PersistenceGateway
+from backend.application.common.interfaces.ports.persistence.gateway import PersistenceGateway
 from backend.application.common.presenters.rbac import present_role_assignment_from
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import Result, ResultImpl, capture

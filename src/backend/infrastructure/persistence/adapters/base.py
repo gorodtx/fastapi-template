@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from backend.application.common.exceptions.storage import NotFoundStorageError, StorageError
-from backend.application.common.interfaces.infra.persistence.manager import TransactionManager
+from backend.application.common.interfaces.ports.persistence.manager import TransactionManager
 
 
 class UnboundAdapter:

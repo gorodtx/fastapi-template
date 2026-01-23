@@ -10,8 +10,8 @@ from backend.application.common.interfaces.auth.types import (
     PermissionSpec,
     UserId,
 )
-from backend.application.common.interfaces.infra.persistence.rbac_adapter import RbacAdapter
-from backend.application.common.interfaces.infra.persistence.users_adapter import UsersAdapter
+from backend.application.common.interfaces.ports.persistence.rbac_adapter import RbacAdapter
+from backend.application.common.interfaces.ports.persistence.users_adapter import UsersAdapter
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.constants.rbac_registry import ROLE_PERMISSIONS
 from backend.domain.core.value_objects.access.permission_code import PermissionCode

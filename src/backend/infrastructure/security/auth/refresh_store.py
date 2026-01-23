@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 from backend.application.common.interfaces.auth.ports import RefreshStore
 from backend.application.common.interfaces.auth.types import UserId
-from backend.application.common.interfaces.cache import StrCache
-from backend.application.common.interfaces.shared_lock import SharedLock
+from backend.application.common.interfaces.ports.cache import StrCache
+from backend.application.common.interfaces.ports.shared_lock import SharedLock
 
 AUTH_KEY_PREFIX = "auth:refresh"
 
