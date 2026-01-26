@@ -24,7 +24,7 @@ from backend.application.common.interfaces.auth.types import (
     PermissionSpec,
     UserId,
 )
-from backend.application.common.interfaces.cache import StrCache
+from backend.application.common.interfaces.ports.cache import StrCache
 from backend.domain.core.constants.rbac import SystemRole
 from backend.startup.di import get_auth_deps
 
