@@ -29,7 +29,7 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
 
         async with self.gateway.manager.transaction():
             user_result = (await self.gateway.users.get_by_id(cmd.user_id)).map_err(
-                map_storage_error_to_app
+                map_storage_error_to_app()
             )
             if user_result.is_err():
                 return ResultImpl.err_from(user_result)
@@ -41,7 +41,7 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
                 def apply_email() -> None:
                     UserFactory.patch(user, email=cmd.email)
 
-                change_result = capture(apply_email, map_user_input_error)
+                change_result = capture(apply_email, map_user_input_error())
                 if change_result.is_err():
                     return ResultImpl.err_from(change_result)
 
@@ -51,7 +51,7 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
                 def hash_password() -> Awaitable[str]:
                     return self.password_hasher.hash(raw_password)
 
-                hashed_result = await capture_async(hash_password, map_user_input_error)
+                hashed_result = await capture_async(hash_password, map_user_input_error())
                 if hashed_result.is_err():
                     return ResultImpl.err_from(hashed_result)
                 hashed = hashed_result.unwrap()
@@ -59,11 +59,11 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
                 def apply_password() -> None:
                     UserFactory.patch(user, password_hash=hashed)
 
-                change_result = capture(apply_password, map_user_input_error)
+                change_result = capture(apply_password, map_user_input_error())
                 if change_result.is_err():
                     return ResultImpl.err_from(change_result)
 
-            save_result = (await self.gateway.users.save(user)).map_err(map_storage_error_to_app)
+            save_result = (await self.gateway.users.save(user)).map_err(map_storage_error_to_app())
             if save_result.is_err():
                 return ResultImpl.err_from(save_result)
 

@@ -35,7 +35,7 @@ class GetUsersByRoleHandler(QueryHandler[GetUsersByRoleQuery, UsersByRoleRespons
 
         role = role_result.unwrap()
         ids_result = (await self.gateway.rbac.list_user_ids_by_role(role)).map_err(
-            map_storage_error_to_app
+            map_storage_error_to_app()
         )
         if ids_result.is_err():
             return ResultImpl.err_from(ids_result)
@@ -43,7 +43,7 @@ class GetUsersByRoleHandler(QueryHandler[GetUsersByRoleQuery, UsersByRoleRespons
         users: list[UserResponseDTO] = []
         for user_id in ids_result.unwrap():
             user_result = (await self.gateway.users.get_by_id(user_id)).map_err(
-                map_storage_error_to_app
+                map_storage_error_to_app()
             )
             if user_result.is_err():
                 return ResultImpl.err_from(user_result)

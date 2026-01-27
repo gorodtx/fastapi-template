@@ -36,7 +36,7 @@ class RevokeRoleFromUserHandler(CommandHandler[RevokeRoleFromUserCommand, RoleAs
 
         async with self.gateway.manager.transaction():
             user_result = (await self.gateway.users.get_by_id(cmd.user_id)).map_err(
-                map_storage_error_to_app
+                map_storage_error_to_app()
             )
             if user_result.is_err():
                 return ResultImpl.err_from(user_result)
@@ -56,7 +56,7 @@ class RevokeRoleFromUserHandler(CommandHandler[RevokeRoleFromUserCommand, RoleAs
 
             replace_result = (
                 await self.gateway.rbac.replace_user_roles(user.id, set(user.roles))
-            ).map_err(map_storage_error_to_app)
+            ).map_err(map_storage_error_to_app())
             if replace_result.is_err():
                 return ResultImpl.err_from(replace_result)
 

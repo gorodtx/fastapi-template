@@ -24,6 +24,6 @@ class GetUserRolesHandler(QueryHandler[GetUserRolesQuery, UserRolesResponseDTO])
     ) -> Result[UserRolesResponseDTO, AppError]:
         return (
             (await self.gateway.users.get_by_id(query.user_id))
-            .map_err(map_storage_error_to_app)
+            .map_err(map_storage_error_to_app())
             .map(present_user_roles)
         )

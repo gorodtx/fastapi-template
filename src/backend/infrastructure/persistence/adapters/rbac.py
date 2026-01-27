@@ -10,7 +10,7 @@ from backend.application.handlers.result import Result
 from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter
 from backend.infrastructure.persistence.mappers.users import role_records_to_set
-from backend.infrastructure.persistence.rawrepo.rbac import (
+from backend.infrastructure.persistence.rawadapter.rbac import (
     q_get_role_ids_by_codes,
     q_get_user_role_codes,
     q_list_user_ids_by_role_id,
@@ -65,6 +65,3 @@ class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
             )
         role_id = pairs[0][1]
         return await self.manager.send(q_list_user_ids_by_role_id(role_id))
-
-
-__all__ = ["RbacAdapter", "Result", "SqlRbacAdapter", "StorageError"]

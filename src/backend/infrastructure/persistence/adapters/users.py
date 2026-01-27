@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from uuid_utils.compat import UUID
 
-from backend.application.common.exceptions.storage import StorageError
 from backend.application.common.interfaces.ports.persistence.users_adapter import UsersAdapter
-from backend.application.handlers.result import Result
 from backend.domain.core.entities.user import User
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter
 from backend.infrastructure.persistence.mappers.users import (
@@ -12,9 +10,10 @@ from backend.infrastructure.persistence.mappers.users import (
     row_record_to_user,
     user_to_row_record,
 )
-from backend.infrastructure.persistence.rawrepo.rbac import q_get_user_role_codes
-from backend.infrastructure.persistence.rawrepo.users import (
+from backend.infrastructure.persistence.rawadapter.rbac import q_get_user_role_codes
+from backend.infrastructure.persistence.rawadapter.users import (
     q_delete_user,
+    q_get_user_row_by_email,
     q_get_user_row_by_id,
     q_upsert_user_row,
 )
@@ -38,6 +37,19 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
         return row_record_to_user(rec, roles=roles)
 
     @as_result()
+    async def get_by_email(self, email: str) -> User:
+        rec = await self.manager.send(q_get_user_row_by_email(email))
+        rec = self.require_found(
+            rec,
+            code="user.not_found",
+            message="User not found",
+            detail=f"email={email}",
+        )
+        role_rows = await self.manager.send(q_get_user_role_codes(rec.id))
+        roles = role_records_to_set(role_rows)
+        return row_record_to_user(rec, roles=roles)
+
+    @as_result()
     async def save(self, user: User) -> User:
         row = user_to_row_record(user)
         saved_row = await self.manager.send(q_upsert_user_row(row))
@@ -48,6 +60,3 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
     @as_result()
     async def delete(self, user_id: UUID) -> bool:
         return await self.manager.send(q_delete_user(user_id))
-
-
-__all__ = ["Result", "SqlUsersAdapter", "StorageError", "UsersAdapter"]

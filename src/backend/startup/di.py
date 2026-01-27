@@ -15,13 +15,25 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
+from backend.application.common.dtos.auth import SuccessDTO, TokenPairDTO
 from backend.application.common.dtos.rbac import UserRolesResponseDTO
 from backend.application.common.dtos.users import UserResponseDTO
-from backend.application.common.interfaces.auth.ports import Authenticator, JwtIssuer, JwtVerifier
+from backend.application.common.interfaces.auth.ports import (
+    Authenticator,
+    JwtIssuer,
+    JwtVerifier,
+    RefreshStore,
+)
 from backend.application.common.interfaces.ports.cache import StrCache
 from backend.application.common.interfaces.ports.persistence.gateway import PersistenceGateway
 from backend.application.common.interfaces.ports.persistence.manager import TransactionManager
 from backend.application.handlers.base import CommandHandler, QueryHandler
+from backend.application.handlers.commands.auth.login import LoginUserCommand, LoginUserHandler
+from backend.application.handlers.commands.auth.logout import LogoutUserCommand, LogoutUserHandler
+from backend.application.handlers.commands.auth.refresh import (
+    RefreshUserCommand,
+    RefreshUserHandler,
+)
 from backend.application.handlers.commands.users.create import CreateUserCommand, CreateUserHandler
 from backend.application.handlers.queries.rbac.get_user_roles import (
     GetUserRolesHandler,
@@ -39,6 +51,7 @@ from backend.infrastructure.persistence.sqlalchemy.session_db import (
 )
 from backend.infrastructure.security.auth.authenticator import AuthenticatorImpl
 from backend.infrastructure.security.auth.jwt import JwtConfig, JwtImpl
+from backend.infrastructure.security.auth.refresh_store import RefreshStoreImpl
 from backend.infrastructure.security.password_hasher import Argon2PasswordHasher
 
 
@@ -146,6 +159,9 @@ class ApiHandlers:
     create_user: CommandHandler[CreateUserCommand, UserResponseDTO]
     get_user: QueryHandler[GetUserQuery, UserResponseDTO]
     get_user_roles: QueryHandler[GetUserRolesQuery, UserRolesResponseDTO]
+    login_user: CommandHandler[LoginUserCommand, TokenPairDTO]
+    logout_user: CommandHandler[LogoutUserCommand, SuccessDTO]
+    refresh_user: CommandHandler[RefreshUserCommand, TokenPairDTO]
 
 
 @dataclass(slots=True)
@@ -180,6 +196,10 @@ class AppProvider(Provider):
     @provide(scope=Scope.APP)
     def shared_lock(self, client: Redis) -> RedisSharedLock:
         return RedisSharedLock(client)
+
+    @provide(scope=Scope.APP)
+    def refresh_store(self, cache: StrCache, lock: RedisSharedLock) -> RefreshStore:
+        return RefreshStoreImpl(cache=cache, lock=lock)
 
     @provide(scope=Scope.APP)
     def password_hasher(self) -> PasswordHasherPort:
@@ -240,16 +260,58 @@ class RequestProvider(Provider):
         return GetUserRolesHandler(gateway=gateway)
 
     @provide(scope=Scope.REQUEST)
+    def login_user_handler(
+        self,
+        gateway: PersistenceGateway,
+        password_hasher: PasswordHasherPort,
+        jwt_issuer: JwtIssuer,
+        refresh_store: RefreshStore,
+    ) -> LoginUserHandler:
+        return LoginUserHandler(
+            gateway=gateway,
+            password_hasher=password_hasher,
+            jwt_issuer=jwt_issuer,
+            refresh_store=refresh_store,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def logout_user_handler(
+        self,
+        jwt_verifier: JwtVerifier,
+        refresh_store: RefreshStore,
+    ) -> LogoutUserHandler:
+        return LogoutUserHandler(jwt_verifier=jwt_verifier, refresh_store=refresh_store)
+
+    @provide(scope=Scope.REQUEST)
+    def refresh_user_handler(
+        self,
+        jwt_verifier: JwtVerifier,
+        jwt_issuer: JwtIssuer,
+        refresh_store: RefreshStore,
+    ) -> RefreshUserHandler:
+        return RefreshUserHandler(
+            jwt_verifier=jwt_verifier,
+            jwt_issuer=jwt_issuer,
+            refresh_store=refresh_store,
+        )
+
+    @provide(scope=Scope.REQUEST)
     def api_handlers(
         self,
         create_user: CreateUserHandler,
         get_user: GetUserHandler,
         get_user_roles: GetUserRolesHandler,
+        login_user: LoginUserHandler,
+        logout_user: LogoutUserHandler,
+        refresh_user: RefreshUserHandler,
     ) -> ApiHandlers:
         return ApiHandlers(
             create_user=create_user,
             get_user=get_user,
             get_user_roles=get_user_roles,
+            login_user=login_user,
+            logout_user=logout_user,
+            refresh_user=refresh_user,
         )
 
     @provide(scope=Scope.REQUEST)
