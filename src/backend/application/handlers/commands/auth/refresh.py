@@ -3,11 +3,24 @@ from __future__ import annotations
 from collections.abc import Awaitable
 
 from backend.application.common.dtos.auth import RefreshUserDTO, TokenPairDTO
-from backend.application.common.exceptions.application import AppError, UnauthenticatedError
-from backend.application.common.exceptions.error_mappers.auth import map_refresh_replay
-from backend.application.common.interfaces.auth.ports import JwtIssuer, JwtVerifier, RefreshStore
+from backend.application.common.exceptions.application import (
+    AppError,
+    UnauthenticatedError,
+)
+from backend.application.common.exceptions.error_mappers.auth import (
+    map_refresh_replay,
+)
+from backend.application.common.interfaces.auth.ports import (
+    JwtIssuer,
+    JwtVerifier,
+    RefreshStore,
+)
 from backend.application.handlers.base import CommandHandler
-from backend.application.handlers.result import Result, ResultImpl, capture_async
+from backend.application.handlers.result import (
+    Result,
+    ResultImpl,
+    capture_async,
+)
 from backend.application.handlers.transform import handler
 
 
@@ -21,7 +34,7 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
     refresh_store: RefreshStore
 
     async def __call__(
-        self,
+        self: RefreshUserHandler,
         cmd: RefreshUserCommand,
         /,
     ) -> Result[TokenPairDTO, AppError]:
@@ -31,7 +44,8 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
 
         user_id, token_fingerprint = verify_result.unwrap()
         if token_fingerprint != cmd.fingerprint:
-            return ResultImpl.err(UnauthenticatedError("Refresh token fingerprint mismatch"))
+            err = UnauthenticatedError("Refresh token fingerprint mismatch")
+            return ResultImpl.err_app(err, TokenPairDTO)
 
         access_token = self.jwt_issuer.issue_access(user_id=user_id)
         refresh_token = self.jwt_issuer.issue_refresh(
@@ -47,7 +61,9 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
                 new=refresh_token,
             )
 
-        rotate_result = await capture_async(rotate_refresh, map_refresh_replay())
+        rotate_result = await capture_async(
+            rotate_refresh, map_refresh_replay()
+        )
         if rotate_result.is_err():
             return ResultImpl.err_from(rotate_result)
 
@@ -55,5 +71,6 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
             TokenPairDTO(
                 access_token=access_token,
                 refresh_token=refresh_token,
-            )
+            ),
+            AppError,
         )

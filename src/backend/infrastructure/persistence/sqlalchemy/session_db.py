@@ -9,17 +9,21 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-_DEFAULT_DATABASE_URL = "xyi"
+_DEFAULT_DATABASE_URL: str = "xyi"
 
 
-def create_engine(url: str | None = None, *, echo: bool = False) -> AsyncEngine:
+def create_engine(
+    url: str | None = None, *, echo: bool = False
+) -> AsyncEngine:
     return create_async_engine(
         url or _DEFAULT_DATABASE_URL,
         echo=echo,
     )
 
 
-def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+def create_session_factory(
+    engine: AsyncEngine,
+) -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(
         bind=engine,
         expire_on_commit=False,

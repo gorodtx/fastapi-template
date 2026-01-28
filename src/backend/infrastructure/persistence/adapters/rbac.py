@@ -5,11 +5,15 @@ from dataclasses import dataclass
 from uuid_utils.compat import UUID
 
 from backend.application.common.exceptions.storage import StorageError
-from backend.application.common.interfaces.ports.persistence.rbac_adapter import RbacAdapter
+from backend.application.common.interfaces.ports.persistence.rbac_adapter import (
+    RbacAdapter,
+)
 from backend.application.handlers.result import Result
 from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter
-from backend.infrastructure.persistence.mappers.users import role_records_to_set
+from backend.infrastructure.persistence.mappers.users import (
+    role_records_to_set,
+)
 from backend.infrastructure.persistence.rawadapter.rbac import (
     q_get_role_ids_by_codes,
     q_get_user_role_codes,
@@ -26,15 +30,19 @@ class _ReplaceUserRoles:
 
 
 class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     @as_result()
-    async def get_user_roles(self, user_id: UUID) -> set[SystemRole]:
+    async def get_user_roles(
+        self: SqlRbacAdapter, user_id: UUID
+    ) -> set[SystemRole]:
         rows = await self.manager.send(q_get_user_role_codes(user_id))
         return role_records_to_set(rows)
 
     @as_result()
-    async def _replace_user_roles_impl(self, payload: _ReplaceUserRoles) -> None:
+    async def _replace_user_roles_impl(
+        self: SqlRbacAdapter, payload: _ReplaceUserRoles
+    ) -> None:
         roles = payload.roles
         pairs = await self.manager.send(q_get_role_ids_by_codes(list(roles)))
         got = {role.value for (role, _role_id) in pairs}
@@ -47,15 +55,21 @@ class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
                 detail=f"missing={sorted(missing)}",
             )
         role_ids = [rid for (_role, rid) in pairs]
-        await self.manager.send(q_replace_user_roles(payload.user_id, role_ids))
+        await self.manager.send(
+            q_replace_user_roles(payload.user_id, role_ids)
+        )
 
     async def replace_user_roles(
-        self, user_id: UUID, roles: set[SystemRole]
+        self: SqlRbacAdapter, user_id: UUID, roles: set[SystemRole]
     ) -> Result[None, StorageError]:
-        return await self._replace_user_roles_impl(_ReplaceUserRoles(user_id=user_id, roles=roles))
+        return await self._replace_user_roles_impl(
+            _ReplaceUserRoles(user_id=user_id, roles=roles)
+        )
 
     @as_result()
-    async def list_user_ids_by_role(self, role: SystemRole) -> list[UUID]:
+    async def list_user_ids_by_role(
+        self: SqlRbacAdapter, role: SystemRole
+    ) -> list[UUID]:
         pairs = await self.manager.send(q_get_role_ids_by_codes([role]))
         if not pairs:
             raise StorageError(

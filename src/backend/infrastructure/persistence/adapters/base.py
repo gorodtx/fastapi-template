@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-from backend.application.common.exceptions.storage import NotFoundStorageError, StorageError
-from backend.application.common.interfaces.ports.persistence.manager import TransactionManager
+from backend.application.common.exceptions.storage import (
+    NotFoundStorageError,
+    StorageError,
+)
+from backend.application.common.interfaces.ports.persistence.manager import (
+    TransactionManager,
+)
 
 
 class UnboundAdapter:
-    __slots__ = ("_manager",)
+    __slots__: tuple[str, ...] = ("_manager",)
 
-    def __init__(self, manager: TransactionManager) -> None:
+    def __init__(self: UnboundAdapter, manager: TransactionManager) -> None:
         self._manager = manager
 
     @property
-    def manager(self) -> TransactionManager:
+    def manager(self: UnboundAdapter) -> TransactionManager:
         return self._manager
 
     @staticmethod
@@ -23,7 +28,9 @@ class UnboundAdapter:
         detail: str,
     ) -> T:
         if value is None:
-            raise NotFoundStorageError(code=code, message=message, detail=detail)
+            raise NotFoundStorageError(
+                code=code, message=message, detail=detail
+            )
         return value
 
     @staticmethod
@@ -39,12 +46,16 @@ class UnboundAdapter:
 
 
 class BoundAdapter[E](UnboundAdapter):
-    __slots__ = ("_record_type",)
+    __slots__: tuple[str, ...] = ("_record_type",)
 
-    def __init__(self, manager: TransactionManager, record_type: type[E]) -> None:
+    def __init__(
+        self: BoundAdapter[E],
+        manager: TransactionManager,
+        record_type: type[E],
+    ) -> None:
         super().__init__(manager)
         self._record_type = record_type
 
     @property
-    def record_type(self) -> type[E]:
+    def record_type(self: BoundAdapter[E]) -> type[E]:
         return self._record_type

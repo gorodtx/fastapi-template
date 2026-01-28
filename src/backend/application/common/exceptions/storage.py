@@ -13,7 +13,7 @@ class StorageError(Exception):
 
 class NotFoundStorageError(StorageError):
     def __init__(
-        self,
+        self: NotFoundStorageError,
         *,
         code: str,
         message: str,

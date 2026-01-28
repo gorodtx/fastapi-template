@@ -3,7 +3,7 @@ from __future__ import annotations
 
 class ConstraintViolationError(Exception):
     def __init__(
-        self,
+        self: ConstraintViolationError,
         constraint: str,
         message: str | None = None,
         field: str | None = None,

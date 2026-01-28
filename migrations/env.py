@@ -23,7 +23,9 @@ if str(_SRC_DIR) not in sys.path:
 
 
 def _get_target_metadata() -> MetaData:
-    module = importlib.import_module("backend.infrastructure.persistence.sqlalchemy.tables.base")
+    module = importlib.import_module(
+        "backend.infrastructure.persistence.sqlalchemy.tables.base"
+    )
     try:
         metadata = module.metadata
     except AttributeError:
@@ -43,7 +45,9 @@ def _get_database_url() -> str:
     config_url = config.get_main_option("sqlalchemy.url")
     if config_url:
         return config_url
-    raise RuntimeError("DATABASE_URL or sqlalchemy.url must be set for Alembic")
+    raise RuntimeError(
+        "DATABASE_URL or sqlalchemy.url must be set for Alembic"
+    )
 
 
 def run_migrations_offline() -> None:

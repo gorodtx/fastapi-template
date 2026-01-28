@@ -5,15 +5,21 @@ from backend.infrastructure.persistence.sqlalchemy.tables.base import (
     mapper_registry,
     metadata,
 )
-from backend.infrastructure.persistence.sqlalchemy.tables.permission import permissions_table
-from backend.infrastructure.persistence.sqlalchemy.tables.role import roles_table
+from backend.infrastructure.persistence.sqlalchemy.tables.permission import (
+    permissions_table,
+)
+from backend.infrastructure.persistence.sqlalchemy.tables.role import (
+    roles_table,
+)
 from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import (
     role_permissions_table,
     user_roles_table,
 )
-from backend.infrastructure.persistence.sqlalchemy.tables.users import users_table
+from backend.infrastructure.persistence.sqlalchemy.tables.users import (
+    users_table,
+)
 
-__all__ = [
+__all__: list[str] = [
     "NAMING_CONVENTION",
     "mapper_registry",
     "metadata",

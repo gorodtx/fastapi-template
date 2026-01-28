@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from uuid_utils.compat import UUID
 
 from backend.domain.core.constants.rbac import RoleAction, SystemRole
-from backend.domain.core.value_objects.access.permission_code import PermissionCode
+from backend.domain.core.value_objects.access.permission_code import (
+    PermissionCode,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,14 +20,20 @@ class AppError(Exception):
 
 class ConflictError(AppError):
     def __init__(
-        self, message: str, *, detail: str | None = None, meta: dict[str, object] | None = None
+        self: ConflictError,
+        message: str,
+        *,
+        detail: str | None = None,
+        meta: dict[str, object] | None = None,
     ) -> None:
-        super().__init__(code="conflict", message=message, detail=detail, meta=meta)
+        super().__init__(
+            code="conflict", message=message, detail=detail, meta=meta
+        )
 
 
 class ResourceNotFoundError(AppError):
     def __init__(
-        self,
+        self: ResourceNotFoundError,
         resource: str,
         identifier: str,
         *,
@@ -39,24 +47,29 @@ class ResourceNotFoundError(AppError):
 
 class PermissionDeniedError(AppError):
     def __init__(
-        self,
+        self: PermissionDeniedError,
         *,
         user_id: UUID,
         missing_permission: PermissionCode,
         detail: str | None = None,
     ) -> None:
-        message = f"User {user_id} lacks permission {missing_permission.value!r}"
+        message = (
+            f"User {user_id} lacks permission {missing_permission.value!r}"
+        )
         super().__init__(
             code="auth.forbidden",
             message=message,
             detail=detail,
-            meta={"user_id": str(user_id), "permission": missing_permission.value},
+            meta={
+                "user_id": str(user_id),
+                "permission": missing_permission.value,
+            },
         )
 
 
 class RoleHierarchyViolationError(AppError):
     def __init__(
-        self,
+        self: RoleHierarchyViolationError,
         *,
         action: RoleAction,
         target_role: SystemRole,
@@ -72,10 +85,12 @@ class RoleHierarchyViolationError(AppError):
 
 
 class UnauthenticatedError(AppError):
-    def __init__(self, message: str = "Authentication required") -> None:
+    def __init__(
+        self: UnauthenticatedError, message: str = "Authentication required"
+    ) -> None:
         super().__init__(code="auth.unauthenticated", message=message)
 
 
 class AuthorizationError(AppError):
-    def __init__(self, message: str = "Forbidden") -> None:
+    def __init__(self: AuthorizationError, message: str = "Forbidden") -> None:
         super().__init__(code="auth.forbidden", message=message)

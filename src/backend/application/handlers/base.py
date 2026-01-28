@@ -6,7 +6,7 @@ from backend.application.common.dtos.base import DTO
 from backend.application.common.exceptions.application import AppError
 from backend.application.handlers.result import Result
 
-HandlerMode = Literal["read", "write"]
+type HandlerMode = Literal["read", "write"]
 
 
 class HandlerBase(Protocol):
@@ -14,10 +14,14 @@ class HandlerBase(Protocol):
 
 
 class Handler[InDTO: DTO, OutDTO: DTO](HandlerBase, Protocol):
-    async def __call__(self, data: InDTO, /) -> Result[OutDTO, AppError]: ...
+    async def __call__(
+        self: Handler[InDTO, OutDTO], data: InDTO, /
+    ) -> Result[OutDTO, AppError]: ...
 
 
-class CommandHandler[InDTO: DTO, OutDTO: DTO](Handler[InDTO, OutDTO], Protocol):
+class CommandHandler[InDTO: DTO, OutDTO: DTO](
+    Handler[InDTO, OutDTO], Protocol
+):
     """Marker protocol for command handlers."""
 
 

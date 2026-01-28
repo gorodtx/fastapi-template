@@ -5,8 +5,13 @@ from starlette.requests import Request
 
 from backend.application.handlers.commands.auth.login import LoginUserCommand
 from backend.application.handlers.commands.auth.logout import LogoutUserCommand
-from backend.application.handlers.commands.auth.refresh import RefreshUserCommand
-from backend.presentation.http.api.middlewere.auth import AuthzRoute, auth_optional
+from backend.application.handlers.commands.auth.refresh import (
+    RefreshUserCommand,
+)
+from backend.presentation.http.api.middlewere.auth import (
+    AuthzRoute,
+    auth_optional,
+)
 from backend.presentation.http.api.schemas.auth import (
     LoginRequest,
     LogoutRequest,
@@ -16,7 +21,7 @@ from backend.presentation.http.api.schemas.auth import (
 )
 from backend.startup.di import get_handlers
 
-router = APIRouter(route_class=AuthzRoute)
+router: APIRouter = APIRouter(route_class=AuthzRoute)
 
 
 @router.post("/auth/login", response_model=TokenPairResponse)
@@ -57,10 +62,16 @@ async def logout_user(
 
 @router.post("/auth/refresh", response_model=TokenPairResponse)
 @auth_optional()
-async def refresh_user(payload: RefreshRequest, request: Request) -> TokenPairResponse:
+async def refresh_user(
+    payload: RefreshRequest, request: Request
+) -> TokenPairResponse:
     handlers = await get_handlers(request)
-    cmd = RefreshUserCommand(refresh_token=payload.refresh_token, fingerprint=payload.fingerprint)
+    cmd = RefreshUserCommand(
+        refresh_token=payload.refresh_token, fingerprint=payload.fingerprint
+    )
     result = await handlers.refresh_user(cmd)
     dto = result.unwrap()
 
-    return TokenPairResponse(access_token=dto.access_token, refresh_token=dto.refresh_token)
+    return TokenPairResponse(
+        access_token=dto.access_token, refresh_token=dto.refresh_token
+    )

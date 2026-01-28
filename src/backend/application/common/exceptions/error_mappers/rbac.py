@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from backend.application.common.exceptions.application import AppError, ConflictError
+from backend.application.common.exceptions.application import (
+    AppError,
+    ConflictError,
+)
 from backend.domain.core.exceptions.rbac import RoleNotAssignedError
 
 

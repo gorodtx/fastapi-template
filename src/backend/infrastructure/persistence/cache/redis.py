@@ -11,7 +11,7 @@ from backend.application.common.interfaces.ports.cache import StrCache
 class RedisCache(StrCache):
     client: Redis
 
-    async def get(self, key: str) -> str | None:
+    async def get(self: RedisCache, key: str) -> str | None:
         value = await self.client.get(key)
         if value is None:
             return None
@@ -21,11 +21,13 @@ class RedisCache(StrCache):
             return value
         raise TypeError(f"Unexpected cache value type: {type(value).__name__}")
 
-    async def set(self, key: str, value: str, *, ttl_s: int | None = None) -> None:
+    async def set(
+        self: RedisCache, key: str, value: str, *, ttl_s: int | None = None
+    ) -> None:
         await self.client.set(key, value, ex=ttl_s)
 
-    async def delete(self, key: str) -> None:
+    async def delete(self: RedisCache, key: str) -> None:
         await self.client.delete(key)
 
-    async def increment(self, key: str, *, delta: int = 1) -> int:
+    async def increment(self: RedisCache, key: str, *, delta: int = 1) -> int:
         return int(await self.client.incrby(key, delta))

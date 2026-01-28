@@ -8,7 +8,9 @@ from backend.application.handlers.base import HandlerBase, HandlerMode
 
 
 @dataclass_transform(frozen_default=True, eq_default=True)
-def handler[H: HandlerBase](*, mode: HandlerMode) -> Callable[[type[H]], type[H]]:
+def handler[H: HandlerBase](
+    *, mode: HandlerMode
+) -> Callable[[type[H]], type[H]]:
     """Decorator for command/query handlers with frozen dataclass."""
 
     def decorate(cls: type[H]) -> type[H]:

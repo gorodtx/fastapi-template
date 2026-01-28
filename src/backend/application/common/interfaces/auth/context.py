@@ -5,7 +5,10 @@ from dataclasses import dataclass, field
 from typing import TypeGuard
 
 from backend.application.common.interfaces.auth.ports import Authenticator
-from backend.application.common.interfaces.auth.types import AuthUser, PermissionSpec
+from backend.application.common.interfaces.auth.types import (
+    AuthUser,
+    PermissionSpec,
+)
 
 
 def _is_mapping(value: object) -> TypeGuard[Mapping[object, object]]:
@@ -13,7 +16,9 @@ def _is_mapping(value: object) -> TypeGuard[Mapping[object, object]]:
 
 
 def _is_iterable(value: object) -> TypeGuard[Iterable[object]]:
-    return isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping))
+    return isinstance(value, Iterable) and not isinstance(
+        value, (str, bytes, Mapping)
+    )
 
 
 def _empty_str_dict() -> dict[str, str]:
@@ -29,14 +34,18 @@ class Context:
     request_method: str = ""
     request_path: str = ""
     request_url: str = ""
-    request_path_params: dict[str, str] = field(default_factory=_empty_str_dict)
-    request_query_params: dict[str, str] = field(default_factory=_empty_str_dict)
+    request_path_params: dict[str, str] = field(
+        default_factory=_empty_str_dict
+    )
+    request_query_params: dict[str, str] = field(
+        default_factory=_empty_str_dict
+    )
     request_json_params: object | None = None
 
-    def set_user(self, user: AuthUser | None) -> None:
+    def set_user(self: Context, user: AuthUser | None) -> None:
         self.user = user
 
-    def collect_keys(self, data: object) -> None:
+    def collect_keys(self: Context, data: object) -> None:
         if data is None:
             return
         if _is_mapping(data):
@@ -56,7 +65,7 @@ class Context:
             for raw_name in attrs:
                 self._keys.add(str(raw_name))
 
-    async def check_permission(self, spec: PermissionSpec) -> None:
+    async def check_permission(self: Context, spec: PermissionSpec) -> None:
         if self.user is None:
             raise PermissionError("Unauthenticated")
         merged = PermissionSpec(
@@ -65,8 +74,10 @@ class Context:
             deny_fields=spec.deny_fields,
             allow_all_fields=spec.allow_all_fields,
         )
-        perm = await self.authenticator.get_permission_for(self.user.id, merged)
+        perm = await self.authenticator.get_permission_for(
+            self.user.id, merged
+        )
         perm.check(merged)
 
-    def request_keys(self) -> frozenset[str]:
+    def request_keys(self: Context) -> frozenset[str]:
         return frozenset(self._keys)

@@ -6,7 +6,7 @@ from typing import Protocol, Self
 
 class DTOCodec(Protocol):
     def to_mapping(
-        self,
+        self: DTOCodec,
         obj: object,
         *,
         exclude_none: bool = False,
@@ -14,7 +14,7 @@ class DTOCodec(Protocol):
     ) -> Mapping[str, object]: ...
 
     def to_string(
-        self,
+        self: DTOCodec,
         obj: object,
         *,
         exclude_none: bool = False,
@@ -22,7 +22,7 @@ class DTOCodec(Protocol):
     ) -> str: ...
 
     def to_bytes(
-        self,
+        self: DTOCodec,
         obj: object,
         *,
         exclude_none: bool = False,
@@ -30,16 +30,24 @@ class DTOCodec(Protocol):
     ) -> bytes: ...
 
     def from_mapping[T](
-        self, cls: type[T], value: Mapping[str, object], *, strict: bool = False
+        self: DTOCodec,
+        cls: type[T],
+        value: Mapping[str, object],
+        *,
+        strict: bool = False,
     ) -> T: ...
 
-    def from_string[T](self, cls: type[T], value: str, *, strict: bool = False) -> T: ...
-    def from_bytes[T](self, cls: type[T], value: bytes, *, strict: bool = False) -> T: ...
+    def from_string[T](
+        self: DTOCodec, cls: type[T], value: str, *, strict: bool = False
+    ) -> T: ...
+    def from_bytes[T](
+        self: DTOCodec, cls: type[T], value: bytes, *, strict: bool = False
+    ) -> T: ...
 
 
 class Serializable(Protocol):
     def as_mapping(
-        self,
+        self: Serializable,
         *,
         exclude_none: bool = False,
         exclude: set[str] | None = None,
@@ -48,7 +56,7 @@ class Serializable(Protocol):
 
 class Deserializable(Protocol):
     @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> Self: ...
+    def from_mapping(cls: type[Self], value: Mapping[str, object]) -> Self: ...
 
 
 class DTO(Serializable, Deserializable, Protocol): ...

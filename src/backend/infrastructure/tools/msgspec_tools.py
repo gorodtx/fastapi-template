@@ -22,12 +22,15 @@ DEFAULT_CONVERT_TO_TYPES: Final[tuple[type, ...]] = (
     uuid.UUID,
     Decimal,
 )
-DEFAULT_CONVERT_FROM_TYPES: Final[tuple[type, ...]] = (*DEFAULT_CONVERT_TO_TYPES, memoryview)
+DEFAULT_CONVERT_FROM_TYPES: Final[tuple[type, ...]] = (
+    *DEFAULT_CONVERT_TO_TYPES,
+    memoryview,
+)
 
 
 @runtime_checkable
 class _Fallback(Protocol):
-    def __call__(self, name: str) -> object: ...
+    def __call__(self: _Fallback, name: str) -> object: ...
 
 
 def convert_to[T](cls: type[T], value: object, *, strict: bool = False) -> T:
@@ -53,7 +56,9 @@ def msgpack_decoder(obj: bytes, *, strict: bool = False) -> object:
     return msgspec.msgpack.decode(obj, strict=strict)
 
 
-def msgspec_encoder(obj: object, *, order: Literal["deterministic", "sorted"] | None = None) -> str:
+def msgspec_encoder(
+    obj: object, *, order: Literal["deterministic", "sorted"] | None = None
+) -> str:
     return msgspec.json.encode(obj, order=order).decode("utf-8")
 
 
@@ -103,13 +108,15 @@ def convert_record[T](row: Mapping[str, object], record_type: type[T]) -> T:
 
 
 class ClosableProxy:
-    __slots__ = ("_close_fn", "_target")
+    __slots__: tuple[str, ...] = ("_close_fn", "_target")
 
-    def __init__(self, target: object, close_fn: Callable[[], object]) -> None:
+    def __init__(
+        self: ClosableProxy, target: object, close_fn: Callable[[], object]
+    ) -> None:
         self._target = target
         self._close_fn = close_fn
 
-    async def close(self) -> None:
+    async def close(self: ClosableProxy) -> None:
         if inspect.iscoroutinefunction(self._close_fn):
             await self._close_fn()
         else:
@@ -117,7 +124,7 @@ class ClosableProxy:
             if inspect.isawaitable(res):
                 await res
 
-    def __getattr__(self, key: str) -> object:
+    def __getattr__(self: ClosableProxy, key: str) -> object:
         try:
             return self._target.__getattribute__(key)
         except AttributeError:
@@ -129,5 +136,5 @@ class ClosableProxy:
                 return fallback(key)
             raise
 
-    def __repr__(self) -> str:
+    def __repr__(self: ClosableProxy) -> str:
         return f"{self._target!r}"

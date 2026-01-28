@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Coroutine, Mapping
 from enum import Enum
-from typing import Final, ParamSpec, TypeGuard, TypeVar
+from typing import Final, TypeGuard
 from uuid import UUID
 
 import msgspec
@@ -17,12 +17,14 @@ from backend.application.common.exceptions.application import (
     UnauthenticatedError,
 )
 from backend.application.common.interfaces.auth.context import Context
-from backend.application.common.interfaces.auth.ports import Authenticator, JwtVerifier
+from backend.application.common.interfaces.auth.ports import (
+    Authenticator,
+    JwtVerifier,
+)
 from backend.application.common.interfaces.auth.types import (
     AuthUser,
     Permission,
     PermissionSpec,
-    UserId,
 )
 from backend.application.common.interfaces.ports.cache import StrCache
 from backend.domain.core.constants.rbac import SystemRole
@@ -31,9 +33,6 @@ from backend.startup.di import get_auth_deps
 _AUTH_REQUIRED_ATTR: Final[str] = "__auth_required__"
 _AUTH_OPTIONAL_ATTR: Final[str] = "__auth_optional__"
 _REQUIRED_PERMS_ATTR: Final[str] = "__required_permissions__"
-
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
 
 
 class Source(Enum):
@@ -47,30 +46,32 @@ def get_ctx(request: Request) -> Context:
     except AttributeError:
         ctx = None
     if not isinstance(ctx, Context):
-        raise RuntimeError("Context is not initialized. Did you add AuthContextMiddleware?")
+        raise RuntimeError(
+            "Context is not initialized. Did you add AuthContextMiddleware?"
+        )
     return ctx
 
 
-def require_auth() -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
-    def deco(fn: Callable[_P, _R]) -> Callable[_P, _R]:
+def require_auth[**P, R]() -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def deco(fn: Callable[P, R]) -> Callable[P, R]:
         fn.__dict__[_AUTH_REQUIRED_ATTR] = True
         return fn
 
     return deco
 
 
-def auth_optional() -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
-    def deco(fn: Callable[_P, _R]) -> Callable[_P, _R]:
+def auth_optional[**P, R]() -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def deco(fn: Callable[P, R]) -> Callable[P, R]:
         fn.__dict__[_AUTH_OPTIONAL_ATTR] = True
         return fn
 
     return deco
 
 
-def requires_permissions(
+def requires_permissions[**P, R](
     *specs: PermissionSpec,
-) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
-    def deco(fn: Callable[_P, _R]) -> Callable[_P, _R]:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def deco(fn: Callable[P, R]) -> Callable[P, R]:
         fn.__dict__[_REQUIRED_PERMS_ATTR] = specs
         return fn
 
@@ -89,7 +90,9 @@ def _is_object_mapping(value: object) -> TypeGuard[Mapping[object, object]]:
     return isinstance(value, Mapping)
 
 
-def _is_permission_spec_tuple(value: object) -> TypeGuard[tuple[PermissionSpec, ...]]:
+def _is_permission_spec_tuple(
+    value: object,
+) -> TypeGuard[tuple[PermissionSpec, ...]]:
     if not _is_object_tuple(value):
         return False
     return all(isinstance(item, PermissionSpec) for item in value)
@@ -120,16 +123,26 @@ def _required_permissions(value: object) -> tuple[PermissionSpec, ...]:
 
 
 class AuthContextMiddleware:
-    __slots__ = ("_max_body_bytes", "_user_cache_ttl_cap_s", "app")
+    __slots__: tuple[str, ...] = (
+        "_max_body_bytes",
+        "_user_cache_ttl_cap_s",
+        "app",
+    )
 
     def __init__(
-        self, app: ASGIApp, *, max_body_bytes: int = 256 * 1024, user_cache_ttl_cap_s: int = 300
+        self: AuthContextMiddleware,
+        app: ASGIApp,
+        *,
+        max_body_bytes: int = 256 * 1024,
+        user_cache_ttl_cap_s: int = 300,
     ) -> None:
         self.app = app
         self._max_body_bytes = max_body_bytes
         self._user_cache_ttl_cap_s = user_cache_ttl_cap_s
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+    async def __call__(
+        self: AuthContextMiddleware, scope: Scope, receive: Receive, send: Send
+    ) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -171,7 +184,7 @@ class AuthContextMiddleware:
         await self.app(scope, request.receive, send)
 
     async def _authenticate_into_context(
-        self,
+        self: AuthContextMiddleware,
         *,
         ctx: Context,
         auth_header: str,
@@ -197,18 +210,26 @@ class AuthContextMiddleware:
             raise UnauthenticatedError("User not found or inactive")
 
         ctx.set_user(auth_user)
-        await cache.set(cache_key, _encode_cached_user(auth_user), ttl_s=self._user_cache_ttl_cap_s)
+        await cache.set(
+            cache_key,
+            _encode_cached_user(auth_user),
+            ttl_s=self._user_cache_ttl_cap_s,
+        )
 
 
 class AuthzRoute(APIRoute):
-    def get_route_handler(self) -> Callable[[Request], Coroutine[object, object, Response]]:
+    def get_route_handler(
+        self: AuthzRoute,
+    ) -> Callable[[Request], Coroutine[object, object, Response]]:
         original = super().get_route_handler()
         endpoint = self.endpoint
         try:
             endpoint_dict = dict(endpoint.__dict__)
         except AttributeError:
             endpoint_dict = {}
-        required = _required_permissions(endpoint_dict.get(_REQUIRED_PERMS_ATTR))
+        required = _required_permissions(
+            endpoint_dict.get(_REQUIRED_PERMS_ATTR)
+        )
         is_auth_required = bool(endpoint_dict.get(_AUTH_REQUIRED_ATTR, False))
         is_optional = bool(endpoint_dict.get(_AUTH_OPTIONAL_ATTR, False))
 
@@ -282,7 +303,9 @@ async def _enforce_permissions(
                     continue
                 denied = perm.deny_fields & req_keys
                 if denied:
-                    raise AuthorizationError(f"Denied fields in {src.name}: {sorted(denied)}")
+                    raise AuthorizationError(
+                        f"Denied fields in {src.name}: {sorted(denied)}"
+                    )
 
 
 def _encode_cached_user(user: AuthUser) -> str:
@@ -316,7 +339,7 @@ def _decode_cached_user(raw: str) -> AuthUser | None:
     ):
         return None
     try:
-        uid = UserId(UUID(user_id))
+        uid = UUID(user_id)
     except ValueError:
         return None
     role_set: set[SystemRole] = set()
@@ -359,6 +382,8 @@ def _decode_permission(raw: str) -> Permission:
         deny_fields = _to_str_frozenset_from_list(data.get("deny_fields", []))
         allow_all_fields = bool(data.get("allow_all_fields", True))
         return Permission(
-            allowed=allowed, deny_fields=deny_fields, allow_all_fields=allow_all_fields
+            allowed=allowed,
+            deny_fields=deny_fields,
+            allow_all_fields=allow_all_fields,
         )
     return Permission(allowed=False)

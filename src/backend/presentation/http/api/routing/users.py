@@ -5,8 +5,12 @@ from starlette.requests import Request
 from uuid_utils.compat import UUID
 
 from backend.application.common.dtos.users import UserResponseDTO
-from backend.application.common.exceptions.application import UnauthenticatedError
-from backend.application.handlers.commands.users.create import CreateUserCommand
+from backend.application.common.exceptions.application import (
+    UnauthenticatedError,
+)
+from backend.application.handlers.commands.users.create import (
+    CreateUserCommand,
+)
 from backend.application.handlers.queries.users.get_user import GetUserQuery
 from backend.presentation.http.api.middlewere.auth import (
     AuthzRoute,
@@ -14,10 +18,13 @@ from backend.presentation.http.api.middlewere.auth import (
     get_ctx,
     require_auth,
 )
-from backend.presentation.http.api.schemas.users import UserCreateRequest, UserResponse
+from backend.presentation.http.api.schemas.users import (
+    UserCreateRequest,
+    UserResponse,
+)
 from backend.startup.di import get_handlers
 
-router = APIRouter(route_class=AuthzRoute)
+router: APIRouter = APIRouter(route_class=AuthzRoute)
 
 
 @router.post("/users", response_model=UserResponse)

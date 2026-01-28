@@ -14,11 +14,13 @@ from backend.application.common.interfaces.ports.shared_lock import SharedLock
 class RedisSharedLock(SharedLock):
     client: Redis
 
-    def __call__(self, key: str) -> AbstractAsyncContextManager[None]:
+    def __call__(
+        self: RedisSharedLock, key: str
+    ) -> AbstractAsyncContextManager[None]:
         return self._lock(key)
 
     @asynccontextmanager
-    async def _lock(self, key: str) -> AsyncIterator[None]:
+    async def _lock(self: RedisSharedLock, key: str) -> AsyncIterator[None]:
         lock: Lock = self.client.lock(key)
         await lock.acquire()
         try:

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from enum import StrEnum, unique
+from enum import Enum, unique
 
 
 @unique
-class PermissionCode(StrEnum):
+class PermissionCode(Enum):
     USERS_READ = "users:read"
     USERS_CREATE = "users:create"
     USERS_UPDATE = "users:update"

@@ -22,7 +22,7 @@ class User(Entity):
     _roles: set[SystemRole]
 
     def __init__(
-        self,
+        self: User,
         *,
         id: UUID,
         email: Email,
@@ -41,32 +41,32 @@ class User(Entity):
         self._roles = set(roles) if roles is not None else set()
 
     @property
-    def email(self) -> Email:
+    def email(self: User) -> Email:
         return self._email
 
     @property
-    def login(self) -> Login:
+    def login(self: User) -> Login:
         return self._login
 
     @property
-    def username(self) -> Username:
+    def username(self: User) -> Username:
         return self._username
 
     @property
-    def password(self) -> Password:
+    def password(self: User) -> Password:
         return self._password
 
     @property
-    def is_active(self) -> bool:
+    def is_active(self: User) -> bool:
         return self._is_active
 
     @property
-    def roles(self) -> frozenset[SystemRole]:
+    def roles(self: User) -> frozenset[SystemRole]:
         return frozenset(self._roles)
 
     @classmethod
     def register(
-        cls,
+        cls: type[User],
         *,
         id: UUID,
         email: Email,
@@ -84,7 +84,7 @@ class User(Entity):
 
     @classmethod
     def rehydrate(
-        cls,
+        cls: type[User],
         *,
         id: UUID,
         email: Email,
@@ -104,44 +104,50 @@ class User(Entity):
             roles=roles,
         )
 
-    def change_email(self, new_email: Email) -> None:
+    def change_email(self: User, new_email: Email) -> None:
         if new_email == self._email:
-            raise DomainError(f"New email {new_email.value!r} is same as current")
+            raise DomainError(
+                f"New email {new_email.value!r} is same as current"
+            )
 
         self._email = new_email
 
-    def change_login(self, new_login: Login) -> None:
+    def change_login(self: User, new_login: Login) -> None:
         if new_login == self._login:
-            raise DomainError(f"New login {new_login.value!r} is same as current")
+            raise DomainError(
+                f"New login {new_login.value!r} is same as current"
+            )
 
         self._login = new_login
 
-    def change_username(self, new_username: Username) -> None:
+    def change_username(self: User, new_username: Username) -> None:
         if new_username == self._username:
-            raise DomainError(f"New username {new_username.value!r} is same as current")
+            raise DomainError(
+                f"New username {new_username.value!r} is same as current"
+            )
 
         self._username = new_username
 
-    def change_password(self, new_password: Password) -> None:
+    def change_password(self: User, new_password: Password) -> None:
         if new_password == self._password:
             raise DomainError("New password must differ from the old one")
 
         self._password = new_password
 
-    def assign_role(self, role: SystemRole) -> None:
+    def assign_role(self: User, role: SystemRole) -> None:
         if role in self._roles:
             return
         self._roles.add(role)
 
-    def revoke_role(self, role: SystemRole) -> None:
+    def revoke_role(self: User, role: SystemRole) -> None:
         if role not in self._roles:
             raise RoleNotAssignedError(role=role, user_id=self.id)
         self._roles.remove(role)
 
-    def has_role(self, role: SystemRole) -> bool:
+    def has_role(self: User, role: SystemRole) -> bool:
         return role in self._roles
 
-    def replace_roles(self, roles: set[SystemRole]) -> None:
+    def replace_roles(self: User, roles: set[SystemRole]) -> None:
         desired_roles = set(roles)
         current_roles = set(self._roles)
         roles_to_remove = current_roles - desired_roles

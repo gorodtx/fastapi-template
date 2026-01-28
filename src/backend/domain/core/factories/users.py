@@ -18,7 +18,9 @@ def _type_error(field: str, exc: Exception) -> DomainTypeError:
     return DomainTypeError(f"{field}: {exc}")
 
 
-def _corrupted_error(user_id: UUID, field: str, exc: Exception) -> UserDataCorruptedError:
+def _corrupted_error(
+    user_id: UUID, field: str, exc: Exception
+) -> UserDataCorruptedError:
     return UserDataCorruptedError(user_id=user_id, details=f"{field}: {exc}")
 
 

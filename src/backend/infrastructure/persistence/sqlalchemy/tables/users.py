@@ -9,7 +9,10 @@ from backend.domain.core.value_objects.identity.email import Email
 from backend.domain.core.value_objects.identity.login import Login
 from backend.domain.core.value_objects.identity.username import Username
 from backend.domain.core.value_objects.password import Password
-from backend.infrastructure.persistence.sqlalchemy.tables.base import mapper_registry, metadata
+from backend.infrastructure.persistence.sqlalchemy.tables.base import (
+    mapper_registry,
+    metadata,
+)
 from backend.infrastructure.persistence.sqlalchemy.types import (
     EmailType,
     LoginType,
@@ -55,7 +58,7 @@ user_is_active_column: Column[bool] = Column(
     default=True,
 )
 
-users_table = Table(
+users_table: Table = Table(
     "users",
     metadata,
     user_id_column,

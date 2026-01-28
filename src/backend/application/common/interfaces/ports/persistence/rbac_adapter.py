@@ -12,13 +12,13 @@ from backend.domain.core.constants.rbac import SystemRole
 
 class RbacAdapter(Protocol):
     def get_user_roles(
-        self, user_id: UUID, /
+        self: RbacAdapter, user_id: UUID, /
     ) -> Awaitable[Result[set[SystemRole], StorageError]]: ...
 
     def replace_user_roles(
-        self, user_id: UUID, roles: set[SystemRole], /
+        self: RbacAdapter, user_id: UUID, roles: set[SystemRole], /
     ) -> Awaitable[Result[None, StorageError]]: ...
 
     def list_user_ids_by_role(
-        self, role: SystemRole, /
+        self: RbacAdapter, role: SystemRole, /
     ) -> Awaitable[Result[list[UUID], StorageError]]: ...

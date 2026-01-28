@@ -8,9 +8,14 @@ from uuid import UUID
 
 from jwt import PyJWTError
 
-from backend.application.common.exceptions.application import AppError, UnauthenticatedError
-from backend.application.common.interfaces.auth.ports import JwtIssuer, JwtVerifier
-from backend.application.common.interfaces.auth.types import UserId
+from backend.application.common.exceptions.application import (
+    AppError,
+    UnauthenticatedError,
+)
+from backend.application.common.interfaces.auth.ports import (
+    JwtIssuer,
+    JwtVerifier,
+)
 from backend.application.handlers.result import Result, ResultImpl
 
 _REQUIRED_CLAIMS: Final[list[str]] = ["exp", "iat", "sub", "iss", "aud"]
@@ -18,7 +23,9 @@ _REQUIRED_CLAIMS: Final[list[str]] = ["exp", "iat", "sub", "iss", "aud"]
 
 if TYPE_CHECKING:
 
-    def _jwt_encode_raw(payload: Mapping[str, object], key: str, *, algorithm: str) -> str: ...
+    def _jwt_encode_raw(
+        payload: Mapping[str, object], key: str, *, algorithm: str
+    ) -> str: ...
 
     def _jwt_decode_raw(
         token: str,
@@ -34,7 +41,9 @@ else:
     from jwt import encode as _jwt_encode_raw
 
 
-def _jwt_encode(payload: Mapping[str, object], key: str, *, algorithm: str) -> str:
+def _jwt_encode(
+    payload: Mapping[str, object], key: str, *, algorithm: str
+) -> str:
     return _jwt_encode_raw(payload, key, algorithm=algorithm)
 
 
@@ -61,6 +70,14 @@ def _jwt_decode(
     return out
 
 
+def _access_error(message: str) -> Result[UUID, AppError]:
+    return ResultImpl.err_app(UnauthenticatedError(message))
+
+
+def _refresh_error(message: str) -> Result[tuple[UUID, str], AppError]:
+    return ResultImpl.err_app(UnauthenticatedError(message))
+
+
 @dataclass(frozen=True, slots=True)
 class JwtConfig:
     issuer: str
@@ -75,10 +92,10 @@ class JwtConfig:
 class JwtImpl(JwtIssuer, JwtVerifier):
     cfg: JwtConfig
 
-    def _now(self) -> datetime:
+    def _now(self: JwtImpl) -> datetime:
         return datetime.now(tz=UTC)
 
-    def issue_access(self, *, user_id: UserId) -> str:
+    def issue_access(self: JwtImpl, *, user_id: UUID) -> str:
         now = self._now()
         payload = {
             "iss": self.cfg.issuer,
@@ -90,7 +107,9 @@ class JwtImpl(JwtIssuer, JwtVerifier):
         }
         return _jwt_encode(payload, self.cfg.secret, algorithm=self.cfg.alg)
 
-    def issue_refresh(self, *, user_id: UserId, fingerprint: str) -> str:
+    def issue_refresh(
+        self: JwtImpl, *, user_id: UUID, fingerprint: str
+    ) -> str:
         now = self._now()
         payload = {
             "iss": self.cfg.issuer,
@@ -103,7 +122,7 @@ class JwtImpl(JwtIssuer, JwtVerifier):
         }
         return _jwt_encode(payload, self.cfg.secret, algorithm=self.cfg.alg)
 
-    def verify_access(self, token: str) -> Result[UserId, AppError]:
+    def verify_access(self: JwtImpl, token: str) -> Result[UUID, AppError]:
         try:
             data = _jwt_decode(
                 token,
@@ -114,19 +133,21 @@ class JwtImpl(JwtIssuer, JwtVerifier):
                 options={"require": _REQUIRED_CLAIMS},
             )
         except PyJWTError as exc:
-            return ResultImpl.err(UnauthenticatedError(f"Invalid access token: {exc}"))
+            return _access_error(f"Invalid access token: {exc}")
 
         if data.get("typ") != "access":
-            return ResultImpl.err(UnauthenticatedError("Invalid access token type"))
+            return _access_error("Invalid access token type")
         sub = data.get("sub")
         if not isinstance(sub, str):
-            return ResultImpl.err(UnauthenticatedError("Invalid token subject"))
+            return _access_error("Invalid token subject")
         try:
-            return ResultImpl.ok(UserId(UUID(sub)))
+            return ResultImpl.ok(UUID(sub), AppError)
         except ValueError as exc:
-            return ResultImpl.err(UnauthenticatedError(f"Invalid token subject: {exc}"))
+            return _access_error(f"Invalid token subject: {exc}")
 
-    def verify_refresh(self, token: str) -> Result[tuple[UserId, str], AppError]:
+    def verify_refresh(
+        self: JwtImpl, token: str
+    ) -> Result[tuple[UUID, str], AppError]:
         try:
             data = _jwt_decode(
                 token,
@@ -137,15 +158,16 @@ class JwtImpl(JwtIssuer, JwtVerifier):
                 options={"require": _REQUIRED_CLAIMS},
             )
         except PyJWTError as exc:
-            return ResultImpl.err(UnauthenticatedError(f"Invalid refresh token: {exc}"))
+            return _refresh_error(f"Invalid refresh token: {exc}")
 
         if data.get("typ") != "refresh":
-            return ResultImpl.err(UnauthenticatedError("Invalid refresh token type"))
+            return _refresh_error("Invalid refresh token type")
         sub = data.get("sub")
         fpr = data.get("fpr")
         if not isinstance(sub, str) or not isinstance(fpr, str) or not fpr:
-            return ResultImpl.err(UnauthenticatedError("Invalid refresh token"))
+            return _refresh_error("Invalid refresh token")
         try:
-            return ResultImpl.ok((UserId(UUID(sub)), fpr))
+            fingerprint: str = fpr or ""
+            return ResultImpl.ok((UUID(sub), fingerprint), AppError)
         except ValueError as exc:
-            return ResultImpl.err(UnauthenticatedError(f"Invalid token subject: {exc}"))
+            return _refresh_error(f"Invalid token subject: {exc}")

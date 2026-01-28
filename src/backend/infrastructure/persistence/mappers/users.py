@@ -3,7 +3,10 @@ from __future__ import annotations
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.user import User
 from backend.domain.core.factories.users import UserFactory
-from backend.infrastructure.persistence.records import UserRoleCodeRecord, UserRowRecord
+from backend.infrastructure.persistence.records import (
+    UserRoleCodeRecord,
+    UserRowRecord,
+)
 from backend.infrastructure.tools.converters import CONVERTERS
 
 

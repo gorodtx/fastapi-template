@@ -5,4 +5,6 @@ from typing import Protocol
 
 
 class SharedLock(Protocol):
-    def __call__(self, key: str) -> AbstractAsyncContextManager[None]: ...
+    def __call__(
+        self: SharedLock, key: str
+    ) -> AbstractAsyncContextManager[None]: ...

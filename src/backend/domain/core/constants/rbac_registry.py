@@ -12,7 +12,9 @@ from backend.domain.core.constants.permission_codes import (
     USERS_UPDATE,
 )
 from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.value_objects.access.permission_code import PermissionCode
+from backend.domain.core.value_objects.access.permission_code import (
+    PermissionCode,
+)
 
 _EMPTY_PERMISSIONS: Final[frozenset[PermissionCode]] = frozenset()
 

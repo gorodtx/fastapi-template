@@ -26,7 +26,7 @@ role_description_column: Column[str] = Column(
     nullable=True,
 )
 
-roles_table = Table(
+roles_table: Table = Table(
     "roles",
     metadata,
     role_id_column,

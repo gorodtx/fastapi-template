@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from backend.application.common.dtos.users import UserResponseDTO, UserWithRolesDTO
+from backend.application.common.dtos.users import (
+    UserResponseDTO,
+    UserWithRolesDTO,
+)
 from backend.application.common.tools.response_mapper import ResponseMapper
 from backend.domain.core.entities.user import User
 from backend.domain.core.services.access_control import permissions_for_roles
@@ -35,4 +38,4 @@ def build_response_mapper() -> ResponseMapper:
     return mapper
 
 
-DEFAULT_RESPONSE_MAPPER = build_response_mapper()
+DEFAULT_RESPONSE_MAPPER: ResponseMapper = build_response_mapper()

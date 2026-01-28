@@ -7,7 +7,10 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from backend.application.common.exceptions.storage import StorageError
 from backend.application.handlers.result import Result, ResultImpl
-from backend.infrastructure.errors.sqlalchemy_errors import map_dbapi_error, map_integrity_error
+from backend.infrastructure.errors.sqlalchemy_errors import (
+    map_dbapi_error,
+    map_integrity_error,
+)
 
 
 def _default_map_exc(exc: Exception) -> StorageError:
@@ -28,7 +31,8 @@ def as_result[T, A1, A2](
     *,
     map_err: Callable[[Exception], StorageError] | None = None,
 ) -> Callable[
-    [Callable[[A1, A2], Awaitable[T]]], Callable[[A1, A2], Awaitable[Result[T, StorageError]]]
+    [Callable[[A1, A2], Awaitable[T]]],
+    Callable[[A1, A2], Awaitable[Result[T, StorageError]]],
 ]:
     mapper = map_err or _default_map_exc
 

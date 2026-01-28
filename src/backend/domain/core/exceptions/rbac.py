@@ -9,35 +9,47 @@ from backend.domain.core.exceptions.base import DomainError
 class RoleError(DomainError):
     """Base role domain error."""
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
 
 class RoleAssignmentError(RoleError):
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
 
 class RoleAlreadyAssignedError(RoleAssignmentError):
-    __slots__ = ("_role", "_user_id")
+    __slots__: tuple[str, ...] = ("_role", "_user_id")
 
-    def __init__(self, role: SystemRole, user_id: UUID) -> None:
+    def __init__(
+        self: RoleAlreadyAssignedError, role: SystemRole, user_id: UUID
+    ) -> None:
         self._role = role
         self._user_id = user_id
-        super().__init__(f"Role {role.value!r} already assigned to user {user_id!r}")
+        super().__init__(
+            f"Role {role.value!r} already assigned to user {user_id!r}"
+        )
 
 
 class RoleNotAssignedError(RoleAssignmentError):
-    __slots__ = ("_role", "_user_id")
+    __slots__: tuple[str, ...] = ("_role", "_user_id")
 
-    def __init__(self, role: SystemRole, user_id: UUID) -> None:
+    def __init__(
+        self: RoleNotAssignedError, role: SystemRole, user_id: UUID
+    ) -> None:
         self._role = role
         self._user_id = user_id
-        super().__init__(f"Role {role.value!r} not assigned to user {user_id!r}")
+        super().__init__(
+            f"Role {role.value!r} not assigned to user {user_id!r}"
+        )
 
 
 class RoleHierarchyViolationError(RoleError):
-    __slots__ = ("_action", "_target_role")
+    __slots__: tuple[str, ...] = ("_action", "_target_role")
 
-    def __init__(self, action: RoleAction, target_role: SystemRole) -> None:
+    def __init__(
+        self: RoleHierarchyViolationError,
+        action: RoleAction,
+        target_role: SystemRole,
+    ) -> None:
         self._action = action
         self._target_role = target_role
         super().__init__(
@@ -46,17 +58,23 @@ class RoleHierarchyViolationError(RoleError):
 
 
 class RoleSelfModificationError(RoleAssignmentError):
-    __slots__ = ("_action", "_user_id")
+    __slots__: tuple[str, ...] = ("_action", "_user_id")
 
-    def __init__(self, action: RoleAction, user_id: UUID) -> None:
+    def __init__(
+        self: RoleSelfModificationError, action: RoleAction, user_id: UUID
+    ) -> None:
         self._action = action
         self._user_id = user_id
-        super().__init__(f"User {user_id!r} cannot {action.value} roles for self")
+        super().__init__(
+            f"User {user_id!r} cannot {action.value} roles for self"
+        )
 
 
 class LastSuperAdminRemovalError(RoleAssignmentError):
-    __slots__ = ("_user_id",)
+    __slots__: tuple[str, ...] = ("_user_id",)
 
-    def __init__(self, user_id: UUID) -> None:
+    def __init__(self: LastSuperAdminRemovalError, user_id: UUID) -> None:
         self._user_id = user_id
-        super().__init__(f"Cannot revoke last super_admin role from user {user_id!r}")
+        super().__init__(
+            f"Cannot revoke last super_admin role from user {user_id!r}"
+        )

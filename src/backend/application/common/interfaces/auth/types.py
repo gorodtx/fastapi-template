@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import NewType
 from uuid import UUID
 
 from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.value_objects.access.permission_code import PermissionCode
-
-UserId = NewType("UserId", UUID)
+from backend.domain.core.value_objects.access.permission_code import (
+    PermissionCode,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class AuthUser:
-    id: UserId
+    id: UUID
     roles: frozenset[SystemRole]
     is_active: bool
     is_superuser: bool = False
@@ -33,7 +32,7 @@ class Permission:
     deny_fields: frozenset[str] = frozenset()
     allow_all_fields: bool = True
 
-    def check(self, spec: PermissionSpec) -> None:
+    def check(self: Permission, spec: PermissionSpec) -> None:
         if not self.allowed:
             raise PermissionError(f"Forbidden: {spec.code.value}")
         if self.allow_all_fields:

@@ -4,9 +4,9 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from backend.application.common.exceptions.storage import StorageError
 
-_SQLSTATE_UNIQUE = "23505"
-_SQLSTATE_FK = "23503"
-_SQLSTATE_NOT_NULL = "23502"
+_SQLSTATE_UNIQUE: str = "23505"
+_SQLSTATE_FK: str = "23503"
+_SQLSTATE_NOT_NULL: str = "23502"
 
 
 def _read_attr(obj: object, name: str) -> object | None:
@@ -32,7 +32,9 @@ def extract_constraint(err: IntegrityError | DBAPIError) -> str | None:
     if orig is None:
         return None
     diag = _read_attr(orig, "diag")
-    constraint = _read_attr(diag, "constraint_name") if diag is not None else None
+    constraint = (
+        _read_attr(diag, "constraint_name") if diag is not None else None
+    )
     if not constraint:
         constraint = _read_attr(orig, "constraint_name")
     return constraint if isinstance(constraint, str) else None

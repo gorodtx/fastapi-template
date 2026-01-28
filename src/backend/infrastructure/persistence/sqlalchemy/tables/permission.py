@@ -17,7 +17,7 @@ permission_description_column: Column[str] = Column(
     nullable=True,
 )
 
-permissions_table = Table(
+permissions_table: Table = Table(
     "permissions",
     metadata,
     permission_code_column,

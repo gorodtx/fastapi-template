@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-from backend.application.common.dtos.rbac import GetUserRolesDTO, UserRolesResponseDTO
+from backend.application.common.dtos.rbac import (
+    GetUserRolesDTO,
+    UserRolesResponseDTO,
+)
 from backend.application.common.exceptions.application import AppError
-from backend.application.common.exceptions.error_mappers.storage import map_storage_error_to_app
-from backend.application.common.interfaces.ports.persistence.gateway import PersistenceGateway
+from backend.application.common.exceptions.error_mappers.storage import (
+    map_storage_error_to_app,
+)
+from backend.application.common.interfaces.ports.persistence.gateway import (
+    PersistenceGateway,
+)
 from backend.application.common.presenters.rbac import present_user_roles
 from backend.application.handlers.base import QueryHandler
 from backend.application.handlers.result import Result
@@ -14,11 +21,13 @@ class GetUserRolesQuery(GetUserRolesDTO): ...
 
 
 @handler(mode="read")
-class GetUserRolesHandler(QueryHandler[GetUserRolesQuery, UserRolesResponseDTO]):
+class GetUserRolesHandler(
+    QueryHandler[GetUserRolesQuery, UserRolesResponseDTO]
+):
     gateway: PersistenceGateway
 
     async def __call__(
-        self,
+        self: GetUserRolesHandler,
         query: GetUserRolesQuery,
         /,
     ) -> Result[UserRolesResponseDTO, AppError]:

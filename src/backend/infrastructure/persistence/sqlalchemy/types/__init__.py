@@ -5,6 +5,13 @@ from backend.infrastructure.persistence.sqlalchemy.types.identity import (
     LoginType,
     UsernameType,
 )
-from backend.infrastructure.persistence.sqlalchemy.types.security import PasswordHashType
+from backend.infrastructure.persistence.sqlalchemy.types.security import (
+    PasswordHashType,
+)
 
-__all__ = ["EmailType", "LoginType", "PasswordHashType", "UsernameType"]
+__all__: list[str] = [
+    "EmailType",
+    "LoginType",
+    "PasswordHashType",
+    "UsernameType",
+]

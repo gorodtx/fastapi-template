@@ -7,9 +7,13 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
-from backend.application.common.interfaces.ports.persistence.manager import SessionProtocol
+from backend.application.common.interfaces.ports.persistence.manager import (
+    SessionProtocol,
+)
 from backend.infrastructure.persistence.records import UserRowRecord
-from backend.infrastructure.persistence.sqlalchemy.tables.users import users_table
+from backend.infrastructure.persistence.sqlalchemy.tables.users import (
+    users_table,
+)
 from backend.infrastructure.tools.msgspec_tools import convert_record
 
 
@@ -109,10 +113,16 @@ def q_upsert_user_row(
     return _q
 
 
-def q_delete_user(user_id: UUID) -> Callable[[SessionProtocol], Awaitable[bool]]:
+def q_delete_user(
+    user_id: UUID,
+) -> Callable[[SessionProtocol], Awaitable[bool]]:
     async def _q(session: SessionProtocol) -> bool:
         async_session = _require_async_session(session)
-        stmt = sa.delete(users_table).where(users_table.c.id == user_id).returning(users_table.c.id)
+        stmt = (
+            sa.delete(users_table)
+            .where(users_table.c.id == user_id)
+            .returning(users_table.c.id)
+        )
         res = await async_session.execute(stmt)
         deleted = res.scalar_one_or_none()
         return deleted is not None

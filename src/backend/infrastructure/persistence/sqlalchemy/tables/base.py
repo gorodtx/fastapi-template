@@ -15,4 +15,4 @@ NAMING_CONVENTION: Final[dict[str, str]] = {
 
 metadata: MetaData = MetaData(naming_convention=NAMING_CONVENTION)
 
-mapper_registry = registry(metadata=metadata)
+mapper_registry: registry = registry(metadata=metadata)

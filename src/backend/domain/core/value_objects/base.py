@@ -6,7 +6,7 @@ from typing import dataclass_transform, overload
 
 
 class ValueObject:
-    def __post_init__(self) -> None:
+    def __post_init__(self: ValueObject) -> None:
         return None
 
 

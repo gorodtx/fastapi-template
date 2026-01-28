@@ -88,7 +88,9 @@ def _parse_bootstrap_user(payload: Mapping[str, object]) -> _BootstrapUser:
 def _require_str(payload: Mapping[str, object], key: str) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{_BOOTSTRAP_ENV_VAR} field '{key}' must be a non-empty string")
+        raise ValueError(
+            f"{_BOOTSTRAP_ENV_VAR} field '{key}' must be a non-empty string"
+        )
     return value.strip()
 
 
@@ -116,15 +118,21 @@ def _hash_password(raw_password: str) -> str:
 def _parse_roles(raw: object) -> tuple[SystemRole, ...]:
     if raw is None:
         return (SystemRole.SUPER_ADMIN,)
-    role_items = _ensure_list(raw, f"{_BOOTSTRAP_ENV_VAR} field 'roles' must be a list of strings")
+    role_items = _ensure_list(
+        raw, f"{_BOOTSTRAP_ENV_VAR} field 'roles' must be a list of strings"
+    )
     roles: set[SystemRole] = set()
     for item in role_items:
         if not isinstance(item, str):
-            raise ValueError(f"{_BOOTSTRAP_ENV_VAR} role values must be strings")
+            raise ValueError(
+                f"{_BOOTSTRAP_ENV_VAR} role values must be strings"
+            )
         try:
             roles.add(SystemRole(item))
         except ValueError as exc:
-            raise ValueError(f"Unknown role {item!r} in {_BOOTSTRAP_ENV_VAR}") from exc
+            raise ValueError(
+                f"Unknown role {item!r} in {_BOOTSTRAP_ENV_VAR}"
+            ) from exc
     if not roles:
         raise ValueError(f"{_BOOTSTRAP_ENV_VAR} field 'roles' cannot be empty")
     return tuple(sorted(roles, key=lambda role: role.value))
@@ -147,12 +155,19 @@ def _is_object_list(value: object) -> TypeGuard[list[object]]:
 def upgrade() -> None:
     users_table = op.create_table(
         "users",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            nullable=False,
+        ),
         sa.Column("email", sa.String(255), nullable=False),
         sa.Column("login", sa.String(20), nullable=False),
         sa.Column("username", sa.String(20), nullable=False),
         sa.Column("password_hash", sa.String(255), nullable=False),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column(
+            "is_active", sa.Boolean(), nullable=False, server_default=sa.true()
+        ),
         sa.UniqueConstraint("email"),
         sa.UniqueConstraint("login"),
         sa.UniqueConstraint("username"),
@@ -160,8 +175,15 @@ def upgrade() -> None:
 
     roles_table = op.create_table(
         "roles",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("code", sa.Enum(SystemRole, native_enum=False), nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            nullable=False,
+        ),
+        sa.Column(
+            "code", sa.Enum(SystemRole, native_enum=False), nullable=False
+        ),
         sa.Column("description", sa.String(255), nullable=True),
         sa.UniqueConstraint("code"),
     )
@@ -208,8 +230,14 @@ def upgrade() -> None:
         ),
     )
 
-    op.create_index("ix_role_permissions_role_id", "role_permissions", ["role_id"])
-    op.create_index("ix_role_permissions_permission_code", "role_permissions", ["permission_code"])
+    op.create_index(
+        "ix_role_permissions_role_id", "role_permissions", ["role_id"]
+    )
+    op.create_index(
+        "ix_role_permissions_permission_code",
+        "role_permissions",
+        ["permission_code"],
+    )
     op.create_index("ix_user_roles_user_id", "user_roles", ["user_id"])
     op.create_index("ix_user_roles_role_id", "user_roles", ["role_id"])
 
@@ -228,7 +256,9 @@ def upgrade() -> None:
             "code": permission.value,
             "description": None,
         }
-        for permission in sorted(ALL_PERMISSION_CODES, key=lambda item: item.value)
+        for permission in sorted(
+            ALL_PERMISSION_CODES, key=lambda item: item.value
+        )
     ]
     op.bulk_insert(permissions_table, permission_rows)
 
@@ -265,7 +295,10 @@ def upgrade() -> None:
                 )
             )
 
-        user_role_rows = [{"user_id": user_id, "role_id": _role_id(role)} for role in user.roles]
+        user_role_rows = [
+            {"user_id": user_id, "role_id": _role_id(role)}
+            for role in user.roles
+        ]
         if user_role_rows:
             stmt = pg_insert(user_roles_table).values(user_role_rows)
             stmt = stmt.on_conflict_do_nothing()
@@ -291,7 +324,9 @@ def _find_user_id(
 def downgrade() -> None:
     op.drop_index("ix_user_roles_role_id", table_name="user_roles")
     op.drop_index("ix_user_roles_user_id", table_name="user_roles")
-    op.drop_index("ix_role_permissions_permission_code", table_name="role_permissions")
+    op.drop_index(
+        "ix_role_permissions_permission_code", table_name="role_permissions"
+    )
     op.drop_index("ix_role_permissions_role_id", table_name="role_permissions")
     op.drop_table("user_roles")
     op.drop_table("role_permissions")

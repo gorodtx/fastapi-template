@@ -1,20 +1,29 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from starlette.middleware import Middleware, _ASGIApp
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from backend.application.common.exceptions.application import AppError
 from backend.infrastructure.tools.converters import register_domain_converters
-from backend.presentation.http.api.middlewere.auth import AuthContextMiddleware, AuthzRoute
+from backend.presentation.http.api.middlewere.auth import (
+    AuthContextMiddleware,
+    AuthzRoute,
+)
 from backend.presentation.http.api.routing import api_router
 from backend.startup.di import setup_di
 
 
+def _auth_middleware(
+    app: _ASGIApp, /, *_args: object, **_kwargs: object
+) -> _ASGIApp:
+    return AuthContextMiddleware(app)
+
+
 def create_app() -> FastAPI:
     register_domain_converters()
-    app = FastAPI()
-    app.add_middleware(AuthContextMiddleware)
+    app = FastAPI(middleware=[Middleware(_auth_middleware)])
     setup_di(app)
     app.router.route_class = AuthzRoute
     app.add_exception_handler(AppError, _app_error_handler)

@@ -6,10 +6,14 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
-from backend.application.common.interfaces.ports.persistence.manager import SessionProtocol
+from backend.application.common.interfaces.ports.persistence.manager import (
+    SessionProtocol,
+)
 from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.records import UserRoleCodeRecord
-from backend.infrastructure.persistence.sqlalchemy.tables.role import roles_table
+from backend.infrastructure.persistence.sqlalchemy.tables.role import (
+    roles_table,
+)
 from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import (
     user_roles_table,
 )
@@ -70,7 +74,9 @@ def q_get_role_ids_by_codes(
         async_session = _require_async_session(session)
         if not codes:
             return []
-        stmt = sa.select(roles_table.c.code, roles_table.c.id).where(roles_table.c.code.in_(codes))
+        stmt = sa.select(roles_table.c.code, roles_table.c.id).where(
+            roles_table.c.code.in_(codes)
+        )
         res = await async_session.execute(stmt)
         out: list[tuple[SystemRole, UUID]] = []
         for role_code, role_id in res.all():
@@ -86,10 +92,14 @@ def q_replace_user_roles(
     async def _q(session: SessionProtocol) -> None:
         async_session = _require_async_session(session)
         await async_session.execute(
-            sa.delete(user_roles_table).where(user_roles_table.c.user_id == user_id)
+            sa.delete(user_roles_table).where(
+                user_roles_table.c.user_id == user_id
+            )
         )
         if role_ids:
-            payload = [{"user_id": user_id, "role_id": rid} for rid in role_ids]
+            payload = [
+                {"user_id": user_id, "role_id": rid} for rid in role_ids
+            ]
             await async_session.execute(sa.insert(user_roles_table), payload)
 
     return _q
@@ -100,7 +110,9 @@ def q_list_user_ids_by_role_id(
 ) -> Callable[[SessionProtocol], Awaitable[list[UUID]]]:
     async def _q(session: SessionProtocol) -> list[UUID]:
         async_session = _require_async_session(session)
-        stmt = sa.select(user_roles_table.c.user_id).where(user_roles_table.c.role_id == role_id)
+        stmt = sa.select(user_roles_table.c.user_id).where(
+            user_roles_table.c.role_id == role_id
+        )
         res = await async_session.execute(stmt)
         return [_value_to_uuid(row[0]) for row in res.all()]
 

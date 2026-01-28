@@ -15,7 +15,9 @@ from backend.domain.core.entities.user import User
 from backend.domain.core.services.access_control import permissions_for_roles
 
 
-def present_role_assignment(user_id: UUID, role: SystemRole) -> RoleAssignmentResultDTO:
+def present_role_assignment(
+    user_id: UUID, role: SystemRole
+) -> RoleAssignmentResultDTO:
     return RoleAssignmentResultDTO(user_id=user_id, role=role.value)
 
 
@@ -36,7 +38,9 @@ def present_user_roles(user: User) -> UserRolesResponseDTO:
     )
 
 
-def present_users_by_role(role: SystemRole, users: list[UserResponseDTO]) -> UsersByRoleResponseDTO:
+def present_users_by_role(
+    role: SystemRole, users: list[UserResponseDTO]
+) -> UsersByRoleResponseDTO:
     return UsersByRoleResponseDTO(role=role.value, users=users)
 
 

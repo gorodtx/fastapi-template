@@ -11,32 +11,46 @@ from backend.domain.core.exceptions.rbac import (
     RoleHierarchyViolationError,
     RoleSelfModificationError,
 )
-from backend.domain.core.value_objects.access.permission_code import PermissionCode
+from backend.domain.core.value_objects.access.permission_code import (
+    PermissionCode,
+)
 
 _EMPTY_PERMISSIONS: frozenset[PermissionCode] = frozenset[PermissionCode]()
 
 
-def permissions_for_roles(roles: Iterable[SystemRole]) -> frozenset[PermissionCode]:
+def permissions_for_roles(
+    roles: Iterable[SystemRole],
+) -> frozenset[PermissionCode]:
     permissions: set[PermissionCode] = set()
     for role in roles:
         permissions.update(ROLE_PERMISSIONS.get(role, _EMPTY_PERMISSIONS))
     return frozenset(permissions)
 
 
-def is_allowed(roles: Iterable[SystemRole], permission: PermissionCode) -> bool:
+def is_allowed(
+    roles: Iterable[SystemRole], permission: PermissionCode
+) -> bool:
     return permission in permissions_for_roles(roles)
 
 
-def ensure_can_assign_role(actor_roles: Set[SystemRole], target_role: SystemRole) -> None:
+def ensure_can_assign_role(
+    actor_roles: Set[SystemRole], target_role: SystemRole
+) -> None:
     if _can_manage_role(actor_roles, target_role):
         return
-    raise RoleHierarchyViolationError(action=RoleAction.ASSIGN, target_role=target_role)
+    raise RoleHierarchyViolationError(
+        action=RoleAction.ASSIGN, target_role=target_role
+    )
 
 
-def ensure_can_revoke_role(actor_roles: Set[SystemRole], target_role: SystemRole) -> None:
+def ensure_can_revoke_role(
+    actor_roles: Set[SystemRole], target_role: SystemRole
+) -> None:
     if _can_manage_role(actor_roles, target_role):
         return
-    raise RoleHierarchyViolationError(action=RoleAction.REVOKE, target_role=target_role)
+    raise RoleHierarchyViolationError(
+        action=RoleAction.REVOKE, target_role=target_role
+    )
 
 
 def ensure_not_self_role_change(
@@ -58,7 +72,11 @@ def ensure_not_last_super_admin(
         raise LastSuperAdminRemovalError(user_id=target_user_id)
 
 
-def _can_manage_role(actor_roles: Set[SystemRole], target_role: SystemRole) -> bool:
+def _can_manage_role(
+    actor_roles: Set[SystemRole], target_role: SystemRole
+) -> bool:
     if SystemRole.SUPER_ADMIN in actor_roles:
         return True
-    return bool(SystemRole.ADMIN in actor_roles and target_role == SystemRole.USER)
+    return bool(
+        SystemRole.ADMIN in actor_roles and target_role == SystemRole.USER
+    )
