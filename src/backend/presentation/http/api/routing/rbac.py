@@ -1,35 +1,34 @@
 from __future__ import annotations
 
+from dishka.integrations.fastapi import FromDishka
 from fastapi import APIRouter
-from starlette.requests import Request
 from uuid_utils.compat import UUID
 
-from backend.application.common.interfaces.auth.types import PermissionSpec
+from backend.application.common.interfaces.auth.types import AuthUser
+from backend.application.common.interfaces.ports.persistence.gateway import (
+    PersistenceGateway,
+)
+from backend.application.common.tools.permission_guard import PermissionGuard
 from backend.application.handlers.queries.rbac.get_user_roles import (
+    GetUserRolesHandler,
     GetUserRolesQuery,
 )
 from backend.domain.core.constants.permission_codes import RBAC_READ_ROLES
-from backend.presentation.http.api.middlewere.auth import (
-    AuthzRoute,
-    requires_permissions,
-)
 from backend.presentation.http.api.schemas.rbac import UserRolesResponse
-from backend.startup.di import get_handlers
 
-router: APIRouter = APIRouter(route_class=AuthzRoute)
+router: APIRouter = APIRouter()
 
 
 @router.get("/rbac/users/{user_id}/roles", response_model=UserRolesResponse)
-@requires_permissions(PermissionSpec(code=RBAC_READ_ROLES))
 async def get_user_roles(
     user_id: UUID,
-    request: Request,
+    gateway: FromDishka[PersistenceGateway],
+    current_user: FromDishka[AuthUser],
+    permission_guard: FromDishka[PermissionGuard],
 ) -> UserRolesResponse:
-    handlers = await get_handlers(request)
-    result = await handlers.get_user_roles(GetUserRolesQuery(user_id=user_id))
+    await permission_guard.require(current_user, RBAC_READ_ROLES)
+    handler = GetUserRolesHandler(gateway=gateway)
+    result = await handler(GetUserRolesQuery(user_id=user_id))
     dto = result.unwrap()
-    return UserRolesResponse(
-        user_id=dto.user_id,
-        roles=list(dto.roles),
-        permissions=list(dto.permissions),
-    )
+
+    return UserRolesResponse.from_dto(dto)

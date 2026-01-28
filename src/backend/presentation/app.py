@@ -1,33 +1,24 @@
 from __future__ import annotations
 
+from dishka.integrations.fastapi import DishkaRoute
 from fastapi import FastAPI
-from starlette.middleware import Middleware, _ASGIApp
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from backend.application.common.exceptions.application import AppError
 from backend.infrastructure.tools import register_domain_converters
-from backend.presentation.http.api.middlewere.auth import (
-    AuthContextMiddleware,
-    AuthzRoute,
-)
+from backend.presentation.di import assert_closed_by_default, setup_di
 from backend.presentation.http.api.routing import api_router
-from backend.startup.di import setup_di
-
-
-def _auth_middleware(
-    app: _ASGIApp, /, *_args: object, **_kwargs: object
-) -> _ASGIApp:
-    return AuthContextMiddleware(app)
 
 
 def create_app() -> FastAPI:
     register_domain_converters()
-    app = FastAPI(middleware=[Middleware(_auth_middleware)])
+    app = FastAPI()
     setup_di(app)
-    app.router.route_class = AuthzRoute
+    app.router.route_class = DishkaRoute
     app.add_exception_handler(AppError, _app_error_handler)
     app.include_router(api_router)
+    assert_closed_by_default(app)
     return app
 
 

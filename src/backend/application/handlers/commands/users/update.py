@@ -20,6 +20,7 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.users import present_user_response
+from backend.application.common.tools.auth_cache import AuthCacheInvalidator
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
     Result,
@@ -39,6 +40,7 @@ class UpdateUserCommand(UserUpdateDTO): ...
 class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
     gateway: PersistenceGateway
     password_hasher: PasswordHasherPort
+    cache_invalidator: AuthCacheInvalidator
 
     async def __call__(
         self: UpdateUserHandler, cmd: UpdateUserCommand, /
@@ -91,4 +93,7 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
             if save_result.is_err():
                 return ResultImpl.err_from(save_result)
 
-            return save_result.map(present_user_response)
+            response = save_result.map(present_user_response)
+
+        await self.cache_invalidator.invalidate_user(cmd.user_id)
+        return response

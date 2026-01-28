@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import UUID
+
+from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.auth.ports import Authenticator
 from backend.application.common.interfaces.auth.types import (
@@ -35,11 +36,14 @@ class AuthenticatorImpl(Authenticator):
             return None
         user = result.unwrap()
         roles = frozenset(user.roles)
+        is_superuser = SystemRole.SUPER_ADMIN in roles
+        is_admin = is_superuser or SystemRole.ADMIN in roles
         return AuthUser(
             id=user.id,
             roles=roles,
             is_active=user.is_active,
-            is_superuser=SystemRole.SUPER_ADMIN in roles,
+            is_admin=is_admin,
+            is_superuser=is_superuser,
             email=user.email.value,
         )
 
@@ -48,26 +52,14 @@ class AuthenticatorImpl(Authenticator):
     ) -> Permission:
         auth_user = await self.authenticate(user_id)
         if auth_user is None or not auth_user.is_active:
-            return Permission(
-                allowed=False,
-                deny_fields=spec.deny_fields,
-                allow_all_fields=spec.allow_all_fields,
-            )
+            return Permission(allowed=False)
 
         if auth_user.is_superuser:
-            return Permission(
-                allowed=True,
-                deny_fields=spec.deny_fields,
-                allow_all_fields=spec.allow_all_fields,
-            )
+            return Permission(allowed=True)
 
         allowed_codes: set[PermissionCode] = set()
         for role in auth_user.roles:
             allowed_codes.update(ROLE_PERMISSIONS.get(role, frozenset()))
 
         allowed = spec.code in allowed_codes
-        return Permission(
-            allowed=allowed,
-            deny_fields=spec.deny_fields,
-            allow_all_fields=spec.allow_all_fields,
-        )
+        return Permission(allowed=allowed)

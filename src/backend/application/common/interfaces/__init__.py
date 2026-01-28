@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from backend.application.common.interfaces import ports
-from backend.application.common.interfaces.auth.context import Context
 from backend.application.common.interfaces.auth.ports import (
     Authenticator,
     JwtIssuer,
@@ -17,7 +16,6 @@ from backend.application.common.interfaces.auth.types import (
 __all__: list[str] = [
     "AuthUser",
     "Authenticator",
-    "Context",
     "JwtIssuer",
     "JwtVerifier",
     "Permission",

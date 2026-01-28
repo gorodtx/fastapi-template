@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from typing import Protocol
-from uuid import UUID
+
+from uuid_utils.compat import UUID
 
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.interfaces.auth.types import (

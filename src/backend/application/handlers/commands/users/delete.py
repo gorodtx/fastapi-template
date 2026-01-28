@@ -12,6 +12,7 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.users import present_user_response
+from backend.application.common.tools.auth_cache import AuthCacheInvalidator
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import Result, ResultImpl
 from backend.application.handlers.transform import handler
@@ -23,6 +24,7 @@ class DeleteUserCommand(DeleteUserDTO): ...
 @handler(mode="write")
 class DeleteUserHandler(CommandHandler[DeleteUserCommand, UserResponseDTO]):
     gateway: PersistenceGateway
+    cache_invalidator: AuthCacheInvalidator
 
     async def __call__(
         self: DeleteUserHandler, cmd: DeleteUserCommand, /
@@ -41,4 +43,9 @@ class DeleteUserHandler(CommandHandler[DeleteUserCommand, UserResponseDTO]):
             if delete_result.is_err():
                 return ResultImpl.err_from(delete_result)
 
-            return ResultImpl.ok(present_user_response(user))
+            response: Result[UserResponseDTO, AppError] = ResultImpl.ok(
+                present_user_response(user)
+            )
+
+        await self.cache_invalidator.invalidate_user(cmd.user_id)
+        return response

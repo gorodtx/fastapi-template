@@ -16,12 +16,14 @@ class RoleAssignmentResultDTO:
 class AssignRoleToUserDTO:
     user_id: UUID
     role: str
+    actor_id: UUID
 
 
 @dto
 class RevokeRoleFromUserDTO:
     user_id: UUID
     role: str
+    actor_id: UUID
 
 
 @dto

@@ -3,10 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Final
-from uuid import UUID
+from typing import Final
 
 from jwt import PyJWTError
+from jwt import decode as _jwt_decode_impl
+from jwt import encode as _jwt_encode_impl
+from uuid_utils.compat import UUID
 
 from backend.application.common.exceptions.application import (
     AppError,
@@ -21,24 +23,36 @@ from backend.application.handlers.result import Result, ResultImpl
 _REQUIRED_CLAIMS: Final[list[str]] = ["exp", "iat", "sub", "iss", "aud"]
 
 
-if TYPE_CHECKING:
+def _jwt_encode_raw(
+    payload: Mapping[str, object], key: str, *, algorithm: str
+) -> str:
+    payload_dict: dict[str, object] = dict(payload)
+    return _jwt_encode_impl(payload_dict, key, algorithm=algorithm)
 
-    def _jwt_encode_raw(
-        payload: Mapping[str, object], key: str, *, algorithm: str
-    ) -> str: ...
 
-    def _jwt_decode_raw(
-        token: str,
-        key: str,
-        *,
-        algorithms: list[str],
-        audience: str,
-        issuer: str,
-        options: dict[str, object],
-    ) -> Mapping[str, object]: ...
-else:
-    from jwt import decode as _jwt_decode_raw
-    from jwt import encode as _jwt_encode_raw
+def _jwt_decode_raw(
+    token: str,
+    key: str,
+    *,
+    algorithms: list[str],
+    audience: str,
+    issuer: str,
+    options: dict[str, object],
+) -> Mapping[str, object]:
+    raw = _jwt_decode_impl(
+        token,
+        key,
+        algorithms=algorithms,
+        audience=audience,
+        issuer=issuer,
+        options=options,
+    )
+    if not isinstance(raw, Mapping):
+        raise TypeError("Invalid token payload")
+    out: dict[str, object] = {}
+    for key_item, value in raw.items():
+        out[str(key_item)] = value
+    return out
 
 
 def _jwt_encode(

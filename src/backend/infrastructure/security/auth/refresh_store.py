@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import UUID
+
+from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.auth.ports import RefreshStore
 from backend.application.common.interfaces.ports.cache import StrCache

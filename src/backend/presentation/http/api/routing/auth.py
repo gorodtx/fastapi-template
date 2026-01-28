@@ -1,17 +1,29 @@
 from __future__ import annotations
 
+from dishka.integrations.fastapi import FromDishka
 from fastapi import APIRouter
-from starlette.requests import Request
 
-from backend.application.handlers.commands.auth.login import LoginUserCommand
-from backend.application.handlers.commands.auth.logout import LogoutUserCommand
+from backend.application.common.interfaces.auth.ports import (
+    JwtIssuer,
+    JwtVerifier,
+    RefreshStore,
+)
+from backend.application.common.interfaces.ports.persistence.gateway import (
+    PersistenceGateway,
+)
+from backend.application.handlers.commands.auth.login import (
+    LoginUserCommand,
+    LoginUserHandler,
+)
+from backend.application.handlers.commands.auth.logout import (
+    LogoutUserCommand,
+    LogoutUserHandler,
+)
 from backend.application.handlers.commands.auth.refresh import (
     RefreshUserCommand,
+    RefreshUserHandler,
 )
-from backend.presentation.http.api.middlewere.auth import (
-    AuthzRoute,
-    auth_optional,
-)
+from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.presentation.http.api.schemas.auth import (
     LoginRequest,
     LogoutRequest,
@@ -19,59 +31,71 @@ from backend.presentation.http.api.schemas.auth import (
     SuccessResponse,
     TokenPairResponse,
 )
-from backend.startup.di import get_handlers
 
-router: APIRouter = APIRouter(route_class=AuthzRoute)
+router: APIRouter = APIRouter()
 
 
 @router.post("/auth/login", response_model=TokenPairResponse)
-@auth_optional()
 async def login_user(
     payload: LoginRequest,
-    request: Request,
+    gateway: FromDishka[PersistenceGateway],
+    password_hasher: FromDishka[PasswordHasherPort],
+    jwt_issuer: FromDishka[JwtIssuer],
+    refresh_store: FromDishka[RefreshStore],
 ) -> TokenPairResponse:
-    handlers = await get_handlers(request)
+    handler = LoginUserHandler(
+        gateway=gateway,
+        password_hasher=password_hasher,
+        jwt_issuer=jwt_issuer,
+        refresh_store=refresh_store,
+    )
     cmd = LoginUserCommand(
         email=payload.email,
         raw_password=payload.raw_password,
         fingerprint=payload.fingerprint,
     )
-    result = await handlers.login_user(cmd)
+    result = await handler(cmd)
     dto = result.unwrap()
-    return TokenPairResponse(
-        access_token=dto.access_token,
-        refresh_token=dto.refresh_token,
-    )
+
+    return TokenPairResponse.from_dto(dto)
 
 
 @router.post("/auth/logout", response_model=SuccessResponse)
-@auth_optional()
 async def logout_user(
     payload: LogoutRequest,
-    request: Request,
+    jwt_verifier: FromDishka[JwtVerifier],
+    refresh_store: FromDishka[RefreshStore],
 ) -> SuccessResponse:
-    handlers = await get_handlers(request)
+    handler = LogoutUserHandler(
+        jwt_verifier=jwt_verifier,
+        refresh_store=refresh_store,
+    )
     cmd = LogoutUserCommand(
         refresh_token=payload.refresh_token,
         fingerprint=payload.fingerprint,
     )
-    result = await handlers.logout_user(cmd)
+    result = await handler(cmd)
     dto = result.unwrap()
-    return SuccessResponse(success=dto.success)
+
+    return SuccessResponse.from_dto(dto)
 
 
 @router.post("/auth/refresh", response_model=TokenPairResponse)
-@auth_optional()
 async def refresh_user(
-    payload: RefreshRequest, request: Request
+    payload: RefreshRequest,
+    jwt_verifier: FromDishka[JwtVerifier],
+    jwt_issuer: FromDishka[JwtIssuer],
+    refresh_store: FromDishka[RefreshStore],
 ) -> TokenPairResponse:
-    handlers = await get_handlers(request)
+    handler = RefreshUserHandler(
+        jwt_verifier=jwt_verifier,
+        jwt_issuer=jwt_issuer,
+        refresh_store=refresh_store,
+    )
     cmd = RefreshUserCommand(
         refresh_token=payload.refresh_token, fingerprint=payload.fingerprint
     )
-    result = await handlers.refresh_user(cmd)
+    result = await handler(cmd)
     dto = result.unwrap()
 
-    return TokenPairResponse(
-        access_token=dto.access_token, refresh_token=dto.refresh_token
-    )
+    return TokenPairResponse.from_dto(dto)
