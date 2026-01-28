@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+from backend.domain.core.exceptions.base import (
+    CorruptedInvariantError,
+    DomainError,
+    DomainTypeError,
+    ForbiddenOperationError,
+)
+from backend.domain.core.exceptions.rbac import (
+    LastSuperAdminRemovalError,
+    RoleAlreadyAssignedError,
+    RoleAssignmentError,
+    RoleError,
+    RoleHierarchyViolationError,
+    RoleNotAssignedError,
+    RoleSelfModificationError,
+)
+from backend.domain.core.exceptions.user import (
+    DuplicateUserIdError,
+    EmailAlreadyExistsError,
+    InactiveUserOperationError,
+    InsufficientPermissionsError,
+    RoleAssignmentNotAllowedError,
+    SelfOperationNotAllowedError,
+    UserAlreadyActiveError,
+    UserAlreadyExistsError,
+    UserAlreadyInactiveError,
+    UserDataCorruptedError,
+    UserInvariantViolationError,
+    UsernameAlreadyExistsError,
+    UserPermissionError,
+    UserStateViolationError,
+)
+
+__all__: list[str] = [
+    "CorruptedInvariantError",
+    "DomainError",
+    "DomainTypeError",
+    "DuplicateUserIdError",
+    "EmailAlreadyExistsError",
+    "ForbiddenOperationError",
+    "InactiveUserOperationError",
+    "InsufficientPermissionsError",
+    "LastSuperAdminRemovalError",
+    "RoleAlreadyAssignedError",
+    "RoleAssignmentError",
+    "RoleAssignmentNotAllowedError",
+    "RoleError",
+    "RoleHierarchyViolationError",
+    "RoleNotAssignedError",
+    "RoleSelfModificationError",
+    "SelfOperationNotAllowedError",
+    "UserAlreadyActiveError",
+    "UserAlreadyExistsError",
+    "UserAlreadyInactiveError",
+    "UserDataCorruptedError",
+    "UserInvariantViolationError",
+    "UserPermissionError",
+    "UserStateViolationError",
+    "UsernameAlreadyExistsError",
+]

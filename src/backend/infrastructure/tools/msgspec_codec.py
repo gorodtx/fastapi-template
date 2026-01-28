@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Protocol, TypeGuard, runtime_checkable
 
 from backend.application.common.interfaces.ports.serialization import DTOCodec
-from backend.infrastructure.tools.msgspec_tools import (
+from backend.infrastructure.tools import (
     convert_from,
     convert_to,
     msgpack_decoder,

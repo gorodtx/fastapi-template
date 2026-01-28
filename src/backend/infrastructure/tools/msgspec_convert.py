@@ -10,7 +10,10 @@ from typing import Final, Literal, Protocol, runtime_checkable
 import msgspec
 from uuid_utils.compat import UUID
 
-from backend.infrastructure.tools.converters import CONVERTERS, ConversionError
+from backend.infrastructure.tools.domain_converters import (
+    CONVERTERS,
+    ConversionError,
+)
 
 DEFAULT_CONVERT_TO_TYPES: Final[tuple[type, ...]] = (
     bytes,
@@ -91,16 +94,9 @@ def _row_dec_hook(tp: type[object], obj: object) -> object:
     return decoded
 
 
-def _coerce_record_mapping(row: Mapping[str, object]) -> dict[str, object]:
-    out: dict[str, object] = {}
-    for key, value in row.items():
-        out[key] = value
-    return out
-
-
 def convert_record[T](row: Mapping[str, object], record_type: type[T]) -> T:
     return msgspec.convert(
-        _coerce_record_mapping(row),
+        dict(row),
         record_type,
         strict=True,
         dec_hook=_row_dec_hook,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Sequence
 
 import sqlalchemy as sa
+from sqlalchemy import RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
@@ -17,8 +18,7 @@ from backend.infrastructure.persistence.sqlalchemy.tables.role import (
 from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import (
     user_roles_table,
 )
-from backend.infrastructure.tools.converters import CONVERTERS
-from backend.infrastructure.tools.msgspec_tools import convert_record
+from backend.infrastructure.tools import CONVERTERS, convert_record
 
 
 def _value_to_uuid(value: object) -> UUID:
@@ -32,7 +32,7 @@ def _value_to_uuid(value: object) -> UUID:
 def _decode_role(value: object) -> SystemRole:
     if isinstance(value, SystemRole):
         return value
-    decoded = CONVERTERS.decode(value, SystemRole)
+    decoded: SystemRole | None = CONVERTERS.decode(value, SystemRole)
     if decoded is None:
         raise TypeError("role must not be None")
     return decoded
@@ -61,7 +61,7 @@ def q_get_user_role_codes(
             .where(user_roles_table.c.user_id == user_id)
         )
         res = await async_session.execute(stmt)
-        rows = res.mappings().all()
+        rows: Sequence[RowMapping] = res.mappings().all()
         return [convert_record(dict(row), UserRoleCodeRecord) for row in rows]
 
     return _q

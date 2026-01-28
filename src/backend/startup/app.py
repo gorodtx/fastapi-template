@@ -6,7 +6,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from backend.application.common.exceptions.application import AppError
-from backend.infrastructure.tools.converters import register_domain_converters
+from backend.infrastructure.tools import register_domain_converters
 from backend.presentation.http.api.middlewere.auth import (
     AuthContextMiddleware,
     AuthzRoute,

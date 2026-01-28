@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from functools import wraps
 
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
@@ -27,27 +26,14 @@ def _default_map_exc(exc: Exception) -> StorageError:
     )
 
 
-def as_result[T, A1, A2](
-    *,
+async def storage_result[T](
+    fn: Callable[[], Awaitable[T]],
     map_err: Callable[[Exception], StorageError] | None = None,
-) -> Callable[
-    [Callable[[A1, A2], Awaitable[T]]],
-    Callable[[A1, A2], Awaitable[Result[T, StorageError]]],
-]:
+) -> Result[T, StorageError]:
     mapper = map_err or _default_map_exc
-
-    def decorator(
-        fn: Callable[[A1, A2], Awaitable[T]],
-    ) -> Callable[[A1, A2], Awaitable[Result[T, StorageError]]]:
-        @wraps(fn)
-        async def wrapper(a1: A1, a2: A2) -> Result[T, StorageError]:
-            try:
-                return ResultImpl.ok(await fn(a1, a2))
-            except Exception as exc:
-                if isinstance(exc, StorageError):
-                    return ResultImpl.err(exc)
-                return ResultImpl.err(mapper(exc))
-
-        return wrapper
-
-    return decorator
+    try:
+        return ResultImpl.ok(await fn())
+    except Exception as exc:
+        if isinstance(exc, StorageError):
+            return ResultImpl.err(exc)
+        return ResultImpl.err(mapper(exc))

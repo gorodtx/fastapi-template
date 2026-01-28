@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 import sqlalchemy as sa
+from sqlalchemy import RowMapping
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
@@ -14,7 +15,7 @@ from backend.infrastructure.persistence.records import UserRowRecord
 from backend.infrastructure.persistence.sqlalchemy.tables.users import (
     users_table,
 )
-from backend.infrastructure.tools.msgspec_tools import convert_record
+from backend.infrastructure.tools import convert_record
 
 
 def _require_async_session(session: SessionProtocol) -> AsyncSession:
@@ -41,7 +42,7 @@ def q_get_user_row_by_id(
             .where(users_table.c.id == user_id)
         )
         res = await async_session.execute(stmt)
-        row = res.mappings().first()
+        row: RowMapping | None = res.mappings().first()
         if row is None:
             return None
         return convert_record(dict(row), UserRowRecord)
@@ -67,7 +68,7 @@ def q_get_user_row_by_email(
             .where(users_table.c.email == email)
         )
         res = await async_session.execute(stmt)
-        row = res.mappings().first()
+        row: RowMapping | None = res.mappings().first()
         if row is None:
             return None
         return convert_record(dict(row), UserRowRecord)
@@ -105,7 +106,7 @@ def q_upsert_user_row(
             )
         )
         res = await async_session.execute(stmt)
-        row_mapping = res.mappings().first()
+        row_mapping: RowMapping | None = res.mappings().first()
         if row_mapping is None:
             raise RuntimeError("Failed to upsert user row")
         return convert_record(dict(row_mapping), UserRowRecord)
