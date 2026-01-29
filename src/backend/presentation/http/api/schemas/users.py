@@ -17,3 +17,8 @@ class UserResponse(BaseShema):
     email: str
     login: str
     username: str
+
+
+class UserUpdateRequest(BaseShema):
+    email: str | None = None
+    raw_password: str | None = None

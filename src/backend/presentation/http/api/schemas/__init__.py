@@ -8,10 +8,14 @@ from backend.presentation.http.api.schemas.auth import (
     TokenPairResponse,
 )
 from backend.presentation.http.api.schemas.base import BaseShema
-from backend.presentation.http.api.schemas.rbac import UserRolesResponse
+from backend.presentation.http.api.schemas.rbac import (
+    RoleChangeRequest,
+    UserRolesResponse,
+)
 from backend.presentation.http.api.schemas.users import (
     UserCreateRequest,
     UserResponse,
+    UserUpdateRequest,
 )
 
 __all__: list[str] = [
@@ -19,9 +23,11 @@ __all__: list[str] = [
     "LoginRequest",
     "LogoutRequest",
     "RefreshRequest",
+    "RoleChangeRequest",
     "SuccessResponse",
     "TokenPairResponse",
     "UserCreateRequest",
     "UserResponse",
     "UserRolesResponse",
+    "UserUpdateRequest",
 ]

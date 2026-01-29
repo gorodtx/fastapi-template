@@ -9,3 +9,7 @@ class UserRolesResponse(BaseShema):
     user_id: UUID
     roles: list[str]
     permissions: list[str]
+
+
+class RoleChangeRequest(BaseShema):
+    role: str
