@@ -1,4 +1,3 @@
-from backend.application.handlers.base import QueryHandler
-from backend.application.handlers.queries import rbac, users
+from __future__ import annotations
 
-__all__: list[str] = ["QueryHandler", "rbac", "users"]
+__all__: tuple[str, ...] = ("rbac", "users")

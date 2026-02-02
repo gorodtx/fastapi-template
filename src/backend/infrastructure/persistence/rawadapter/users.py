@@ -15,7 +15,7 @@ from backend.infrastructure.persistence.records import UserRowRecord
 from backend.infrastructure.persistence.sqlalchemy.tables.users import (
     users_table,
 )
-from backend.infrastructure.tools import convert_record
+from backend.infrastructure.tools.msgspec_convert import convert_record
 
 
 def _require_async_session(session: SessionProtocol) -> AsyncSession:

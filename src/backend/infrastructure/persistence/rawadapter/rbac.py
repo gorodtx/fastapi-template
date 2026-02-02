@@ -18,7 +18,8 @@ from backend.infrastructure.persistence.sqlalchemy.tables.role import (
 from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import (
     user_roles_table,
 )
-from backend.infrastructure.tools import CONVERTERS, convert_record
+from backend.infrastructure.tools.domain_converters import CONVERTERS
+from backend.infrastructure.tools.msgspec_convert import convert_record
 
 
 def _value_to_uuid(value: object) -> UUID:

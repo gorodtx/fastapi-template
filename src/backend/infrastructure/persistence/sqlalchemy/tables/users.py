@@ -13,11 +13,13 @@ from backend.infrastructure.persistence.sqlalchemy.tables.base import (
     mapper_registry,
     metadata,
 )
-from backend.infrastructure.persistence.sqlalchemy.types import (
+from backend.infrastructure.persistence.sqlalchemy.types.identity import (
     EmailType,
     LoginType,
-    PasswordHashType,
     UsernameType,
+)
+from backend.infrastructure.persistence.sqlalchemy.types.security import (
+    PasswordHashType,
 )
 
 user_id_column: Column[UUID] = Column(

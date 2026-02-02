@@ -6,9 +6,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from backend.application.common.exceptions.application import AppError
-from backend.infrastructure.tools import register_domain_converters
-from backend.presentation.di import assert_closed_by_default, setup_di
-from backend.presentation.http.api.routing import api_router
+from backend.infrastructure.tools.domain_converters import (
+    register_domain_converters,
+)
+from backend.presentation.di.container import setup_di
+from backend.presentation.di.startup_checks import assert_closed_by_default
+from backend.presentation.http.api.routing.router import api_router
 
 
 def create_app() -> FastAPI:

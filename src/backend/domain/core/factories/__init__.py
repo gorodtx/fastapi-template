@@ -1,3 +1,3 @@
-from backend.domain.core.factories.users import UserFactory
+from __future__ import annotations
 
-__all__: list[str] = ["UserFactory"]
+__all__: tuple[str, ...] = ("users",)

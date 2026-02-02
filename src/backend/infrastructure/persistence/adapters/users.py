@@ -23,7 +23,7 @@ from backend.infrastructure.persistence.rawadapter.users import (
     q_get_user_row_by_id,
     q_upsert_user_row,
 )
-from backend.infrastructure.tools import storage_result
+from backend.infrastructure.tools.storage_result import storage_result
 
 
 class SqlUsersAdapter(UnboundAdapter, UsersAdapter):

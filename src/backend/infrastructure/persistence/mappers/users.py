@@ -7,7 +7,7 @@ from backend.infrastructure.persistence.records import (
     UserRoleCodeRecord,
     UserRowRecord,
 )
-from backend.infrastructure.tools import CONVERTERS
+from backend.infrastructure.tools.domain_converters import CONVERTERS
 
 
 def user_to_row_record(user: User) -> UserRowRecord:

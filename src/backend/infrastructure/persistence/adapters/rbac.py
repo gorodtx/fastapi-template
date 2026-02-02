@@ -21,7 +21,7 @@ from backend.infrastructure.persistence.rawadapter.rbac import (
     q_replace_user_roles,
 )
 from backend.infrastructure.persistence.records import UserRoleCodeRecord
-from backend.infrastructure.tools import storage_result
+from backend.infrastructure.tools.storage_result import storage_result
 
 
 @dataclass(frozen=True, slots=True)
