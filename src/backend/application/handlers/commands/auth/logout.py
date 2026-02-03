@@ -12,7 +12,9 @@ from backend.application.common.exceptions.error_mappers.auth import (
 )
 from backend.application.common.interfaces.auth.ports import (
     JwtVerifier,
-    RefreshStore,
+)
+from backend.application.common.tools.refresh_tokens import (
+    RefreshTokenService,
 )
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
@@ -29,7 +31,7 @@ class LogoutUserCommand(LogoutUserDTO): ...
 @handler(mode="write")
 class LogoutUserHandler(CommandHandler[LogoutUserCommand, SuccessDTO]):
     jwt_verifier: JwtVerifier
-    refresh_store: RefreshStore
+    refresh_tokens: RefreshTokenService
 
     async def __call__(
         self: LogoutUserHandler,
@@ -46,7 +48,7 @@ class LogoutUserHandler(CommandHandler[LogoutUserCommand, SuccessDTO]):
             return ResultImpl.err_app(err, SuccessDTO)
 
         def revoke_refresh() -> Awaitable[None]:
-            return self.refresh_store.revoke(
+            return self.refresh_tokens.revoke(
                 user_id=user_id, fingerprint=token_fingerprint
             )
 

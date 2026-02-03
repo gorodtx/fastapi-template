@@ -10,9 +10,12 @@ from typing import Final, Literal, Protocol, runtime_checkable
 import msgspec
 from uuid_utils.compat import UUID
 
-from backend.infrastructure.tools.domain_converters import (
-    CONVERTERS,
-    ConversionError,
+from backend.domain.core.constants.serialization import (
+    decode_value,
+    encode_str,
+)
+from backend.domain.core.exceptions.serialization import (
+    DomainSerializationError,
 )
 
 DEFAULT_CONVERT_TO_TYPES: Final[tuple[type, ...]] = (
@@ -81,13 +84,10 @@ def _row_dec_hook(tp: type[object], obj: object) -> object:
     if tp is str:
         if isinstance(obj, str):
             return obj
-        encoded = CONVERTERS.encode(obj)
-        if not isinstance(encoded, str):
-            raise TypeError("Expected str")
-        return encoded
+        return encode_str(obj)
     try:
-        decoded = CONVERTERS.decode(obj, tp)
-    except ConversionError as exc:
+        decoded = decode_value(obj, tp)
+    except DomainSerializationError as exc:
         raise NotImplementedError from exc
     if decoded is None:
         raise TypeError(f"Expected {tp.__name__}")

@@ -6,10 +6,12 @@ from fastapi import APIRouter
 from backend.application.common.interfaces.auth.ports import (
     JwtIssuer,
     JwtVerifier,
-    RefreshStore,
 )
 from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
+)
+from backend.application.common.tools.refresh_tokens import (
+    RefreshTokenService,
 )
 from backend.application.handlers.commands.auth.login import (
     LoginUserCommand,
@@ -41,13 +43,13 @@ async def login_user(
     gateway: FromDishka[PersistenceGateway],
     password_hasher: FromDishka[PasswordHasherPort],
     jwt_issuer: FromDishka[JwtIssuer],
-    refresh_store: FromDishka[RefreshStore],
+    refresh_tokens: FromDishka[RefreshTokenService],
 ) -> TokenPairResponse:
     handler = LoginUserHandler(
         gateway=gateway,
         password_hasher=password_hasher,
         jwt_issuer=jwt_issuer,
-        refresh_store=refresh_store,
+        refresh_tokens=refresh_tokens,
     )
     cmd = LoginUserCommand(
         email=payload.email,
@@ -64,11 +66,11 @@ async def login_user(
 async def logout_user(
     payload: LogoutRequest,
     jwt_verifier: FromDishka[JwtVerifier],
-    refresh_store: FromDishka[RefreshStore],
+    refresh_tokens: FromDishka[RefreshTokenService],
 ) -> SuccessResponse:
     handler = LogoutUserHandler(
         jwt_verifier=jwt_verifier,
-        refresh_store=refresh_store,
+        refresh_tokens=refresh_tokens,
     )
     cmd = LogoutUserCommand(
         refresh_token=payload.refresh_token,
@@ -85,12 +87,12 @@ async def refresh_user(
     payload: RefreshRequest,
     jwt_verifier: FromDishka[JwtVerifier],
     jwt_issuer: FromDishka[JwtIssuer],
-    refresh_store: FromDishka[RefreshStore],
+    refresh_tokens: FromDishka[RefreshTokenService],
 ) -> TokenPairResponse:
     handler = RefreshUserHandler(
         jwt_verifier=jwt_verifier,
         jwt_issuer=jwt_issuer,
-        refresh_store=refresh_store,
+        refresh_tokens=refresh_tokens,
     )
     cmd = RefreshUserCommand(
         refresh_token=payload.refresh_token, fingerprint=payload.fingerprint

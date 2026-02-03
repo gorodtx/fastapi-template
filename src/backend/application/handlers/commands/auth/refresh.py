@@ -13,7 +13,9 @@ from backend.application.common.exceptions.error_mappers.auth import (
 from backend.application.common.interfaces.auth.ports import (
     JwtIssuer,
     JwtVerifier,
-    RefreshStore,
+)
+from backend.application.common.tools.refresh_tokens import (
+    RefreshTokenService,
 )
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
@@ -31,7 +33,7 @@ class RefreshUserCommand(RefreshUserDTO): ...
 class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
     jwt_verifier: JwtVerifier
     jwt_issuer: JwtIssuer
-    refresh_store: RefreshStore
+    refresh_tokens: RefreshTokenService
 
     async def __call__(
         self: RefreshUserHandler,
@@ -54,7 +56,7 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
         )
 
         def rotate_refresh() -> Awaitable[None]:
-            return self.refresh_store.rotate(
+            return self.refresh_tokens.rotate(
                 user_id=user_id,
                 fingerprint=cmd.fingerprint,
                 old=cmd.refresh_token,

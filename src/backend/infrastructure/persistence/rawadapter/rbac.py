@@ -11,6 +11,8 @@ from backend.application.common.interfaces.ports.persistence.manager import (
     SessionProtocol,
 )
 from backend.domain.core.constants.rbac import SystemRole
+from backend.domain.core.constants.serialization import decode_system_role
+from backend.infrastructure.persistence.mappers.rbac import value_to_uuid
 from backend.infrastructure.persistence.records import UserRoleCodeRecord
 from backend.infrastructure.persistence.sqlalchemy.tables.role import (
     roles_table,
@@ -18,25 +20,7 @@ from backend.infrastructure.persistence.sqlalchemy.tables.role import (
 from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import (
     user_roles_table,
 )
-from backend.infrastructure.tools.domain_converters import CONVERTERS
 from backend.infrastructure.tools.msgspec_convert import convert_record
-
-
-def _value_to_uuid(value: object) -> UUID:
-    if isinstance(value, UUID):
-        return value
-    if isinstance(value, (bytes, bytearray)):
-        return UUID(bytes=bytes(value))
-    return UUID(str(value))
-
-
-def _decode_role(value: object) -> SystemRole:
-    if isinstance(value, SystemRole):
-        return value
-    decoded: SystemRole | None = CONVERTERS.decode(value, SystemRole)
-    if decoded is None:
-        raise TypeError("role must not be None")
-    return decoded
 
 
 def _require_async_session(session: SessionProtocol) -> AsyncSession:
@@ -81,7 +65,7 @@ def q_get_role_ids_by_codes(
         res = await async_session.execute(stmt)
         out: list[tuple[SystemRole, UUID]] = []
         for role_code, role_id in res.all():
-            out.append((_decode_role(role_code), _value_to_uuid(role_id)))
+            out.append((decode_system_role(role_code), value_to_uuid(role_id)))
         return out
 
     return _q
@@ -115,6 +99,6 @@ def q_list_user_ids_by_role_id(
             user_roles_table.c.role_id == role_id
         )
         res = await async_session.execute(stmt)
-        return [_value_to_uuid(row[0]) for row in res.all()]
+        return [value_to_uuid(row[0]) for row in res.all()]
 
     return _q

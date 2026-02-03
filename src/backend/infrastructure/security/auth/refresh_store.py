@@ -6,37 +6,33 @@ from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.auth.ports import RefreshStore
 from backend.application.common.interfaces.ports.cache import StrCache
-from backend.application.common.interfaces.ports.shared_lock import SharedLock
-
-AUTH_KEY_PREFIX: str = "auth:refresh"
-
-
-def _key(user_id: UUID, fingerprint: str) -> str:
-    return f"{AUTH_KEY_PREFIX}:{user_id}:{fingerprint}"
+from backend.application.common.tools.refresh_tokens import refresh_key
 
 
 @dataclass(slots=True)
 class RefreshStoreImpl(RefreshStore):
     cache: StrCache
-    lock: SharedLock
 
-    async def rotate(
+    async def get(
+        self: RefreshStoreImpl, *, user_id: UUID, fingerprint: str
+    ) -> str | None:
+        return await self.cache.get(refresh_key(user_id, fingerprint))
+
+    async def set(
         self: RefreshStoreImpl,
         *,
         user_id: UUID,
         fingerprint: str,
-        old: str,
-        new: str,
+        value: str,
+        ttl_s: int | None = None,
     ) -> None:
-        key = _key(user_id, fingerprint)
-        async with self.lock(key):
-            current = await self.cache.get(key)
-            if current is not None and current != old:
-                await self.cache.delete(key)
-                raise PermissionError("Refresh token replay detected")
-            await self.cache.set(key, new, ttl_s=30 * 24 * 3600)
+        await self.cache.set(
+            refresh_key(user_id, fingerprint),
+            value,
+            ttl_s=ttl_s,
+        )
 
-    async def revoke(
+    async def delete(
         self: RefreshStoreImpl, *, user_id: UUID, fingerprint: str
     ) -> None:
-        await self.cache.delete(_key(user_id, fingerprint))
+        await self.cache.delete(refresh_key(user_id, fingerprint))

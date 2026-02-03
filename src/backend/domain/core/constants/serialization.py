@@ -5,19 +5,25 @@ from enum import Enum
 from typing import Protocol, TypeGuard, runtime_checkable
 
 from backend.domain.core.constants.rbac import SystemRole
+from backend.domain.core.exceptions.serialization import (
+    DomainSerializationError,
+)
 from backend.domain.core.value_objects.identity.email import Email
 from backend.domain.core.value_objects.identity.login import Login
 from backend.domain.core.value_objects.identity.username import Username
 from backend.domain.core.value_objects.password import Password
 
 
+@runtime_checkable
+class StrValueObject(Protocol):
+    @property
+    def value(self: StrValueObject) -> str: ...
+
+
 class StrValueObjectCtor(Protocol):
     __name__: str
 
     def __call__(self: StrValueObjectCtor, value: str) -> object: ...
-
-
-class ConversionError(Exception): ...
 
 
 class Converter(Protocol):
@@ -30,54 +36,56 @@ def _is_str(value: object) -> TypeGuard[str]:
     return isinstance(value, str)
 
 
-@runtime_checkable
-class _HasValue(Protocol):
-    value: object
-
-
 @dataclass(frozen=True, slots=True)
 class StrValueObjectConverter:
     vo_type: StrValueObjectCtor
 
     def encode(self: StrValueObjectConverter, value: object) -> object:
-        raw = value.value if isinstance(value, _HasValue) else None
+        raw = value.value if isinstance(value, StrValueObject) else None
         if not _is_str(raw):
-            raise ConversionError(
+            raise DomainSerializationError(
                 f"{self.vo_type.__name__}.value must be str, got {type(raw).__name__}"
             )
         return raw
 
     def decode(self: StrValueObjectConverter, value: object) -> object:
         if not _is_str(value):
-            raise ConversionError(f"Expected str, got {type(value).__name__}")
-        return self.vo_type(value)
+            raise DomainSerializationError(
+                f"Expected str for {self.vo_type.__name__}, got {type(value).__name__}"
+            )
+        try:
+            return self.vo_type(value)
+        except Exception as exc:
+            raise DomainSerializationError(
+                f"{self.vo_type.__name__} decoding failed: {exc}"
+            ) from exc
 
 
 @dataclass(frozen=True, slots=True)
-class StrEnumValueConverter[E: Enum]:
-    enum_type: type[E]
+class StrEnumValueConverter:
+    enum_type: type[Enum]
 
-    def encode(self: StrEnumValueConverter[E], value: object) -> object:
+    def encode(self: StrEnumValueConverter, value: object) -> object:
         if not isinstance(value, self.enum_type):
-            raise ConversionError(
+            raise DomainSerializationError(
                 f"Expected {self.enum_type.__name__}, got {type(value).__name__}"
             )
         raw = value.value
         if not _is_str(raw):
-            raise ConversionError(
+            raise DomainSerializationError(
                 f"{self.enum_type.__name__}.value must be str, got {type(raw).__name__}"
             )
         return raw
 
-    def decode(self: StrEnumValueConverter[E], value: object) -> object:
+    def decode(self: StrEnumValueConverter, value: object) -> object:
         if not _is_str(value):
-            raise ConversionError(
+            raise DomainSerializationError(
                 f"Expected str enum value, got {type(value).__name__}"
             )
         try:
             return self.enum_type(value)
         except ValueError as exc:
-            raise ConversionError(
+            raise DomainSerializationError(
                 f"Unknown {self.enum_type.__name__} value: {value!r}"
             ) from exc
 
@@ -106,27 +114,49 @@ class ConverterRegistry:
         conv = self._find(type(value))
         return value if conv is None else conv.encode(value)
 
-    def decode[T](
-        self: ConverterRegistry, value: object, target_type: type[T]
-    ) -> T | None:
+    def decode(
+        self: ConverterRegistry, value: object, target_type: type[object]
+    ) -> object:
         if value is None:
             return None
         conv = self._find(target_type)
         if conv is None:
             if isinstance(value, target_type):
                 return value
-            raise ConversionError(
+            raise DomainSerializationError(
                 f"Cannot decode {type(value).__name__} as {target_type.__name__}"
             )
         decoded = conv.decode(value)
         if not isinstance(decoded, target_type):
-            raise ConversionError(
+            raise DomainSerializationError(
                 f"Decoded {type(decoded).__name__} is not {target_type.__name__}"
             )
         return decoded
 
 
 CONVERTERS: ConverterRegistry = ConverterRegistry()
+
+
+def encode_str(value: object) -> str:
+    encoded = CONVERTERS.encode(value)
+    if not isinstance(encoded, str):
+        raise DomainSerializationError(
+            f"Expected str, got {type(encoded).__name__}"
+        )
+    return encoded
+
+
+def decode_value(value: object, target_type: type[object]) -> object:
+    return CONVERTERS.decode(value, target_type)
+
+
+def decode_system_role(value: object) -> SystemRole:
+    decoded = CONVERTERS.decode(value, SystemRole)
+    if not isinstance(decoded, SystemRole):
+        raise DomainSerializationError(
+            f"Decoded {type(decoded).__name__} is not SystemRole"
+        )
+    return decoded
 
 
 def register_domain_converters() -> None:

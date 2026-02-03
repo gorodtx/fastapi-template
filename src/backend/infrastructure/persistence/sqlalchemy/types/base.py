@@ -1,28 +1,27 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Protocol, overload
+from typing import overload
 
-
-class HasStrValue(Protocol):
-    @property
-    def value(self: HasStrValue) -> str: ...
+from backend.domain.core.constants.serialization import StrValueObject
 
 
 @overload
-def bind_vo[T: HasStrValue](value: None, expected_type: type[T]) -> None: ...
+def bind_vo[T: StrValueObject](
+    value: None, expected_type: type[T]
+) -> None: ...
 
 
 @overload
-def bind_vo[T: HasStrValue](value: T, expected_type: type[T]) -> str: ...
+def bind_vo[T: StrValueObject](value: T, expected_type: type[T]) -> str: ...
 
 
 def bind_vo(
-    value: HasStrValue | None, expected_type: type[object]
+    value: StrValueObject | None, expected_type: type[object]
 ) -> str | None:
     if value is None:
         return None
-    vo_value: HasStrValue = value
+    vo_value: StrValueObject = value
     if not isinstance(vo_value, expected_type):
         raise TypeError(
             f"Expected {expected_type.__name__}, got {type(vo_value).__name__}"
@@ -30,7 +29,7 @@ def bind_vo(
     return vo_value.value
 
 
-def result_vo[T: HasStrValue](
+def result_vo[T: StrValueObject](
     value: str | None,
     vo_ctor: Callable[[str], T],
 ) -> T | None:

@@ -4,7 +4,11 @@ from dataclasses import dataclass
 
 from uuid_utils.compat import UUID
 
-from backend.application.common.interfaces.auth.ports import Authenticator
+from backend.application.common.interfaces.auth.ports import (
+    Authenticator,
+    derive_auth_flags,
+    is_allowed,
+)
 from backend.application.common.interfaces.auth.types import (
     AuthUser,
     Permission,
@@ -15,11 +19,6 @@ from backend.application.common.interfaces.ports.persistence.rbac_adapter import
 )
 from backend.application.common.interfaces.ports.persistence.users_adapter import (
     UsersAdapter,
-)
-from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.constants.rbac_registry import ROLE_PERMISSIONS
-from backend.domain.core.value_objects.access.permission_code import (
-    PermissionCode,
 )
 
 
@@ -36,8 +35,7 @@ class AuthenticatorImpl(Authenticator):
             return None
         user = result.unwrap()
         roles = frozenset(user.roles)
-        is_superuser = SystemRole.SUPER_ADMIN in roles
-        is_admin = is_superuser or SystemRole.ADMIN in roles
+        is_admin, is_superuser = derive_auth_flags(roles)
         return AuthUser(
             id=user.id,
             roles=roles,
@@ -54,12 +52,5 @@ class AuthenticatorImpl(Authenticator):
         if auth_user is None or not auth_user.is_active:
             return Permission(allowed=False)
 
-        if auth_user.is_superuser:
-            return Permission(allowed=True)
-
-        allowed_codes: set[PermissionCode] = set()
-        for role in auth_user.roles:
-            allowed_codes.update(ROLE_PERMISSIONS.get(role, frozenset()))
-
-        allowed = spec.code in allowed_codes
+        allowed = is_allowed(auth_user.roles, spec.code)
         return Permission(allowed=allowed)

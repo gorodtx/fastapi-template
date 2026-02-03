@@ -17,10 +17,12 @@ from backend.application.common.exceptions.error_mappers.storage import (
 from backend.application.common.exceptions.storage import NotFoundStorageError
 from backend.application.common.interfaces.auth.ports import (
     JwtIssuer,
-    RefreshStore,
 )
 from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
+)
+from backend.application.common.tools.refresh_tokens import (
+    RefreshTokenService,
 )
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
@@ -40,7 +42,7 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
     gateway: PersistenceGateway
     password_hasher: PasswordHasherPort
     jwt_issuer: JwtIssuer
-    refresh_store: RefreshStore
+    refresh_tokens: RefreshTokenService
 
     async def __call__(
         self: LoginUserHandler,
@@ -82,7 +84,7 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
         )
 
         def rotate_refresh() -> Awaitable[None]:
-            return self.refresh_store.rotate(
+            return self.refresh_tokens.rotate(
                 user_id=user_id,
                 fingerprint=cmd.fingerprint,
                 old="",

@@ -123,10 +123,10 @@ class UserFactory:
         password_hash: str | None = None,
     ) -> None:
         if email is not None:
-            user.change_email(UserFactory.email(email))
+            user._email = UserFactory.email(email)
         if login is not None:
-            user.change_login(UserFactory.login(login))
+            user._login = UserFactory.login(login)
         if username is not None:
-            user.change_username(UserFactory.username(username))
+            user._username = UserFactory.username(username)
         if password_hash is not None:
-            user.change_password(UserFactory.password_from_hash(password_hash))
+            user._password = UserFactory.password_from_hash(password_hash)

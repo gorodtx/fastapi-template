@@ -1,29 +1,20 @@
 from __future__ import annotations
 
 from backend.domain.core.constants.rbac import SystemRole
+from backend.domain.core.constants.serialization import encode_str
 from backend.domain.core.entities.user import User
 from backend.domain.core.factories.users import UserFactory
 from backend.infrastructure.persistence.records import (
     UserRoleCodeRecord,
     UserRowRecord,
 )
-from backend.infrastructure.tools.domain_converters import CONVERTERS
 
 
 def user_to_row_record(user: User) -> UserRowRecord:
-    email = CONVERTERS.encode(user.email)
-    login = CONVERTERS.encode(user.login)
-    username = CONVERTERS.encode(user.username)
-    password_hash = CONVERTERS.encode(user.password)
-
-    if not isinstance(email, str):
-        raise TypeError("Email encoding must return str")
-    if not isinstance(login, str):
-        raise TypeError("Login encoding must return str")
-    if not isinstance(username, str):
-        raise TypeError("Username encoding must return str")
-    if not isinstance(password_hash, str):
-        raise TypeError("Password encoding must return str")
+    email = encode_str(user.email)
+    login = encode_str(user.login)
+    username = encode_str(user.username)
+    password_hash = encode_str(user.password)
 
     return UserRowRecord(
         id=user.id,

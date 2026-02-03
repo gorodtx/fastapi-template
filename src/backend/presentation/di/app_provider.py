@@ -21,6 +21,9 @@ from backend.application.common.interfaces.auth.ports import (
 )
 from backend.application.common.interfaces.ports.cache import StrCache
 from backend.application.common.tools.auth_cache import AuthCacheInvalidator
+from backend.application.common.tools.refresh_tokens import (
+    RefreshTokenService,
+)
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.infrastructure.lock.redis_lock import RedisSharedLock
 from backend.infrastructure.persistence.cache.redis import RedisCache
@@ -146,10 +149,18 @@ class AppProvider(Provider):
         return RedisSharedLock(client)
 
     @provide(scope=Scope.APP)
-    def refresh_store(
-        self: AppProvider, cache: StrCache, lock: RedisSharedLock
-    ) -> RefreshStore:
-        return RefreshStoreImpl(cache=cache, lock=lock)
+    def refresh_store(self: AppProvider, cache: StrCache) -> RefreshStore:
+        return RefreshStoreImpl(cache=cache)
+
+    @provide(scope=Scope.APP)
+    def refresh_tokens(
+        self: AppProvider,
+        store: RefreshStore,
+        lock: RedisSharedLock,
+        cfg: JwtConfig,
+    ) -> RefreshTokenService:
+        ttl_s = int(cfg.refresh_ttl.total_seconds())
+        return RefreshTokenService(store=store, lock=lock, ttl_s=ttl_s)
 
     @provide(scope=Scope.APP)
     def password_hasher(self: AppProvider) -> PasswordHasherPort:

@@ -4,7 +4,6 @@ from uuid_utils.compat import UUID
 
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.base import Entity, entity
-from backend.domain.core.exceptions.base import DomainError
 from backend.domain.core.exceptions.rbac import RoleNotAssignedError
 from backend.domain.core.value_objects.identity.email import Email
 from backend.domain.core.value_objects.identity.login import Login
@@ -104,36 +103,6 @@ class User(Entity):
             roles=roles,
         )
 
-    def change_email(self: User, new_email: Email) -> None:
-        if new_email == self._email:
-            raise DomainError(
-                f"New email {new_email.value!r} is same as current"
-            )
-
-        self._email = new_email
-
-    def change_login(self: User, new_login: Login) -> None:
-        if new_login == self._login:
-            raise DomainError(
-                f"New login {new_login.value!r} is same as current"
-            )
-
-        self._login = new_login
-
-    def change_username(self: User, new_username: Username) -> None:
-        if new_username == self._username:
-            raise DomainError(
-                f"New username {new_username.value!r} is same as current"
-            )
-
-        self._username = new_username
-
-    def change_password(self: User, new_password: Password) -> None:
-        if new_password == self._password:
-            raise DomainError("New password must differ from the old one")
-
-        self._password = new_password
-
     def assign_role(self: User, role: SystemRole) -> None:
         if role in self._roles:
             return
@@ -143,17 +112,3 @@ class User(Entity):
         if role not in self._roles:
             raise RoleNotAssignedError(role=role, user_id=self.id)
         self._roles.remove(role)
-
-    def has_role(self: User, role: SystemRole) -> bool:
-        return role in self._roles
-
-    def replace_roles(self: User, roles: set[SystemRole]) -> None:
-        desired_roles = set(roles)
-        current_roles = set(self._roles)
-        roles_to_remove = current_roles - desired_roles
-        roles_to_add = desired_roles - current_roles
-
-        for role in roles_to_remove:
-            self.revoke_role(role)
-        for role in roles_to_add:
-            self.assign_role(role)
