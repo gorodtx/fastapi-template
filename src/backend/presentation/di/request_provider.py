@@ -179,8 +179,8 @@ class RequestProvider(Provider):
         return AuthenticatorImpl(users=gateway.users, rbac=gateway.rbac)
 
     @provide(scope=Scope.REQUEST)
-    def permission_guard(self: Self, cache: StrCache) -> PermissionGuard:
-        return PermissionGuard(cache=cache)
+    def permission_guard(self: Self) -> PermissionGuard:
+        return PermissionGuard()
 
     @provide(scope=Scope.REQUEST)
     async def current_user(

@@ -50,7 +50,10 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
         /,
     ) -> Result[TokenPairDTO, AppError]:
         invalid_credentials = UnauthenticatedError("Invalid email or password")
-        user_result = await self.gateway.users.get_by_email(cmd.email)
+        user_result = await self.gateway.users.get_by_email(
+            cmd.email,
+            include_roles=False,
+        )
         if user_result.is_err():
             err = user_result.unwrap_err()
             if isinstance(err, NotFoundStorageError):

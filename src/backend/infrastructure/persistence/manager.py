@@ -13,6 +13,24 @@ from backend.application.common.interfaces.ports.persistence.manager import (
 )
 
 
+class _NoopTxScope(AbstractAsyncContextManager["TransactionManagerImpl"]):
+    __slots__: tuple[str, ...] = ("_tm",)
+
+    def __init__(self: _NoopTxScope, tm: TransactionManagerImpl) -> None:
+        self._tm = tm
+
+    async def __aenter__(self: _NoopTxScope) -> TransactionManagerImpl:
+        return self._tm
+
+    async def __aexit__(
+        self: _NoopTxScope,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        return None
+
+
 class _TxScope(AbstractAsyncContextManager["TransactionManagerImpl"]):
     __slots__: tuple[str, ...] = ("_tm", "_tx")
 
@@ -52,13 +70,14 @@ class TransactionManagerImpl(TransactionManager):
     def transaction(
         self: TransactionManagerImpl, *, nested: bool = False
     ) -> TransactionScope:
-        if nested and not self.conn.in_transaction():
-            raise RuntimeError(
-                "Nested transaction requires an outer transaction"
-            )
-        tx = (
-            self.conn.begin_nested()
-            if self.conn.in_transaction()
-            else self.conn.begin()
-        )
-        return _TxScope(self, tx)
+        if nested:
+            if not self.conn.in_transaction():
+                raise RuntimeError(
+                    "Nested transaction requires an outer transaction"
+                )
+            return _TxScope(self, self.conn.begin_nested())
+
+        if self.conn.in_transaction():
+            return _NoopTxScope(self)
+
+        return _TxScope(self, self.conn.begin())

@@ -12,15 +12,27 @@ from backend.domain.core.entities.user import User
 
 class UsersAdapter(Protocol):
     def get_by_id(
-        self: UsersAdapter, user_id: UUID, /
+        self: UsersAdapter,
+        user_id: UUID,
+        /,
+        *,
+        include_roles: bool = True,
     ) -> Awaitable[Result[User, StorageError]]: ...
 
     def get_by_email(
-        self: UsersAdapter, email: str, /
+        self: UsersAdapter,
+        email: str,
+        /,
+        *,
+        include_roles: bool = True,
     ) -> Awaitable[Result[User, StorageError]]: ...
 
     def save(
-        self: UsersAdapter, user: User, /
+        self: UsersAdapter,
+        user: User,
+        /,
+        *,
+        include_roles: bool = True,
     ) -> Awaitable[Result[User, StorageError]]: ...
 
     def delete(

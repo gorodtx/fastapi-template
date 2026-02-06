@@ -51,7 +51,10 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
 
         async with self.gateway.manager.transaction():
             user_result = (
-                await self.gateway.users.get_by_id(cmd.user_id)
+                await self.gateway.users.get_by_id(
+                    cmd.user_id,
+                    include_roles=False,
+                )
             ).map_err(map_storage_error_to_app())
             if user_result.is_err():
                 return ResultImpl.err_from(user_result)
@@ -87,9 +90,9 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
                 if change_result.is_err():
                     return ResultImpl.err_from(change_result)
 
-            save_result = (await self.gateway.users.save(user)).map_err(
-                map_storage_error_to_app()
-            )
+            save_result = (
+                await self.gateway.users.save(user, include_roles=False)
+            ).map_err(map_storage_error_to_app())
             if save_result.is_err():
                 return ResultImpl.err_from(save_result)
 

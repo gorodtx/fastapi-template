@@ -71,9 +71,9 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
         async with self.gateway.manager.transaction():
             user.assign_role(SystemRole.USER)
 
-            save_result = (await self.gateway.users.save(user)).map_err(
-                map_storage_error_to_app()
-            )
+            save_result = (
+                await self.gateway.users.save(user, include_roles=False)
+            ).map_err(map_storage_error_to_app())
             if save_result.is_err():
                 return ResultImpl.err_from(save_result)
 
@@ -85,7 +85,4 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
             if role_result.is_err():
                 return ResultImpl.err_from(role_result)
 
-            reread_result = (
-                await self.gateway.users.get_by_id(user.id)
-            ).map_err(map_storage_error_to_app())
-            return reread_result.map(present_user_response)
+            return save_result.map(present_user_response)

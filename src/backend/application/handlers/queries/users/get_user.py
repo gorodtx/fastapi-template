@@ -25,7 +25,12 @@ class GetUserHandler(QueryHandler[GetUserQuery, UserResponseDTO]):
         self: GetUserHandler, query: GetUserQuery, /
     ) -> Result[UserResponseDTO, AppError]:
         return (
-            (await self.gateway.users.get_by_id(query.user_id))
+            (
+                await self.gateway.users.get_by_id(
+                    query.user_id,
+                    include_roles=False,
+                )
+            )
             .map_err(map_storage_error_to_app())
             .map(present_user_response)
         )
