@@ -6,6 +6,10 @@ from backend.application.common.exceptions.application import (
     AppError,
     UnauthenticatedError,
 )
+from backend.application.common.exceptions.auth import (
+    InvalidRefreshTokenError,
+    RefreshTokenReplayError,
+)
 
 type AuthRule = tuple[type[Exception], Callable[[Exception], AppError]]
 
@@ -35,11 +39,24 @@ def map_invalid_credentials() -> Callable[[Exception], AppError]:
 
 def map_refresh_replay() -> Callable[[Exception], AppError]:
     return map_auth_error(
-        (PermissionError, unauthenticated("Refresh token replay detected"))
+        (
+            RefreshTokenReplayError,
+            unauthenticated("Refresh token replay detected"),
+        )
     )
 
 
 def map_invalid_refresh() -> Callable[[Exception], AppError]:
     return map_auth_error(
-        (PermissionError, unauthenticated("Invalid refresh token"))
+        (InvalidRefreshTokenError, unauthenticated("Invalid refresh token"))
+    )
+
+
+def map_refresh_token_error() -> Callable[[Exception], AppError]:
+    return map_auth_error(
+        (InvalidRefreshTokenError, unauthenticated("Invalid refresh token")),
+        (
+            RefreshTokenReplayError,
+            unauthenticated("Refresh token replay detected"),
+        ),
     )

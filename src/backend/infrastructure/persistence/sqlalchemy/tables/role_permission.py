@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, ForeignKey, String, Table
+from sqlalchemy import Column, ForeignKey, Index, String, Table
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from uuid_utils.compat import UUID
 
@@ -39,6 +39,15 @@ role_permissions_table: Table = Table(
     role_permission_code_column,
 )
 
+Index(
+    "ix_role_permissions_role_id",
+    role_permissions_table.c.role_id,
+)
+Index(
+    "ix_role_permissions_permission_code",
+    role_permissions_table.c.permission_code,
+)
+
 user_roles_user_id_column: Column[UUID] = Column(
     "user_id",
     PG_UUID(as_uuid=True),
@@ -61,4 +70,13 @@ user_roles_table: Table = Table(
     metadata,
     user_roles_user_id_column,
     user_roles_role_id_column,
+)
+
+Index(
+    "ix_user_roles_user_id",
+    user_roles_table.c.user_id,
+)
+Index(
+    "ix_user_roles_role_id",
+    user_roles_table.c.role_id,
 )

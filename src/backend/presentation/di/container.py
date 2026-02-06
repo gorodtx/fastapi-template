@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from backend.presentation.di.app_provider import AppProvider
 from backend.presentation.di.request_provider import RequestProvider
+from backend.presentation.settings import Settings
 
 
 class _EventRegistrar(Protocol):
@@ -19,14 +20,14 @@ class _EventRegistrar(Protocol):
     ) -> None: ...
 
 
-def build_container() -> AsyncContainer:
+def build_container(settings: Settings) -> AsyncContainer:
     return make_async_container(
-        AppProvider(), RequestProvider(), FastapiProvider()
+        AppProvider(settings), RequestProvider(), FastapiProvider()
     )
 
 
-def setup_di(app: FastAPI) -> None:
-    container = build_container()
+def setup_di(app: FastAPI, settings: Settings) -> None:
+    container = build_container(settings)
     setup_dishka(container, app)
 
     async def _close_container() -> None:

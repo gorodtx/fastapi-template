@@ -52,16 +52,13 @@ class TransactionManagerImpl(TransactionManager):
     def transaction(
         self: TransactionManagerImpl, *, nested: bool = False
     ) -> TransactionScope:
-        if nested:
-            if not self.conn.in_transaction():
-                raise RuntimeError(
-                    "Nested transaction requires an outer transaction"
-                )
-            tx = self.conn.begin_nested()
-        else:
-            if self.conn.in_transaction():
-                raise RuntimeError(
-                    "Outer transaction already started; use nested=True"
-                )
-            tx = self.conn.begin()
+        if nested and not self.conn.in_transaction():
+            raise RuntimeError(
+                "Nested transaction requires an outer transaction"
+            )
+        tx = (
+            self.conn.begin_nested()
+            if self.conn.in_transaction()
+            else self.conn.begin()
+        )
         return _TxScope(self, tx)

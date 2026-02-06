@@ -1,11 +1,9 @@
 """Create users + RBAC tables and seed system roles/permissions.
 
-Revision ID: 20251230_0001
+Revision ID: 20260203_0001
 Revises:
-Create Date: 2025-12-30 00:00:00.000000
+Create Date: 2026-02-03 00:00:00.000000
 """
-
-from __future__ import annotations
 
 import json
 import os
@@ -25,7 +23,7 @@ from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.constants.rbac_registry import ROLE_PERMISSIONS
 
 # revision identifiers, used by Alembic.
-revision: str = "20251230_0001"
+revision: str = "20260203_0001"
 down_revision: str | None = None
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
@@ -182,7 +180,13 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column(
-            "code", sa.Enum(SystemRole, native_enum=False), nullable=False
+            "code",
+            sa.Enum(
+                SystemRole,
+                native_enum=False,
+                values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            ),
+            nullable=False,
         ),
         sa.Column("description", sa.String(255), nullable=True),
         sa.UniqueConstraint("code"),
@@ -199,14 +203,22 @@ def upgrade() -> None:
         sa.Column(
             "role_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("roles.id", ondelete="CASCADE"),
+            sa.ForeignKey(
+                "roles.id",
+                name="fk_role_permissions_role_id__roles_id",
+                ondelete="CASCADE",
+            ),
             primary_key=True,
             nullable=False,
         ),
         sa.Column(
             "permission_code",
             sa.String(64),
-            sa.ForeignKey("permissions.code", ondelete="CASCADE"),
+            sa.ForeignKey(
+                "permissions.code",
+                name="fk_role_permissions_permission_code__permissions_code",
+                ondelete="CASCADE",
+            ),
             primary_key=True,
             nullable=False,
         ),
@@ -217,14 +229,22 @@ def upgrade() -> None:
         sa.Column(
             "user_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            sa.ForeignKey(
+                "users.id",
+                name="fk_user_roles_user_id__users_id",
+                ondelete="CASCADE",
+            ),
             primary_key=True,
             nullable=False,
         ),
         sa.Column(
             "role_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("roles.id", ondelete="CASCADE"),
+            sa.ForeignKey(
+                "roles.id",
+                name="fk_user_roles_role_id__roles_id",
+                ondelete="CASCADE",
+            ),
             primary_key=True,
             nullable=False,
         ),

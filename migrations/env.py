@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import os
 import sys
@@ -8,7 +9,9 @@ from pathlib import Path
 from typing import Final
 
 from alembic import context
-from sqlalchemy import MetaData, engine_from_config, pool
+from sqlalchemy import MetaData, pool
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 config = context.config
 
@@ -63,26 +66,29 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def run_migrations_online() -> None:
-    url = _get_database_url()
-    config.set_main_option("sqlalchemy.url", url)
+def _do_run_migrations(connection: Connection) -> None:
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
 
-    section = config.get_section(config.config_ini_section, {})
-    connectable = engine_from_config(
-        section,
-        prefix="sqlalchemy.",
+
+async def _run_migrations_online() -> None:
+    url = _get_database_url()
+    connectable: AsyncEngine = create_async_engine(
+        url,
         poolclass=pool.NullPool,
     )
+    async with connectable.connect() as connection:
+        await connection.run_sync(_do_run_migrations)
+    await connectable.dispose()
 
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-        )
 
-        with context.begin_transaction():
-            context.run_migrations()
+def run_migrations_online() -> None:
+    asyncio.run(_run_migrations_online())
 
 
 if context.is_offline_mode():

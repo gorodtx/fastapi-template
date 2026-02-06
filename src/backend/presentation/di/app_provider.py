@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 from datetime import timedelta
-from enum import Enum, auto
+from typing import Self
 from urllib.parse import urlparse
 
 from dishka import Provider, Scope, provide
@@ -36,63 +35,7 @@ from backend.infrastructure.security.auth.refresh_store import RefreshStoreImpl
 from backend.infrastructure.security.password_hasher import (
     Argon2PasswordHasher,
 )
-
-
-class EnvKey(str, Enum):
-    @staticmethod
-    def _generate_next_value_(
-        name: str, start: int, count: int, last_values: list[object]
-    ) -> str:
-        del start, count, last_values
-        return name
-
-    DATABASE_URL = auto()
-    REDIS_URL = auto()
-    JWT_ISSUER = auto()
-    JWT_AUDIENCE = auto()
-    JWT_ALG = auto()
-    JWT_SECRET = auto()
-    JWT_ACCESS_TTL_S = auto()
-    JWT_REFRESH_TTL_S = auto()
-
-
-def _read_env(key: EnvKey) -> str | None:
-    value = os.environ.get(key.value)
-    if value is None or not value.strip():
-        return None
-    return value
-
-
-def _require_env(key: EnvKey) -> str:
-    value = _read_env(key)
-    if value is None:
-        raise RuntimeError(
-            f"Missing required environment variable: {key.value}"
-        )
-    return value
-
-
-def _require_env_int(key: EnvKey) -> int:
-    raw = _require_env(key)
-    try:
-        return int(raw)
-    except ValueError as exc:
-        raise RuntimeError(f"Invalid integer for {key.value}: {raw}") from exc
-
-
-def _build_jwt_config() -> JwtConfig:
-    return JwtConfig(
-        issuer=_require_env(EnvKey.JWT_ISSUER),
-        audience=_require_env(EnvKey.JWT_AUDIENCE),
-        alg=_require_env(EnvKey.JWT_ALG),
-        access_ttl=timedelta(
-            seconds=_require_env_int(EnvKey.JWT_ACCESS_TTL_S)
-        ),
-        refresh_ttl=timedelta(
-            seconds=_require_env_int(EnvKey.JWT_REFRESH_TTL_S)
-        ),
-        secret=_require_env(EnvKey.JWT_SECRET),
-    )
+from backend.presentation.settings import Settings
 
 
 def _build_redis_client(redis_url: str | None) -> Redis:
@@ -122,39 +65,47 @@ def _build_redis_client(redis_url: str | None) -> Redis:
 
 
 class AppProvider(Provider):
+    def __init__(self: Self, settings: Settings) -> None:
+        super().__init__()
+        self._settings = settings
+
     @provide(scope=Scope.APP)
-    def engine(self: AppProvider) -> AsyncEngine:
-        return create_engine(_read_env(EnvKey.DATABASE_URL))
+    def settings(self: Self) -> Settings:
+        return self._settings
+
+    @provide(scope=Scope.APP)
+    def engine(self: Self) -> AsyncEngine:
+        return create_engine(self._settings.database_url)
 
     @provide(scope=Scope.APP)
     def session_factory(
-        self: AppProvider, engine: AsyncEngine
+        self: Self, engine: AsyncEngine
     ) -> async_sessionmaker[AsyncSession]:
         return create_session_factory(engine)
 
     @provide(scope=Scope.APP)
-    async def redis_client(self: AppProvider) -> AsyncIterator[Redis]:
-        client = _build_redis_client(_read_env(EnvKey.REDIS_URL))
+    async def redis_client(self: Self) -> AsyncIterator[Redis]:
+        client = _build_redis_client(self._settings.redis_url)
         try:
             yield client
         finally:
             await client.aclose()
 
     @provide(scope=Scope.APP)
-    def auth_cache(self: AppProvider, client: Redis) -> StrCache:
+    def auth_cache(self: Self, client: Redis) -> StrCache:
         return RedisCache(client)
 
     @provide(scope=Scope.APP)
-    def shared_lock(self: AppProvider, client: Redis) -> RedisSharedLock:
+    def shared_lock(self: Self, client: Redis) -> RedisSharedLock:
         return RedisSharedLock(client)
 
     @provide(scope=Scope.APP)
-    def refresh_store(self: AppProvider, cache: StrCache) -> RefreshStore:
+    def refresh_store(self: Self, cache: StrCache) -> RefreshStore:
         return RefreshStoreImpl(cache=cache)
 
     @provide(scope=Scope.APP)
     def refresh_tokens(
-        self: AppProvider,
+        self: Self,
         store: RefreshStore,
         lock: RedisSharedLock,
         cfg: JwtConfig,
@@ -163,27 +114,34 @@ class AppProvider(Provider):
         return RefreshTokenService(store=store, lock=lock, ttl_s=ttl_s)
 
     @provide(scope=Scope.APP)
-    def password_hasher(self: AppProvider) -> PasswordHasherPort:
+    def password_hasher(self: Self) -> PasswordHasherPort:
         return Argon2PasswordHasher()
 
     @provide(scope=Scope.APP)
-    def jwt_config(self: AppProvider) -> JwtConfig:
-        return _build_jwt_config()
+    def jwt_config(self: Self) -> JwtConfig:
+        return JwtConfig(
+            issuer=self._settings.jwt_issuer,
+            audience=self._settings.jwt_audience,
+            alg=self._settings.jwt_alg,
+            access_ttl=timedelta(seconds=self._settings.jwt_access_ttl_s),
+            refresh_ttl=timedelta(seconds=self._settings.jwt_refresh_ttl_s),
+            secret=self._settings.jwt_secret,
+        )
 
     @provide(scope=Scope.APP)
-    def jwt_impl(self: AppProvider, cfg: JwtConfig) -> JwtImpl:
+    def jwt_impl(self: Self, cfg: JwtConfig) -> JwtImpl:
         return JwtImpl(cfg)
 
     @provide(scope=Scope.APP)
-    def jwt_verifier(self: AppProvider, impl: JwtImpl) -> JwtVerifier:
+    def jwt_verifier(self: Self, impl: JwtImpl) -> JwtVerifier:
         return impl
 
     @provide(scope=Scope.APP)
-    def jwt_issuer(self: AppProvider, impl: JwtImpl) -> JwtIssuer:
+    def jwt_issuer(self: Self, impl: JwtImpl) -> JwtIssuer:
         return impl
 
     @provide(scope=Scope.APP)
     def auth_cache_invalidator(
-        self: AppProvider, cache: StrCache
+        self: Self, cache: StrCache
     ) -> AuthCacheInvalidator:
         return AuthCacheInvalidator(cache=cache)

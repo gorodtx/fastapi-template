@@ -7,6 +7,11 @@ from uuid_utils.compat import UUID
 from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.sqlalchemy.tables.base import metadata
 
+
+def _system_role_values(enum_cls: type[SystemRole]) -> list[str]:
+    return [role.value for role in enum_cls]
+
+
 role_id_column: Column[UUID] = Column(
     "id",
     PG_UUID(as_uuid=True),
@@ -16,7 +21,12 @@ role_id_column: Column[UUID] = Column(
 
 role_code_column: Column[SystemRole] = Column(
     "code",
-    Enum(SystemRole, native_enum=False),
+    Enum(
+        SystemRole,
+        native_enum=False,
+        values_callable=_system_role_values,
+        validate_strings=True,
+    ),
     nullable=False,
 )
 

@@ -31,12 +31,12 @@ def q_get_user_row_by_id(
         async_session = _require_async_session(session)
         stmt = (
             sa.select(
-                users_table.c.id,
+                users_table.c.id.label("id"),
                 users_table.c.email.label("email"),
                 users_table.c.login.label("login"),
                 users_table.c.username.label("username"),
                 users_table.c.password_hash.label("password_hash"),
-                users_table.c.is_active,
+                users_table.c.is_active.label("is_active"),
             )
             .select_from(users_table)
             .where(users_table.c.id == user_id)
@@ -57,12 +57,12 @@ def q_get_user_row_by_email(
         async_session = _require_async_session(session)
         stmt = (
             sa.select(
-                users_table.c.id,
+                users_table.c.id.label("id"),
                 users_table.c.email.label("email"),
                 users_table.c.login.label("login"),
                 users_table.c.username.label("username"),
                 users_table.c.password_hash.label("password_hash"),
-                users_table.c.is_active,
+                users_table.c.is_active.label("is_active"),
             )
             .select_from(users_table)
             .where(users_table.c.email == email)
@@ -97,12 +97,12 @@ def q_upsert_user_row(
                 set_=values,
             )
             .returning(
-                users_table.c.id,
+                users_table.c.id.label("id"),
                 users_table.c.email.label("email"),
                 users_table.c.login.label("login"),
                 users_table.c.username.label("username"),
                 users_table.c.password_hash.label("password_hash"),
-                users_table.c.is_active,
+                users_table.c.is_active.label("is_active"),
             )
         )
         res = await async_session.execute(stmt)

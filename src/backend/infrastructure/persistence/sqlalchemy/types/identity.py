@@ -18,7 +18,7 @@ class EmailType(TypeDecorator[Email]):
     cache_ok: bool = True
 
     def process_bind_param(
-        self: EmailType, value: Email | None, dialect: Dialect
+        self: EmailType, value: Email | str | None, dialect: Dialect
     ) -> str | None:
         del dialect
         return bind_vo(value, Email)
@@ -35,7 +35,7 @@ class LoginType(TypeDecorator[Login]):
     cache_ok: bool = True
 
     def process_bind_param(
-        self: LoginType, value: Login | None, dialect: Dialect
+        self: LoginType, value: Login | str | None, dialect: Dialect
     ) -> str | None:
         del dialect
         return bind_vo(value, Login)
@@ -52,7 +52,7 @@ class UsernameType(TypeDecorator[Username]):
     cache_ok: bool = True
 
     def process_bind_param(
-        self: UsernameType, value: Username | None, dialect: Dialect
+        self: UsernameType, value: Username | str | None, dialect: Dialect
     ) -> str | None:
         del dialect
         return bind_vo(value, Username)

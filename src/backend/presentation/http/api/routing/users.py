@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dishka.integrations.fastapi import FromDishka
+from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
 from uuid_utils.compat import UUID
 
@@ -39,7 +39,7 @@ from backend.presentation.http.api.schemas.users import (
     UserUpdateRequest,
 )
 
-router: APIRouter = APIRouter()
+router: APIRouter = APIRouter(route_class=DishkaRoute)
 
 
 @router.post("/users", response_model=UserResponse)

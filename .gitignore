@@ -711,4 +711,5 @@ test.*
 
 *.docker-compose.local.yaml
 .uv-cache
+.uv_cache
 .npm-cache

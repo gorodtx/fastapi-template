@@ -8,7 +8,7 @@ from backend.application.common.exceptions.application import (
     UnauthenticatedError,
 )
 from backend.application.common.exceptions.error_mappers.auth import (
-    map_refresh_replay,
+    map_refresh_token_error,
 )
 from backend.application.common.interfaces.auth.ports import (
     JwtIssuer,
@@ -64,7 +64,7 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
             )
 
         rotate_result = await capture_async(
-            rotate_refresh, map_refresh_replay()
+            rotate_refresh, map_refresh_token_error()
         )
         if rotate_result.is_err():
             return ResultImpl.err_from(rotate_result)

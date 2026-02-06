@@ -9,14 +9,14 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-_DEFAULT_DATABASE_URL: str = "xyi"
-
 
 def create_engine(
-    url: str | None = None, *, echo: bool = False
+    url: str,
+    *,
+    echo: bool = False,
 ) -> AsyncEngine:
     return create_async_engine(
-        url or _DEFAULT_DATABASE_URL,
+        url,
         echo=echo,
     )
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Mapping
-from typing import TypeGuard
+from typing import Self, TypeGuard
 
 import msgspec
 from dishka import Provider, Scope, provide
@@ -35,6 +35,7 @@ from backend.infrastructure.security.auth.authenticator import (
 )
 
 _AUTH_USER_CACHE_TTL_S: int = 300
+_ROLLBACK_ONLY_SCOPE_KEY: str = "backend.rollback_only"
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -134,39 +135,56 @@ def _is_object_list(value: object) -> TypeGuard[list[object]]:
 class RequestProvider(Provider):
     @provide(scope=Scope.REQUEST)
     async def session(
-        self: RequestProvider,
+        self: Self,
+        request: Request,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> AsyncIterator[AsyncSession]:
+        request.scope.pop(_ROLLBACK_ONLY_SCOPE_KEY, None)
         async with session_factory() as session:
-            yield session
+            await session.begin()
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
+            else:
+                if request.scope.get(_ROLLBACK_ONLY_SCOPE_KEY):
+                    try:
+                        await session.rollback()
+                    except Exception:
+                        return
+                else:
+                    try:
+                        await session.commit()
+                    except Exception:
+                        await session.rollback()
+                        raise
 
     @provide(scope=Scope.REQUEST)
     def transaction_manager(
-        self: RequestProvider, session: AsyncSession
+        self: Self, session: AsyncSession
     ) -> TransactionManager:
         return TransactionManagerImpl(session)
 
     @provide(scope=Scope.REQUEST)
     def persistence_gateway(
-        self: RequestProvider, manager: TransactionManager
+        self: Self, manager: TransactionManager
     ) -> PersistenceGateway:
         return PersistenceGatewayImpl(manager)
 
     @provide(scope=Scope.REQUEST)
     def authenticator(
-        self: RequestProvider, gateway: PersistenceGateway
+        self: Self, gateway: PersistenceGateway
     ) -> Authenticator:
         return AuthenticatorImpl(users=gateway.users, rbac=gateway.rbac)
 
     @provide(scope=Scope.REQUEST)
-    def permission_guard(
-        self: RequestProvider, cache: StrCache
-    ) -> PermissionGuard:
+    def permission_guard(self: Self, cache: StrCache) -> PermissionGuard:
         return PermissionGuard(cache=cache)
 
     @provide(scope=Scope.REQUEST)
     async def current_user(
-        self: RequestProvider,
+        self: Self,
         request: Request,
         jwt_verifier: JwtVerifier,
         authenticator: Authenticator,

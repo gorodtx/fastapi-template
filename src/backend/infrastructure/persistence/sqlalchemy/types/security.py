@@ -16,7 +16,7 @@ class PasswordHashType(TypeDecorator[Password]):
     cache_ok: bool = True
 
     def process_bind_param(
-        self: PasswordHashType, value: Password | None, dialect: Dialect
+        self: PasswordHashType, value: Password | str | None, dialect: Dialect
     ) -> str | None:
         del dialect
         return bind_vo(value, Password)

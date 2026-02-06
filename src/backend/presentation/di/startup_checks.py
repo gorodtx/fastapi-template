@@ -8,14 +8,14 @@ from backend.presentation.di.require_auth import require_auth
 
 def assert_closed_by_default(app: FastAPI) -> None:
     missing: list[str] = []
-    public_prefix = "/auth"
+    public_prefixes = ("/auth", "/system")
     excluded_paths = {"/docs", "/redoc", "/openapi.json"}
 
     for route in app.routes:
         if not isinstance(route, APIRoute):
             continue
         path = route.path
-        if path.startswith(public_prefix) or path in excluded_paths:
+        if path.startswith(public_prefixes) or path in excluded_paths:
             continue
         dependant = getattr(route, "dependant", None)
         if dependant is None:

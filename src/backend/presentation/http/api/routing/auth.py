@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dishka.integrations.fastapi import FromDishka
+from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
 
 from backend.application.common.interfaces.auth.ports import (
@@ -34,7 +34,7 @@ from backend.presentation.http.api.schemas.auth import (
     TokenPairResponse,
 )
 
-router: APIRouter = APIRouter()
+router: APIRouter = APIRouter(route_class=DishkaRoute)
 
 
 @router.post("/auth/login", response_model=TokenPairResponse)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Table, UniqueConstraint
+from sqlalchemy import Boolean, Column, Table, UniqueConstraint, true
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from uuid_utils.compat import UUID
 
@@ -57,7 +57,7 @@ user_is_active_column: Column[bool] = Column(
     "is_active",
     Boolean,
     nullable=False,
-    default=True,
+    server_default=true(),
 )
 
 users_table: Table = Table(

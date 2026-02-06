@@ -16,11 +16,17 @@ def bind_vo[T: StrValueObject](
 def bind_vo[T: StrValueObject](value: T, expected_type: type[T]) -> str: ...
 
 
+@overload
+def bind_vo[T: StrValueObject](value: str, expected_type: type[T]) -> str: ...
+
+
 def bind_vo(
-    value: StrValueObject | None, expected_type: type[object]
+    value: StrValueObject | str | None, expected_type: type[object]
 ) -> str | None:
     if value is None:
         return None
+    if isinstance(value, str):
+        return value
     vo_value: StrValueObject = value
     if not isinstance(vo_value, expected_type):
         raise TypeError(
