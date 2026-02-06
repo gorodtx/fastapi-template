@@ -68,13 +68,10 @@ async def assign_role_to_user(
         user_id=user_id,
         role=payload.role,
         actor_id=current_user.id,
+        actor_roles=current_user.roles,
     )
     result = await handler(cmd)
-    result.unwrap()
-
-    roles_handler = GetUserRolesHandler(gateway=gateway)
-    roles_result = await roles_handler(GetUserRolesQuery(user_id=user_id))
-    dto = roles_result.unwrap()
+    dto = result.unwrap()
 
     return UserRolesResponse.from_dto(dto)
 
@@ -100,12 +97,9 @@ async def revoke_role_from_user(
         user_id=user_id,
         role=role,
         actor_id=current_user.id,
+        actor_roles=current_user.roles,
     )
     result = await handler(cmd)
-    result.unwrap()
-
-    roles_handler = GetUserRolesHandler(gateway=gateway)
-    roles_result = await roles_handler(GetUserRolesQuery(user_id=user_id))
-    dto = roles_result.unwrap()
+    dto = result.unwrap()
 
     return UserRolesResponse.from_dto(dto)

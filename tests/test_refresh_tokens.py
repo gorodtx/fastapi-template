@@ -6,9 +6,14 @@ from contextlib import asynccontextmanager
 import pytest
 from uuid_utils.compat import UUID
 
+from backend.application.common.exceptions.application import ConflictError
 from backend.application.common.exceptions.auth import (
     InvalidRefreshTokenError,
+    RefreshTokenLockTimeoutError,
     RefreshTokenReplayError,
+)
+from backend.application.common.exceptions.error_mappers.auth import (
+    map_refresh_token_error,
 )
 from backend.application.common.tools.refresh_tokens import (
     RefreshTokenService,
@@ -41,6 +46,13 @@ class _InMemoryRefreshStore:
 class _NoopLock:
     @asynccontextmanager
     async def __call__(self, _key: str) -> AsyncIterator[None]:
+        yield
+
+
+class _TimeoutLock:
+    @asynccontextmanager
+    async def __call__(self, _key: str) -> AsyncIterator[None]:
+        raise RefreshTokenLockTimeoutError("lock timeout")
         yield
 
 
@@ -113,3 +125,20 @@ async def test_rotate_refresh_success_rotates_token() -> None:
     await svc.rotate(user_id=user_id, fingerprint="fp", old="old", new="new")
 
     assert await store.get(user_id=user_id, fingerprint="fp") == "new"
+
+
+@pytest.mark.asyncio
+async def test_rotate_refresh_lock_timeout_propagates() -> None:
+    store = _InMemoryRefreshStore()
+    user_id = UUID("00000000-0000-0000-0000-000000000001")
+    svc = RefreshTokenService(store=store, lock=_TimeoutLock(), ttl_s=123)
+
+    with pytest.raises(RefreshTokenLockTimeoutError):
+        await svc.rotate(user_id=user_id, fingerprint="fp", old="", new="new")
+
+
+def test_refresh_token_error_mapper_handles_lock_timeout() -> None:
+    mapped = map_refresh_token_error()(RefreshTokenLockTimeoutError("busy"))
+
+    assert isinstance(mapped, ConflictError)
+    assert mapped.message == "Refresh token operation timeout, retry"

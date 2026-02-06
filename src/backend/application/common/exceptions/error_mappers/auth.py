@@ -4,10 +4,12 @@ from collections.abc import Callable
 
 from backend.application.common.exceptions.application import (
     AppError,
+    ConflictError,
     UnauthenticatedError,
 )
 from backend.application.common.exceptions.auth import (
     InvalidRefreshTokenError,
+    RefreshTokenLockTimeoutError,
     RefreshTokenReplayError,
 )
 
@@ -31,6 +33,13 @@ def unauthenticated(message: str) -> Callable[[Exception], AppError]:
     return factory
 
 
+def conflict(message: str) -> Callable[[Exception], AppError]:
+    def factory(_exc: Exception) -> AppError:
+        return ConflictError(message)
+
+    return factory
+
+
 def map_invalid_credentials() -> Callable[[Exception], AppError]:
     return map_auth_error(
         (ValueError, unauthenticated("Invalid email or password"))
@@ -42,7 +51,11 @@ def map_refresh_replay() -> Callable[[Exception], AppError]:
         (
             RefreshTokenReplayError,
             unauthenticated("Refresh token replay detected"),
-        )
+        ),
+        (
+            RefreshTokenLockTimeoutError,
+            conflict("Refresh token operation timeout, retry"),
+        ),
     )
 
 
@@ -58,5 +71,9 @@ def map_refresh_token_error() -> Callable[[Exception], AppError]:
         (
             RefreshTokenReplayError,
             unauthenticated("Refresh token replay detected"),
+        ),
+        (
+            RefreshTokenLockTimeoutError,
+            conflict("Refresh token operation timeout, retry"),
         ),
     )

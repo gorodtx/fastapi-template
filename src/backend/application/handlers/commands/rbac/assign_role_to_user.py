@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from backend.application.common.dtos.rbac import (
     AssignRoleToUserDTO,
-    RoleAssignmentResultDTO,
+    UserRolesResponseDTO,
 )
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.error_mappers.rbac import (
@@ -16,7 +16,7 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.rbac import (
-    present_role_assignment_from,
+    present_user_roles,
 )
 from backend.application.common.tools.auth_cache import AuthCacheInvalidator
 from backend.application.handlers.base import CommandHandler
@@ -34,7 +34,7 @@ class AssignRoleToUserCommand(AssignRoleToUserDTO): ...
 
 @handler(mode="write")
 class AssignRoleToUserHandler(
-    CommandHandler[AssignRoleToUserCommand, RoleAssignmentResultDTO]
+    CommandHandler[AssignRoleToUserCommand, UserRolesResponseDTO]
 ):
     gateway: PersistenceGateway
     cache_invalidator: AuthCacheInvalidator
@@ -43,7 +43,7 @@ class AssignRoleToUserHandler(
         self: AssignRoleToUserHandler,
         cmd: AssignRoleToUserCommand,
         /,
-    ) -> Result[RoleAssignmentResultDTO, AppError]:
+    ) -> Result[UserRolesResponseDTO, AppError]:
         def parse_role() -> SystemRole:
             return SystemRole(cmd.role)
 
@@ -58,14 +58,7 @@ class AssignRoleToUserHandler(
             if user_result.is_err():
                 return ResultImpl.err_from(user_result)
 
-            actor_result = (
-                await self.gateway.users.get_by_id(cmd.actor_id)
-            ).map_err(map_storage_error_to_app())
-            if actor_result.is_err():
-                return ResultImpl.err_from(actor_result)
-
             user = user_result.unwrap()
-            actor = actor_result.unwrap()
             role = role_result.unwrap()
 
             def enforce_policy() -> None:
@@ -74,7 +67,7 @@ class AssignRoleToUserHandler(
                     target_user_id=user.id,
                     action=RoleAction.ASSIGN,
                 )
-                ensure_can_assign_role(set(actor.roles), role)
+                ensure_can_assign_role(set(cmd.actor_roles), role)
 
             policy_result = capture(
                 enforce_policy,
@@ -105,8 +98,7 @@ class AssignRoleToUserHandler(
             if replace_result.is_err():
                 return ResultImpl.err_from(replace_result)
 
-            presenter = present_role_assignment_from(user.id, role)
-            response = replace_result.map(presenter)
+            response = ResultImpl.ok(present_user_roles(user), AppError)
 
         await self.cache_invalidator.invalidate_user(cmd.user_id)
         return response

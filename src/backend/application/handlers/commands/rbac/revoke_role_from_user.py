@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from backend.application.common.dtos.rbac import (
     RevokeRoleFromUserDTO,
-    RoleAssignmentResultDTO,
+    UserRolesResponseDTO,
 )
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.error_mappers.rbac import (
@@ -16,7 +16,7 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.rbac import (
-    present_role_assignment_from,
+    present_user_roles,
 )
 from backend.application.common.tools.auth_cache import AuthCacheInvalidator
 from backend.application.handlers.base import CommandHandler
@@ -35,7 +35,7 @@ class RevokeRoleFromUserCommand(RevokeRoleFromUserDTO): ...
 
 @handler(mode="write")
 class RevokeRoleFromUserHandler(
-    CommandHandler[RevokeRoleFromUserCommand, RoleAssignmentResultDTO]
+    CommandHandler[RevokeRoleFromUserCommand, UserRolesResponseDTO]
 ):
     gateway: PersistenceGateway
     cache_invalidator: AuthCacheInvalidator
@@ -44,7 +44,7 @@ class RevokeRoleFromUserHandler(
         self: RevokeRoleFromUserHandler,
         cmd: RevokeRoleFromUserCommand,
         /,
-    ) -> Result[RoleAssignmentResultDTO, AppError]:
+    ) -> Result[UserRolesResponseDTO, AppError]:
         def parse_role() -> SystemRole:
             return SystemRole(cmd.role)
 
@@ -59,16 +59,10 @@ class RevokeRoleFromUserHandler(
             user_result = (
                 await self.gateway.users.get_by_id(cmd.user_id)
             ).map_err(map_storage_error_to_app())
-            actor_result = (
-                await self.gateway.users.get_by_id(cmd.actor_id)
-            ).map_err(map_storage_error_to_app())
-            if user_result.is_err() or actor_result.is_err():
-                return ResultImpl.err_from(
-                    user_result if user_result.is_err() else actor_result
-                )
+            if user_result.is_err():
+                return ResultImpl.err_from(user_result)
 
             user = user_result.unwrap()
-            actor = actor_result.unwrap()
             role = role_result.unwrap()
 
             def enforce_policy() -> None:
@@ -77,7 +71,7 @@ class RevokeRoleFromUserHandler(
                     target_user_id=user.id,
                     action=RoleAction.REVOKE,
                 )
-                ensure_can_revoke_role(set(actor.roles), role)
+                ensure_can_revoke_role(set(cmd.actor_roles), role)
 
             policy_result = capture(
                 enforce_policy,
@@ -136,8 +130,7 @@ class RevokeRoleFromUserHandler(
             if replace_result.is_err():
                 return ResultImpl.err_from(replace_result)
 
-            presenter = present_role_assignment_from(user.id, role)
-            response = replace_result.map(presenter)
+            response = ResultImpl.ok(present_user_roles(user), AppError)
 
         await self.cache_invalidator.invalidate_user(cmd.user_id)
         return response
