@@ -6,10 +6,7 @@ from backend.application.common.dtos.users import (
     UserResponseDTO,
     UserUpdateDTO,
 )
-from backend.application.common.exceptions.application import (
-    AppError,
-    ConflictError,
-)
+from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.error_mappers.storage import (
     map_storage_error_to_app,
 )
@@ -45,10 +42,6 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
     async def __call__(
         self: UpdateUserHandler, cmd: UpdateUserCommand, /
     ) -> Result[UserResponseDTO, AppError]:
-        if cmd.email is None and cmd.raw_password is None:
-            err = ConflictError("Nothing to update")
-            return ResultImpl.err_app(err, UserResponseDTO)
-
         async with self.gateway.manager.transaction():
             user_result = (
                 await self.gateway.users.get_by_id(

@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from pydantic import ValidationError
 
-from backend.presentation.http.api.schemas.auth import LoginRequest
+from backend.presentation.http.api.schemas.auth import (
+    LoginRequest,
+    LogoutRequest,
+    RefreshRequest,
+    RegisterRequest,
+)
 
 
 def _has_field_error(exc: ValidationError, field_name: str) -> bool:
@@ -16,6 +23,10 @@ def _has_field_error(exc: ValidationError, field_name: str) -> bool:
 
 def _build_raw_password() -> str:
     return "".join(("valid", "-", "password", "-", "value"))
+
+
+def _build_refresh_token() -> str:
+    return "".join(("dummy", "-", "refresh", "-", "token"))
 
 
 def test_login_request_accepts_valid_payload() -> None:
@@ -64,3 +75,41 @@ def test_login_request_rejects_invalid_fields(
         )
 
     assert _has_field_error(exc_info.value, field_name)
+
+
+@pytest.mark.parametrize(
+    ("factory", "fingerprint"),
+    (
+        (
+            lambda fingerprint: RegisterRequest(
+                email="valid@example.com",
+                login="validlogin",
+                username="validuser",
+                raw_password="".join(("Strong", "Pass", "123", "!")),
+                fingerprint=fingerprint,
+            ),
+            "short",
+        ),
+        (
+            lambda fingerprint: RefreshRequest(
+                refresh_token=_build_refresh_token(),
+                fingerprint=fingerprint,
+            ),
+            "fp with spaces",
+        ),
+        (
+            lambda fingerprint: LogoutRequest(
+                refresh_token=_build_refresh_token(),
+                fingerprint=fingerprint,
+            ),
+            "short",
+        ),
+    ),
+)
+def test_auth_requests_reject_invalid_fingerprint(
+    factory: Callable[[str], object], fingerprint: str
+) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        factory(fingerprint)
+
+    assert _has_field_error(exc_info.value, "fingerprint")

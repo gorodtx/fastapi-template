@@ -43,17 +43,17 @@ class LoginRequest(BaseShema):
 
 
 class RegisterRequest(UserCreateRequest):
-    fingerprint: str
+    fingerprint: FingerprintStr
 
 
 class RefreshRequest(BaseShema):
     refresh_token: str
-    fingerprint: str
+    fingerprint: FingerprintStr
 
 
 class LogoutRequest(BaseShema):
     refresh_token: str
-    fingerprint: str
+    fingerprint: FingerprintStr
 
 
 class TokenPairResponse(BaseShema):

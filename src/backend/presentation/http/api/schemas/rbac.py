@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid_utils.compat import UUID
 
+from backend.domain.core.constants.rbac import SystemRole
 from backend.presentation.http.api.schemas.base import BaseShema
 
 
@@ -12,4 +13,4 @@ class UserRolesResponse(BaseShema):
 
 
 class RoleChangeRequest(BaseShema):
-    role: str
+    role: SystemRole

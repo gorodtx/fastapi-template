@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import StringConstraints, field_validator
+from pydantic import StringConstraints, field_validator, model_validator
 from uuid_utils.compat import UUID
 
 from backend.application.common.tools.password_validator import (
@@ -71,6 +71,12 @@ class UserResponse(BaseShema):
 class UserUpdateRequest(BaseShema):
     email: EmailStr | None = None
     raw_password: RawPasswordStr | None = None
+
+    @model_validator(mode="after")
+    def _validate_not_empty(self: Self) -> Self:
+        if self.email is None and self.raw_password is None:
+            raise ValueError("At least one field must be provided")
+        return self
 
     @field_validator("email")
     @classmethod

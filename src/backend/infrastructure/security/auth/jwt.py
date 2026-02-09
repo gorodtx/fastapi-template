@@ -123,6 +123,7 @@ class JwtImpl(JwtIssuer, JwtVerifier):
             "aud": self.cfg.audience,
             "sub": str(user_id),
             "typ": "access",
+            "jti": str(uuid4()),
             "iat": int(now.timestamp()),
             "exp": int((now + self.cfg.access_ttl).timestamp()),
         }
@@ -162,7 +163,8 @@ class JwtImpl(JwtIssuer, JwtVerifier):
         if data.get("typ") != "access":
             return _access_error("Invalid access token")
         sub = data.get("sub")
-        if not isinstance(sub, str):
+        jti = data.get("jti")
+        if not isinstance(sub, str) or not isinstance(jti, str) or not jti:
             return _access_error("Invalid access token")
         try:
             return ResultImpl.ok(UUID(sub), AppError)

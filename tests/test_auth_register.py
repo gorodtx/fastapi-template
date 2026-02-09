@@ -112,7 +112,7 @@ async def test_register_user_creates_user_and_returns_tokens(
         login="newuser",
         username="newuser",
         raw_password=raw_password,
-        fingerprint="fp-test",
+        fingerprint="fp-test-1",
     )
     jwt_issuer = _FakeJwtIssuer(
         access_token=access_token,
@@ -136,10 +136,10 @@ async def test_register_user_creates_user_and_returns_tokens(
     assert cmd.username == "newuser"
     assert cmd.raw_password == raw_password
     assert jwt_issuer.issued_access_for == _USER_ID
-    assert jwt_issuer.issued_refresh_for == (_USER_ID, "fp-test")
+    assert jwt_issuer.issued_refresh_for == (_USER_ID, "fp-test-1")
     assert refresh_tokens.rotate_args == (
         _USER_ID,
-        "fp-test",
+        "fp-test-1",
         "",
         refresh_jti,
     )
@@ -185,7 +185,7 @@ async def test_register_user_maps_refresh_replay_to_app_error(
         login="newuser",
         username="newuser",
         raw_password=raw_password,
-        fingerprint="fp-test",
+        fingerprint="fp-test-1",
     )
 
     with pytest.raises(AppError) as exc_info:

@@ -43,6 +43,9 @@ class LogoutUserHandler(CommandHandler[LogoutUserCommand, SuccessDTO]):
             return ResultImpl.err_from(verify_result)
 
         user_id, token_fingerprint, _token_jti = verify_result.unwrap()
+        if user_id != cmd.actor_user_id:
+            err = UnauthenticatedError("Invalid refresh token")
+            return ResultImpl.err_app(err, SuccessDTO)
         if token_fingerprint != cmd.fingerprint:
             err = UnauthenticatedError("Refresh token fingerprint mismatch")
             return ResultImpl.err_app(err, SuccessDTO)

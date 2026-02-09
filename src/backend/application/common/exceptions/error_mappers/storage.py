@@ -43,6 +43,8 @@ def map_storage_error_to_app() -> Callable[[StorageError], AppError]:
                 code=_INTERNAL_ERROR_CODE,
                 message=_INTERNAL_ERROR_MESSAGE,
             )
+        if error.code.endswith(".not_found"):
+            return AppError(code=error.code, message=error.message)
         return AppError(
             code=error.code,
             message=error.message,

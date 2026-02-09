@@ -27,6 +27,7 @@ from backend.domain.core.constants.permission_codes import (
     RBAC_READ_ROLES,
     RBAC_REVOKE_ROLE,
 )
+from backend.domain.core.constants.rbac import SystemRole
 from backend.presentation.http.api.schemas.rbac import (
     RoleChangeRequest,
     UserRolesResponse,
@@ -66,7 +67,7 @@ async def assign_role_to_user(
     )
     cmd = AssignRoleToUserCommand(
         user_id=user_id,
-        role=payload.role,
+        role=payload.role.value,
         actor_id=current_user.id,
         actor_roles=current_user.roles,
     )
@@ -82,7 +83,7 @@ async def assign_role_to_user(
 )
 async def revoke_role_from_user(
     user_id: UUID,
-    role: str,
+    role: SystemRole,
     gateway: FromDishka[PersistenceGateway],
     cache_invalidator: FromDishka[AuthCacheInvalidator],
     current_user: FromDishka[AuthUser],
@@ -95,7 +96,7 @@ async def revoke_role_from_user(
     )
     cmd = RevokeRoleFromUserCommand(
         user_id=user_id,
-        role=role,
+        role=role.value,
         actor_id=current_user.id,
         actor_roles=current_user.roles,
     )

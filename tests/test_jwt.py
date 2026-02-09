@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from jwt import decode as jwt_decode
+from jwt import encode as jwt_encode
 from uuid_utils.compat import UUID
 
 from backend.infrastructure.security.auth.jwt import JwtConfig, JwtImpl
@@ -78,3 +79,52 @@ def test_verify_refresh_invalid_token_returns_generic_message() -> None:
 
     assert err.code == "auth.unauthenticated"
     assert err.message == "Invalid refresh token"
+
+
+def test_issue_access_contains_jti_and_is_unique() -> None:
+    jwt_impl = JwtImpl(cfg=_config())
+
+    token_1 = jwt_impl.issue_access(user_id=_USER_ID)
+    token_2 = jwt_impl.issue_access(user_id=_USER_ID)
+
+    payload_1 = jwt_decode(
+        token_1,
+        jwt_impl.cfg.secret,
+        algorithms=[jwt_impl.cfg.alg],
+        audience=jwt_impl.cfg.audience,
+        issuer=jwt_impl.cfg.issuer,
+    )
+    payload_2 = jwt_decode(
+        token_2,
+        jwt_impl.cfg.secret,
+        algorithms=[jwt_impl.cfg.alg],
+        audience=jwt_impl.cfg.audience,
+        issuer=jwt_impl.cfg.issuer,
+    )
+
+    assert token_1 != token_2
+    assert isinstance(payload_1.get("jti"), str)
+    assert payload_1.get("jti")
+    assert isinstance(payload_2.get("jti"), str)
+    assert payload_2.get("jti")
+
+
+def test_verify_access_requires_jti_claim() -> None:
+    jwt_impl = JwtImpl(cfg=_config())
+    now = datetime.now(tz=UTC)
+    payload = {
+        "iss": jwt_impl.cfg.issuer,
+        "aud": jwt_impl.cfg.audience,
+        "sub": str(_USER_ID),
+        "typ": "access",
+        "iat": int(now.timestamp()),
+        "exp": int((now + jwt_impl.cfg.access_ttl).timestamp()),
+    }
+    token = jwt_encode(
+        payload, jwt_impl.cfg.secret, algorithm=jwt_impl.cfg.alg
+    )
+
+    err = jwt_impl.verify_access(token).unwrap_err()
+
+    assert err.code == "auth.unauthenticated"
+    assert err.message == "Invalid access token"

@@ -43,7 +43,7 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
                 rec,
                 code="user.not_found",
                 message="User not found",
-                detail=f"id={user_id}",
+                detail="not found",
             )
             roles: set[SystemRole] = set()
             if include_roles:
@@ -68,7 +68,7 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
                 rec,
                 code="user.not_found",
                 message="User not found",
-                detail=f"email={email}",
+                detail="not found",
             )
             roles: set[SystemRole] = set()
             if include_roles:

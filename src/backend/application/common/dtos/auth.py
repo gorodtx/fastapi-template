@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid_utils.compat import UUID
+
 from backend.application.common.dtos.base import dto
 
 
@@ -20,6 +22,7 @@ class LoginUserDTO:
 class LogoutUserDTO:
     refresh_token: str
     fingerprint: str
+    actor_user_id: UUID
 
 
 @dto

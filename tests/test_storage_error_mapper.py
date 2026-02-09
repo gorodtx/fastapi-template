@@ -58,3 +58,20 @@ def test_non_unique_storage_error_keeps_original_payload() -> None:
     assert mapped.message == "Internal server error"
     assert mapped.detail is None
     assert mapped.meta is None
+
+
+def test_not_found_storage_error_masks_detail_and_meta() -> None:
+    error = StorageError(
+        code="user.not_found",
+        message="User not found",
+        detail="id=123",
+        meta={"debug": "value"},
+    )
+
+    mapped = map_storage_error_to_app()(error)
+
+    assert isinstance(mapped, AppError)
+    assert mapped.code == "user.not_found"
+    assert mapped.message == "User not found"
+    assert mapped.detail is None
+    assert mapped.meta is None

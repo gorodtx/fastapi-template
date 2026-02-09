@@ -10,6 +10,7 @@ from backend.application.common.interfaces.auth.ports import (
     JwtIssuer,
     JwtVerifier,
 )
+from backend.application.common.interfaces.auth.types import AuthUser
 from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
@@ -118,6 +119,7 @@ async def logout_user(
     payload: LogoutRequest,
     jwt_verifier: FromDishka[JwtVerifier],
     refresh_tokens: FromDishka[RefreshTokenService],
+    current_user: FromDishka[AuthUser],
 ) -> SuccessResponse:
     handler = LogoutUserHandler(
         jwt_verifier=jwt_verifier,
@@ -126,6 +128,7 @@ async def logout_user(
     cmd = LogoutUserCommand(
         refresh_token=payload.refresh_token,
         fingerprint=payload.fingerprint,
+        actor_user_id=current_user.id,
     )
     result = await handler(cmd)
     dto = result.unwrap()
