@@ -81,7 +81,7 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
 
         user_id = user.id
         access_token = self.jwt_issuer.issue_access(user_id=user_id)
-        refresh_token = self.jwt_issuer.issue_refresh(
+        refresh_token, refresh_jti = self.jwt_issuer.issue_refresh(
             user_id=user_id,
             fingerprint=cmd.fingerprint,
         )
@@ -90,8 +90,8 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
             return self.refresh_tokens.rotate(
                 user_id=user_id,
                 fingerprint=cmd.fingerprint,
-                old="",
-                new=refresh_token,
+                old_jti="",
+                new_jti=refresh_jti,
             )
 
         rotate_result = await capture_async(

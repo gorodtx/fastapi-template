@@ -97,7 +97,7 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     def shared_lock(self: Self, client: Redis) -> RedisSharedLock:
-        return RedisSharedLock(client)
+        return RedisSharedLock(client=client)
 
     @provide(scope=Scope.APP)
     def refresh_store(self: Self, cache: StrCache) -> RefreshStore:

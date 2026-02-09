@@ -3,6 +3,9 @@ from __future__ import annotations
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
 
+from backend.application.common.exceptions.error_mappers.auth import (
+    map_refresh_replay,
+)
 from backend.application.common.interfaces.auth.ports import (
     JwtIssuer,
     JwtVerifier,
@@ -25,16 +28,64 @@ from backend.application.handlers.commands.auth.refresh import (
     RefreshUserCommand,
     RefreshUserHandler,
 )
+from backend.application.handlers.commands.users.create import (
+    CreateUserCommand,
+    CreateUserHandler,
+)
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.presentation.http.api.schemas.auth import (
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
+    RegisterRequest,
     SuccessResponse,
     TokenPairResponse,
 )
 
 router: APIRouter = APIRouter(route_class=DishkaRoute)
+
+
+@router.post("/auth/register", response_model=TokenPairResponse)
+async def register_user(
+    payload: RegisterRequest,
+    gateway: FromDishka[PersistenceGateway],
+    password_hasher: FromDishka[PasswordHasherPort],
+    jwt_issuer: FromDishka[JwtIssuer],
+    refresh_tokens: FromDishka[RefreshTokenService],
+) -> TokenPairResponse:
+    create_handler = CreateUserHandler(
+        gateway=gateway,
+        password_hasher=password_hasher,
+    )
+    create_cmd = CreateUserCommand(
+        email=payload.email,
+        login=payload.login,
+        username=payload.username,
+        raw_password=payload.raw_password,
+    )
+    create_result = await create_handler(create_cmd)
+    user = create_result.unwrap()
+
+    access_token = jwt_issuer.issue_access(user_id=user.id)
+    refresh_token, refresh_jti = jwt_issuer.issue_refresh(
+        user_id=user.id,
+        fingerprint=payload.fingerprint,
+    )
+
+    try:
+        await refresh_tokens.rotate(
+            user_id=user.id,
+            fingerprint=payload.fingerprint,
+            old_jti="",
+            new_jti=refresh_jti,
+        )
+    except Exception as exc:
+        raise map_refresh_replay()(exc) from exc
+
+    return TokenPairResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
 
 
 @router.post("/auth/login", response_model=TokenPairResponse)

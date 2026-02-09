@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final
+from uuid import uuid4
 
 from jwt import PyJWTError
 from jwt import decode as _jwt_decode_impl
@@ -88,8 +89,14 @@ def _access_error(message: str) -> Result[UUID, AppError]:
     return ResultImpl.err_app(UnauthenticatedError(message))
 
 
-def _refresh_error(message: str) -> Result[tuple[UUID, str], AppError]:
+def _refresh_error(message: str) -> Result[tuple[UUID, str, str], AppError]:
     return ResultImpl.err_app(UnauthenticatedError(message))
+
+
+def _refresh_payload(
+    user_id: UUID, fingerprint: str, token_jti: str
+) -> tuple[UUID, str, str]:
+    return user_id, fingerprint, token_jti
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,18 +130,21 @@ class JwtImpl(JwtIssuer, JwtVerifier):
 
     def issue_refresh(
         self: JwtImpl, *, user_id: UUID, fingerprint: str
-    ) -> str:
+    ) -> tuple[str, str]:
         now = self._now()
+        jti = str(uuid4())
         payload = {
             "iss": self.cfg.issuer,
             "aud": self.cfg.audience,
             "sub": str(user_id),
             "typ": "refresh",
             "fpr": fingerprint,
+            "jti": jti,
             "iat": int(now.timestamp()),
             "exp": int((now + self.cfg.refresh_ttl).timestamp()),
         }
-        return _jwt_encode(payload, self.cfg.secret, algorithm=self.cfg.alg)
+        token = _jwt_encode(payload, self.cfg.secret, algorithm=self.cfg.alg)
+        return token, jti
 
     def verify_access(self: JwtImpl, token: str) -> Result[UUID, AppError]:
         try:
@@ -146,22 +156,22 @@ class JwtImpl(JwtIssuer, JwtVerifier):
                 issuer=self.cfg.issuer,
                 options={"require": _REQUIRED_CLAIMS},
             )
-        except PyJWTError as exc:
-            return _access_error(f"Invalid access token: {exc}")
+        except PyJWTError:
+            return _access_error("Invalid access token")
 
         if data.get("typ") != "access":
-            return _access_error("Invalid access token type")
+            return _access_error("Invalid access token")
         sub = data.get("sub")
         if not isinstance(sub, str):
-            return _access_error("Invalid token subject")
+            return _access_error("Invalid access token")
         try:
             return ResultImpl.ok(UUID(sub), AppError)
-        except ValueError as exc:
-            return _access_error(f"Invalid token subject: {exc}")
+        except ValueError:
+            return _access_error("Invalid access token")
 
     def verify_refresh(
         self: JwtImpl, token: str
-    ) -> Result[tuple[UUID, str], AppError]:
+    ) -> Result[tuple[UUID, str, str], AppError]:
         try:
             data = _jwt_decode(
                 token,
@@ -171,17 +181,24 @@ class JwtImpl(JwtIssuer, JwtVerifier):
                 issuer=self.cfg.issuer,
                 options={"require": _REQUIRED_CLAIMS},
             )
-        except PyJWTError as exc:
-            return _refresh_error(f"Invalid refresh token: {exc}")
+        except PyJWTError:
+            return _refresh_error("Invalid refresh token")
 
         if data.get("typ") != "refresh":
-            return _refresh_error("Invalid refresh token type")
+            return _refresh_error("Invalid refresh token")
         sub = data.get("sub")
         fpr = data.get("fpr")
-        if not isinstance(sub, str) or not isinstance(fpr, str) or not fpr:
+        jti = data.get("jti")
+        if (
+            not isinstance(sub, str)
+            or not isinstance(fpr, str)
+            or not fpr
+            or not isinstance(jti, str)
+            or not jti
+        ):
             return _refresh_error("Invalid refresh token")
         try:
-            fingerprint: str = fpr or ""
-            return ResultImpl.ok((UUID(sub), fingerprint), AppError)
-        except ValueError as exc:
-            return _refresh_error(f"Invalid token subject: {exc}")
+            user_id = UUID(sub)
+            return ResultImpl.ok(_refresh_payload(user_id, fpr, jti), AppError)
+        except ValueError:
+            return _refresh_error("Invalid refresh token")

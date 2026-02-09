@@ -63,14 +63,17 @@ async def test_rotate_login_sets_token_when_missing() -> None:
 
     user_id = UUID("00000000-0000-0000-0000-000000000001")
     await svc.rotate(
-        user_id=user_id, fingerprint="fp", old="", new="new-token"
+        user_id=user_id,
+        fingerprint="fp",
+        old_jti="",
+        new_jti="new-jti",
     )
 
-    assert await store.get(user_id=user_id, fingerprint="fp") == "new-token"
+    assert await store.get(user_id=user_id, fingerprint="fp") == "new-jti"
 
 
 @pytest.mark.asyncio
-async def test_rotate_login_rejects_existing_token() -> None:
+async def test_rotate_login_overwrites_existing_token() -> None:
     store = _InMemoryRefreshStore()
     user_id = UUID("00000000-0000-0000-0000-000000000001")
     await store.set(
@@ -78,11 +81,14 @@ async def test_rotate_login_rejects_existing_token() -> None:
     )
 
     svc = RefreshTokenService(store=store, lock=_NoopLock(), ttl_s=123)
+    await svc.rotate(
+        user_id=user_id,
+        fingerprint="fp",
+        old_jti="",
+        new_jti="new-jti",
+    )
 
-    with pytest.raises(RefreshTokenReplayError):
-        await svc.rotate(user_id=user_id, fingerprint="fp", old="", new="new")
-
-    assert await store.get(user_id=user_id, fingerprint="fp") is None
+    assert await store.get(user_id=user_id, fingerprint="fp") == "new-jti"
 
 
 @pytest.mark.asyncio
@@ -93,7 +99,10 @@ async def test_rotate_refresh_requires_current_token() -> None:
 
     with pytest.raises(InvalidRefreshTokenError):
         await svc.rotate(
-            user_id=user_id, fingerprint="fp", old="old", new="new"
+            user_id=user_id,
+            fingerprint="fp",
+            old_jti="old-jti",
+            new_jti="new-jti",
         )
 
 
@@ -109,7 +118,10 @@ async def test_rotate_refresh_replay_deletes_token() -> None:
 
     with pytest.raises(RefreshTokenReplayError):
         await svc.rotate(
-            user_id=user_id, fingerprint="fp", old="old", new="new"
+            user_id=user_id,
+            fingerprint="fp",
+            old_jti="old-jti",
+            new_jti="new-jti",
         )
 
     assert await store.get(user_id=user_id, fingerprint="fp") is None
@@ -119,12 +131,22 @@ async def test_rotate_refresh_replay_deletes_token() -> None:
 async def test_rotate_refresh_success_rotates_token() -> None:
     store = _InMemoryRefreshStore()
     user_id = UUID("00000000-0000-0000-0000-000000000001")
-    await store.set(user_id=user_id, fingerprint="fp", value="old", ttl_s=None)
+    await store.set(
+        user_id=user_id,
+        fingerprint="fp",
+        value="old-jti",
+        ttl_s=None,
+    )
 
     svc = RefreshTokenService(store=store, lock=_NoopLock(), ttl_s=123)
-    await svc.rotate(user_id=user_id, fingerprint="fp", old="old", new="new")
+    await svc.rotate(
+        user_id=user_id,
+        fingerprint="fp",
+        old_jti="old-jti",
+        new_jti="new-jti",
+    )
 
-    assert await store.get(user_id=user_id, fingerprint="fp") == "new"
+    assert await store.get(user_id=user_id, fingerprint="fp") == "new-jti"
 
 
 @pytest.mark.asyncio
@@ -134,7 +156,12 @@ async def test_rotate_refresh_lock_timeout_propagates() -> None:
     svc = RefreshTokenService(store=store, lock=_TimeoutLock(), ttl_s=123)
 
     with pytest.raises(RefreshTokenLockTimeoutError):
-        await svc.rotate(user_id=user_id, fingerprint="fp", old="", new="new")
+        await svc.rotate(
+            user_id=user_id,
+            fingerprint="fp",
+            old_jti="",
+            new_jti="new-jti",
+        )
 
 
 def test_refresh_token_error_mapper_handles_lock_timeout() -> None:

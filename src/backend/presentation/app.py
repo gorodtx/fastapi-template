@@ -55,10 +55,12 @@ def _app_error_handler(request: Request, exc: Exception) -> Response:
 def _status_for_code(code: str) -> int:
     if code == "auth.unauthenticated":
         return 401
-    if code == "auth.forbidden":
+    if code in {"auth.forbidden", "rbac.hierarchy_violation"}:
         return 403
     if code == "conflict":
         return 409
     if code.endswith(".not_found"):
         return 404
+    if code == "internal.error":
+        return 500
     return 400

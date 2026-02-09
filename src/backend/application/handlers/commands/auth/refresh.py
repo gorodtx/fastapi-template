@@ -44,13 +44,13 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
         if verify_result.is_err():
             return ResultImpl.err_from(verify_result)
 
-        user_id, token_fingerprint = verify_result.unwrap()
+        user_id, token_fingerprint, old_jti = verify_result.unwrap()
         if token_fingerprint != cmd.fingerprint:
             err = UnauthenticatedError("Refresh token fingerprint mismatch")
             return ResultImpl.err_app(err, TokenPairDTO)
 
         access_token = self.jwt_issuer.issue_access(user_id=user_id)
-        refresh_token = self.jwt_issuer.issue_refresh(
+        refresh_token, refresh_jti = self.jwt_issuer.issue_refresh(
             user_id=user_id,
             fingerprint=cmd.fingerprint,
         )
@@ -59,8 +59,8 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
             return self.refresh_tokens.rotate(
                 user_id=user_id,
                 fingerprint=cmd.fingerprint,
-                old=cmd.refresh_token,
-                new=refresh_token,
+                old_jti=old_jti,
+                new_jti=refresh_jti,
             )
 
         rotate_result = await capture_async(

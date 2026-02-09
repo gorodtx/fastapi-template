@@ -33,7 +33,7 @@ class JwtIssuer(Protocol):
 
     def issue_refresh(
         self: JwtIssuer, *, user_id: UUID, fingerprint: str
-    ) -> str: ...
+    ) -> tuple[str, str]: ...
 
 
 class JwtVerifier(Protocol):
@@ -43,7 +43,7 @@ class JwtVerifier(Protocol):
 
     def verify_refresh(
         self: JwtVerifier, token: str
-    ) -> Result[tuple[UUID, str], AppError]: ...
+    ) -> Result[tuple[UUID, str, str], AppError]: ...
 
 
 class RefreshStore(Protocol):

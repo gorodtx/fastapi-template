@@ -36,32 +36,27 @@ class RefreshTokenService:
         *,
         user_id: UUID,
         fingerprint: str,
-        old: str,
-        new: str,
+        old_jti: str,
+        new_jti: str,
     ) -> None:
         async with self.lock(refresh_lock_key(user_id, fingerprint)):
             current = await self.store.get(
                 user_id=user_id, fingerprint=fingerprint
             )
-            if old:
+            if old_jti:
                 if current is None:
                     raise InvalidRefreshTokenError("Refresh token not found")
-                if current != old:
+                if current != old_jti:
                     await self.store.delete(
                         user_id=user_id, fingerprint=fingerprint
                     )
                     raise RefreshTokenReplayError(
                         "Refresh token replay detected"
                     )
-            elif current is not None:
-                await self.store.delete(
-                    user_id=user_id, fingerprint=fingerprint
-                )
-                raise RefreshTokenReplayError("Refresh token replay detected")
             await self.store.set(
                 user_id=user_id,
                 fingerprint=fingerprint,
-                value=new,
+                value=new_jti,
                 ttl_s=self.ttl_s,
             )
 

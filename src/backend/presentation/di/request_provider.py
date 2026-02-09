@@ -41,13 +41,13 @@ _ROLLBACK_ONLY_SCOPE_KEY: str = "backend.rollback_only"
 def _extract_bearer_token(request: Request) -> str:
     raw = request.headers.get("Authorization")
     if raw is None:
-        raise UnauthenticatedError("Authorization token missing")
+        raise UnauthenticatedError("Authentication required")
     prefix = "Bearer "
     if not raw.startswith(prefix):
-        raise UnauthenticatedError("Invalid authorization header")
+        raise UnauthenticatedError("Authentication required")
     token = raw[len(prefix) :].strip()
     if not token:
-        raise UnauthenticatedError("Authorization token missing")
+        raise UnauthenticatedError("Authentication required")
     return token
 
 
@@ -200,11 +200,11 @@ class RequestProvider(Provider):
             cached_user = _decode_cached_user(cached)
             if cached_user is not None:
                 if not cached_user.is_active:
-                    raise UnauthenticatedError("User not found or inactive")
+                    raise UnauthenticatedError("Authentication required")
                 return cached_user
         auth_user = await authenticator.authenticate(user_id)
         if auth_user is None or not auth_user.is_active:
-            raise UnauthenticatedError("User not found or inactive")
+            raise UnauthenticatedError("Authentication required")
         await cache.set(
             cache_key,
             _encode_cached_user(auth_user),
