@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from uuid_utils.compat import UUID
 
-from backend.domain.core.constants.rbac import RoleAction, SystemRole
+from backend.domain.core.constants.rbac import RoleAction
 from backend.domain.core.exceptions.base import DomainError
+from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 class RoleError(DomainError):
@@ -20,7 +21,7 @@ class RoleAlreadyAssignedError(RoleAssignmentError):
     __slots__: tuple[str, ...] = ("_role", "_user_id")
 
     def __init__(
-        self: RoleAlreadyAssignedError, role: SystemRole, user_id: UUID
+        self: RoleAlreadyAssignedError, role: RoleCode, user_id: UUID
     ) -> None:
         self._role = role
         self._user_id = user_id
@@ -33,7 +34,7 @@ class RoleNotAssignedError(RoleAssignmentError):
     __slots__: tuple[str, ...] = ("_role", "_user_id")
 
     def __init__(
-        self: RoleNotAssignedError, role: SystemRole, user_id: UUID
+        self: RoleNotAssignedError, role: RoleCode, user_id: UUID
     ) -> None:
         self._role = role
         self._user_id = user_id
@@ -48,7 +49,7 @@ class RoleHierarchyViolationError(RoleError):
     def __init__(
         self: RoleHierarchyViolationError,
         action: RoleAction,
-        target_role: SystemRole,
+        target_role: RoleCode,
     ) -> None:
         self._action = action
         self._target_role = target_role

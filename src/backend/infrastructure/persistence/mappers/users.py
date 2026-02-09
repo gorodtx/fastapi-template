@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.user import User
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.infrastructure.persistence.records import (
     UserRoleCodeRecord,
     UserRowRecord,
@@ -22,7 +22,7 @@ def user_to_row_record(user: User) -> UserRowRecord:
 def row_record_to_user(
     rec: UserRowRecord,
     *,
-    roles: set[SystemRole] | None = None,
+    roles: set[RoleCode] | None = None,
 ) -> User:
     return User.rehydrate(
         id=rec.id,
@@ -35,5 +35,5 @@ def row_record_to_user(
     )
 
 
-def role_records_to_set(records: list[UserRoleCodeRecord]) -> set[SystemRole]:
-    return {SystemRole(record.role) for record in records}
+def role_records_to_set(records: list[UserRoleCodeRecord]) -> set[RoleCode]:
+    return {RoleCode(record.role) for record in records}

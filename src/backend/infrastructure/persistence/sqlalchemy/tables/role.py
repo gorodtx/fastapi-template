@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, Enum, String, Table, UniqueConstraint
+from sqlalchemy import Column, String, Table, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from uuid_utils.compat import UUID
 
-from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.sqlalchemy.tables.base import metadata
-
-
-def _system_role_values(enum_cls: type[SystemRole]) -> list[str]:
-    return [role.value for role in enum_cls]
-
 
 role_id_column: Column[UUID] = Column(
     "id",
@@ -19,14 +13,9 @@ role_id_column: Column[UUID] = Column(
     nullable=False,
 )
 
-role_code_column: Column[SystemRole] = Column(
+role_code_column: Column[str] = Column(
     "code",
-    Enum(
-        SystemRole,
-        native_enum=False,
-        values_callable=_system_role_values,
-        validate_strings=True,
-    ),
+    String(64),
     nullable=False,
 )
 

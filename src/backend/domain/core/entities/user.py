@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from uuid_utils.compat import UUID
 
-from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.base import Entity, entity
 from backend.domain.core.exceptions.rbac import RoleNotAssignedError
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.domain.core.value_objects.identity.email import Email
 from backend.domain.core.value_objects.identity.login import Login
 from backend.domain.core.value_objects.identity.username import Username
@@ -18,7 +18,7 @@ class User(Entity):
     _username: Username
     _password: Password
     _is_active: bool
-    _roles: set[SystemRole]
+    _roles: set[RoleCode]
 
     def __init__(
         self: User,
@@ -29,7 +29,7 @@ class User(Entity):
         username: Username,
         password: Password,
         is_active: bool = True,
-        roles: set[SystemRole] | None = None,
+        roles: set[RoleCode] | None = None,
     ) -> None:
         super().__init__(id=id)
         self._email = email
@@ -60,7 +60,7 @@ class User(Entity):
         return self._is_active
 
     @property
-    def roles(self: User) -> frozenset[SystemRole]:
+    def roles(self: User) -> frozenset[RoleCode]:
         return frozenset(self._roles)
 
     @classmethod
@@ -91,7 +91,7 @@ class User(Entity):
         username: Username,
         password: Password,
         is_active: bool,
-        roles: set[SystemRole],
+        roles: set[RoleCode],
     ) -> User:
         return cls(
             id=id,
@@ -103,12 +103,12 @@ class User(Entity):
             roles=roles,
         )
 
-    def assign_role(self: User, role: SystemRole) -> None:
+    def assign_role(self: User, role: RoleCode) -> None:
         if role in self._roles:
             return
         self._roles.add(role)
 
-    def revoke_role(self: User, role: SystemRole) -> None:
+    def revoke_role(self: User, role: RoleCode) -> None:
         if role not in self._roles:
             raise RoleNotAssignedError(role=role, user_id=self.id)
         self._roles.remove(role)

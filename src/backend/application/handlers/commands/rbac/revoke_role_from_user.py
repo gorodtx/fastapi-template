@@ -22,12 +22,15 @@ from backend.application.common.tools.auth_cache import AuthCacheInvalidator
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import Result, ResultImpl, capture
 from backend.application.handlers.transform import handler
-from backend.domain.core.constants.rbac import RoleAction, SystemRole
+from backend.domain.core.constants.rbac import RoleAction
 from backend.domain.core.services.access_control import (
     ensure_can_revoke_role,
     ensure_not_last_super_admin,
     ensure_not_self_role_change,
 )
+from backend.domain.core.value_objects.access.role_code import RoleCode
+
+_SUPER_ADMIN_ROLE: RoleCode = RoleCode("super_admin")
 
 
 class RevokeRoleFromUserCommand(RevokeRoleFromUserDTO): ...
@@ -45,8 +48,8 @@ class RevokeRoleFromUserHandler(
         cmd: RevokeRoleFromUserCommand,
         /,
     ) -> Result[UserRolesResponseDTO, AppError]:
-        def parse_role() -> SystemRole:
-            return SystemRole(cmd.role)
+        def parse_role() -> RoleCode:
+            return RoleCode(cmd.role)
 
         role_result = capture(
             parse_role,
@@ -82,10 +85,7 @@ class RevokeRoleFromUserHandler(
             if policy_result.is_err():
                 return ResultImpl.err_from(policy_result)
 
-            if (
-                role == SystemRole.SUPER_ADMIN
-                and SystemRole.SUPER_ADMIN in user.roles
-            ):
+            if role == _SUPER_ADMIN_ROLE and _SUPER_ADMIN_ROLE in user.roles:
                 ids_result = (
                     await self.gateway.rbac.list_user_ids_by_role(role)
                 ).map_err(map_storage_error_to_app())
@@ -127,10 +127,30 @@ class RevokeRoleFromUserHandler(
                     user.id, set(user.roles)
                 )
             ).map_err(map_storage_error_to_app())
-            if replace_result.is_err():
-                return ResultImpl.err_from(replace_result)
 
-            response = ResultImpl.ok(present_user_roles(user), AppError)
+            permissions_result = (
+                await self.gateway.rbac.get_user_permission_codes(user.id)
+            ).map_err(map_storage_error_to_app())
+
+            def failed_error_or_none() -> AppError | None:
+                if replace_result.is_err():
+                    return replace_result.unwrap_err()
+                if permissions_result.is_err():
+                    return permissions_result.unwrap_err()
+                return None
+
+            failed_error = failed_error_or_none()
+            if failed_error is not None:
+                return ResultImpl.err(failed_error)
+
+            response = ResultImpl.ok(
+                present_user_roles(
+                    user_id=user.id,
+                    roles=user.roles,
+                    permissions=frozenset(permissions_result.unwrap()),
+                ),
+                AppError,
+            )
 
         await self.cache_invalidator.invalidate_user(cmd.user_id)
         return response

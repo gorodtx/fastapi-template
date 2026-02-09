@@ -57,7 +57,7 @@ def _status_for_code(code: str) -> int:
         return 401
     if code in {"auth.forbidden", "rbac.hierarchy_violation"}:
         return 403
-    if code == "conflict":
+    if code in {"conflict", "rbac.role_unknown"}:
         return 409
     if code.endswith(".not_found"):
         return 404

@@ -24,6 +24,7 @@ class Settings:
     app_env: str
     database_url: str
     redis_url: str | None
+    default_registration_role_code: str
 
     jwt_issuer: str
     jwt_audience: str
@@ -36,11 +37,15 @@ class Settings:
     def from_env(env: Env) -> Settings:
         app_env: str = env.str("APP_ENV", default="dev") or "dev"
         redis_url: str | None = env.str("REDIS_URL", default="") or None
+        default_registration_role_code = (
+            env.str("DEFAULT_REGISTRATION_ROLE_CODE", default="user") or "user"
+        )
 
         return Settings(
             app_env=app_env,
             database_url=_require_str(env, "DATABASE_URL"),
             redis_url=redis_url,
+            default_registration_role_code=default_registration_role_code,
             jwt_issuer=_require_str(env, "JWT_ISSUER"),
             jwt_audience=_require_str(env, "JWT_AUDIENCE"),
             jwt_alg=_require_str(env, "JWT_ALG"),

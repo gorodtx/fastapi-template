@@ -10,19 +10,20 @@ from backend.application.common.dtos.rbac import (
     UsersByRoleResponseDTO,
 )
 from backend.application.common.dtos.users import UserResponseDTO
-from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.entities.user import User
-from backend.domain.core.services.access_control import permissions_for_roles
+from backend.domain.core.value_objects.access.permission_code import (
+    PermissionCode,
+)
+from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 def present_role_assignment(
-    user_id: UUID, role: SystemRole
+    user_id: UUID, role: RoleCode
 ) -> RoleAssignmentResultDTO:
     return RoleAssignmentResultDTO(user_id=user_id, role=role.value)
 
 
 def present_role_assignment_from(
-    user_id: UUID, role: SystemRole
+    user_id: UUID, role: RoleCode
 ) -> Callable[[object], RoleAssignmentResultDTO]:
     def presenter(_unused: object) -> RoleAssignmentResultDTO:
         return present_role_assignment(user_id, role)
@@ -30,22 +31,27 @@ def present_role_assignment_from(
     return presenter
 
 
-def present_user_roles(user: User) -> UserRolesResponseDTO:
+def present_user_roles(
+    *,
+    user_id: UUID,
+    roles: frozenset[RoleCode],
+    permissions: frozenset[PermissionCode],
+) -> UserRolesResponseDTO:
     return UserRolesResponseDTO(
-        user_id=user.id,
-        roles=[role.value for role in user.roles],
-        permissions=[perm.value for perm in permissions_for_roles(user.roles)],
+        user_id=user_id,
+        roles=sorted(role.value for role in roles),
+        permissions=sorted(permission.value for permission in permissions),
     )
 
 
 def present_users_by_role(
-    role: SystemRole, users: list[UserResponseDTO]
+    role: RoleCode, users: list[UserResponseDTO]
 ) -> UsersByRoleResponseDTO:
     return UsersByRoleResponseDTO(role=role.value, users=users)
 
 
 def present_users_by_role_from(
-    role: SystemRole, users: list[UserResponseDTO]
+    role: RoleCode, users: list[UserResponseDTO]
 ) -> Callable[[object], UsersByRoleResponseDTO]:
     def presenter(_unused: object) -> UsersByRoleResponseDTO:
         return present_users_by_role(role, users)

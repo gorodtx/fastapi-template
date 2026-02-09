@@ -27,9 +27,9 @@ from backend.application.handlers.result import (
     capture_async,
 )
 from backend.application.handlers.transform import handler
-from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.user import User
 from backend.domain.core.factories.users import UserFactory
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 
 
@@ -40,6 +40,7 @@ class CreateUserCommand(UserCreateDTO): ...
 class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
     gateway: PersistenceGateway
     password_hasher: PasswordHasherPort
+    default_registration_role: RoleCode
 
     async def __call__(
         self: CreateUserHandler, cmd: CreateUserCommand, /
@@ -69,7 +70,7 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
         user = user_result.unwrap()
 
         async with self.gateway.manager.transaction():
-            user.assign_role(SystemRole.USER)
+            user.assign_role(self.default_registration_role)
 
             save_result = (
                 await self.gateway.users.save(user, include_roles=False)
@@ -79,7 +80,7 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
 
             role_result = (
                 await self.gateway.rbac.replace_user_roles(
-                    user.id, {SystemRole.USER}
+                    user.id, {self.default_registration_role}
                 )
             ).map_err(map_storage_error_to_app())
             if role_result.is_err():

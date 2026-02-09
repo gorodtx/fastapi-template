@@ -4,10 +4,11 @@ from dataclasses import dataclass
 
 from uuid_utils.compat import UUID
 
-from backend.domain.core.constants.rbac import RoleAction, SystemRole
+from backend.domain.core.constants.rbac import RoleAction
 from backend.domain.core.value_objects.access.permission_code import (
     PermissionCode,
 )
+from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,14 @@ class ConflictError(AppError):
     ) -> None:
         super().__init__(
             code="conflict", message=message, detail=detail, meta=meta
+        )
+
+
+class UnknownRoleError(AppError):
+    def __init__(self: UnknownRoleError) -> None:
+        super().__init__(
+            code="rbac.role_unknown",
+            message="Role does not exist",
         )
 
 
@@ -72,7 +81,7 @@ class RoleHierarchyViolationError(AppError):
         self: RoleHierarchyViolationError,
         *,
         action: RoleAction,
-        target_role: SystemRole,
+        target_role: RoleCode,
         detail: str | None = None,
     ) -> None:
         message = f"Cannot {action.value} role {target_role.value!r} with current privileges"

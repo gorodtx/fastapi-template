@@ -1,40 +1,24 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Set
+from collections.abc import Set
 
 from uuid_utils.compat import UUID
 
-from backend.domain.core.constants.rbac import RoleAction, SystemRole
-from backend.domain.core.constants.rbac_registry import ROLE_PERMISSIONS
+from backend.domain.core.constants.rbac import RoleAction
 from backend.domain.core.exceptions.rbac import (
     LastSuperAdminRemovalError,
     RoleHierarchyViolationError,
     RoleSelfModificationError,
 )
-from backend.domain.core.value_objects.access.permission_code import (
-    PermissionCode,
-)
+from backend.domain.core.value_objects.access.role_code import RoleCode
 
-_EMPTY_PERMISSIONS: frozenset[PermissionCode] = frozenset[PermissionCode]()
-
-
-def permissions_for_roles(
-    roles: Iterable[SystemRole],
-) -> frozenset[PermissionCode]:
-    permissions: set[PermissionCode] = set()
-    for role in roles:
-        permissions.update(ROLE_PERMISSIONS.get(role, _EMPTY_PERMISSIONS))
-    return frozenset(permissions)
-
-
-def is_allowed(
-    roles: Iterable[SystemRole], permission: PermissionCode
-) -> bool:
-    return permission in permissions_for_roles(roles)
+_SUPER_ADMIN_ROLE: RoleCode = RoleCode("super_admin")
+_ADMIN_ROLE: RoleCode = RoleCode("admin")
+_USER_ROLE: RoleCode = RoleCode("user")
 
 
 def ensure_can_assign_role(
-    actor_roles: Set[SystemRole], target_role: SystemRole
+    actor_roles: Set[RoleCode], target_role: RoleCode
 ) -> None:
     if _can_manage_role(actor_roles, target_role):
         return
@@ -44,7 +28,7 @@ def ensure_can_assign_role(
 
 
 def ensure_can_revoke_role(
-    actor_roles: Set[SystemRole], target_role: SystemRole
+    actor_roles: Set[RoleCode], target_role: RoleCode
 ) -> None:
     if _can_manage_role(actor_roles, target_role):
         return
@@ -73,10 +57,8 @@ def ensure_not_last_super_admin(
 
 
 def _can_manage_role(
-    actor_roles: Set[SystemRole], target_role: SystemRole
+    actor_roles: Set[RoleCode], target_role: RoleCode
 ) -> bool:
-    if SystemRole.SUPER_ADMIN in actor_roles:
+    if _SUPER_ADMIN_ROLE in actor_roles:
         return True
-    return bool(
-        SystemRole.ADMIN in actor_roles and target_role == SystemRole.USER
-    )
+    return bool(_ADMIN_ROLE in actor_roles and target_role == _USER_ROLE)

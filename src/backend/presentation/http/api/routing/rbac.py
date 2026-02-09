@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import Annotated, Final
+
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter
+from fastapi import APIRouter, Path
 from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.auth.types import AuthUser
@@ -27,13 +29,21 @@ from backend.domain.core.constants.permission_codes import (
     RBAC_READ_ROLES,
     RBAC_REVOKE_ROLE,
 )
-from backend.domain.core.constants.rbac import SystemRole
 from backend.presentation.http.api.schemas.rbac import (
     RoleChangeRequest,
     UserRolesResponse,
 )
 
 router: APIRouter = APIRouter(route_class=DishkaRoute)
+_ROLE_CODE_PATTERN: Final[str] = r"^[a-z][a-z0-9_]{2,63}$"
+type RoleCodePath = Annotated[
+    str,
+    Path(
+        min_length=3,
+        max_length=64,
+        pattern=_ROLE_CODE_PATTERN,
+    ),
+]
 
 
 @router.get("/rbac/users/{user_id}/roles", response_model=UserRolesResponse)
@@ -67,9 +77,9 @@ async def assign_role_to_user(
     )
     cmd = AssignRoleToUserCommand(
         user_id=user_id,
-        role=payload.role.value,
+        role=payload.role_code,
         actor_id=current_user.id,
-        actor_roles=current_user.roles,
+        actor_roles=current_user.role_codes,
     )
     result = await handler(cmd)
     dto = result.unwrap()
@@ -78,12 +88,12 @@ async def assign_role_to_user(
 
 
 @router.delete(
-    "/rbac/users/{user_id}/roles/{role}",
+    "/rbac/users/{user_id}/roles/{role_code}",
     response_model=UserRolesResponse,
 )
 async def revoke_role_from_user(
     user_id: UUID,
-    role: SystemRole,
+    role_code: RoleCodePath,
     gateway: FromDishka[PersistenceGateway],
     cache_invalidator: FromDishka[AuthCacheInvalidator],
     current_user: FromDishka[AuthUser],
@@ -96,9 +106,9 @@ async def revoke_role_from_user(
     )
     cmd = RevokeRoleFromUserCommand(
         user_id=user_id,
-        role=role.value,
+        role=role_code,
         actor_id=current_user.id,
-        actor_roles=current_user.roles,
+        actor_roles=current_user.role_codes,
     )
     result = await handler(cmd)
     dto = result.unwrap()

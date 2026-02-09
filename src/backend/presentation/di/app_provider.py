@@ -23,6 +23,7 @@ from backend.application.common.tools.auth_cache import AuthCacheInvalidator
 from backend.application.common.tools.refresh_tokens import (
     RefreshTokenService,
 )
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.infrastructure.lock.redis_lock import RedisSharedLock
 from backend.infrastructure.persistence.cache.redis import RedisCache
@@ -72,6 +73,10 @@ class AppProvider(Provider):
     @provide(scope=Scope.APP)
     def settings(self: Self) -> Settings:
         return self._settings
+
+    @provide(scope=Scope.APP)
+    def default_registration_role(self: Self) -> RoleCode:
+        return RoleCode(self._settings.default_registration_role_code)
 
     @provide(scope=Scope.APP)
     def engine(self: Self) -> AsyncEngine:

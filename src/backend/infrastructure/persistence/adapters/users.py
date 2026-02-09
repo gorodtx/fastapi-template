@@ -7,8 +7,8 @@ from backend.application.common.interfaces.ports.persistence.users_adapter impor
     UsersAdapter,
 )
 from backend.application.handlers.result import Result
-from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.user import User
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter
 from backend.infrastructure.persistence.mappers.users import (
     role_records_to_set,
@@ -45,7 +45,7 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
                 message="User not found",
                 detail="not found",
             )
-            roles: set[SystemRole] = set()
+            roles: set[RoleCode] = set()
             if include_roles:
                 role_rows = await self.manager.send(
                     q_get_user_role_codes(user_id)
@@ -70,7 +70,7 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
                 message="User not found",
                 detail="not found",
             )
-            roles: set[SystemRole] = set()
+            roles: set[RoleCode] = set()
             if include_roles:
                 role_rows = await self.manager.send(
                     q_get_user_role_codes(rec.id)
@@ -90,7 +90,7 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
         async def _call() -> User:
             row = user_to_row_record(user)
             saved_row = await self.manager.send(q_upsert_user_row(row))
-            roles: set[SystemRole] = set(user.roles)
+            roles: set[RoleCode] = set(user.roles)
             if include_roles:
                 role_rows = await self.manager.send(
                     q_get_user_role_codes(user.id)

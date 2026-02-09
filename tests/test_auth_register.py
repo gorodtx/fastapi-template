@@ -9,6 +9,7 @@ from backend.application.common.dtos.users import UserResponseDTO
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.auth import RefreshTokenReplayError
 from backend.application.handlers.result import ResultImpl
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.presentation.http.api.routing import auth as auth_routing
 from backend.presentation.http.api.schemas.auth import RegisterRequest
 
@@ -86,8 +87,9 @@ async def test_register_user_creates_user_and_returns_tokens(
             *,
             gateway: object,
             password_hasher: object,
+            default_registration_role: object,
         ) -> None:
-            del gateway, password_hasher
+            del gateway, password_hasher, default_registration_role
 
         async def __call__(
             self: _FakeCreateUserHandler, cmd: object
@@ -125,6 +127,7 @@ async def test_register_user_creates_user_and_returns_tokens(
         payload=payload,
         gateway=_DummyGateway(),
         password_hasher=_DummyHasher(),
+        default_registration_role=RoleCode("user"),
         jwt_issuer=jwt_issuer,
         refresh_tokens=refresh_tokens,
     )
@@ -159,8 +162,9 @@ async def test_register_user_maps_refresh_replay_to_app_error(
             *,
             gateway: object,
             password_hasher: object,
+            default_registration_role: object,
         ) -> None:
-            del gateway, password_hasher
+            del gateway, password_hasher, default_registration_role
 
         async def __call__(
             self: _FakeCreateUserHandler, cmd: object
@@ -193,6 +197,7 @@ async def test_register_user_maps_refresh_replay_to_app_error(
             payload=payload,
             gateway=_DummyGateway(),
             password_hasher=_DummyHasher(),
+            default_registration_role=RoleCode("user"),
             jwt_issuer=_FakeJwtIssuer(
                 access_token=_build_token("access"),
                 refresh_token=_build_token("refresh"),

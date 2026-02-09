@@ -7,6 +7,7 @@ from typing import Final
 from backend.application.common.exceptions.application import (
     AppError,
     ConflictError,
+    UnknownRoleError,
 )
 from backend.application.common.exceptions.storage import StorageError
 
@@ -38,6 +39,8 @@ def map_storage_error_to_app() -> Callable[[StorageError], AppError]:
                 f"Resource with this {field} already exists",
                 meta={"field": field},
             )
+        if error.code == "rbac.seed_mismatch":
+            return UnknownRoleError()
         if error.code.startswith(_DB_ERROR_PREFIX):
             return AppError(
                 code=_INTERNAL_ERROR_CODE,
@@ -45,12 +48,7 @@ def map_storage_error_to_app() -> Callable[[StorageError], AppError]:
             )
         if error.code.endswith(".not_found"):
             return AppError(code=error.code, message=error.message)
-        return AppError(
-            code=error.code,
-            message=error.message,
-            detail=error.detail,
-            meta=error.meta,
-        )
+        return AppError(code=error.code, message=error.message)
 
     return mapper
 

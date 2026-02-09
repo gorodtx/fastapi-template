@@ -33,6 +33,7 @@ from backend.application.handlers.commands.users.create import (
     CreateUserCommand,
     CreateUserHandler,
 )
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.presentation.http.api.schemas.auth import (
     LoginRequest,
@@ -51,12 +52,14 @@ async def register_user(
     payload: RegisterRequest,
     gateway: FromDishka[PersistenceGateway],
     password_hasher: FromDishka[PasswordHasherPort],
+    default_registration_role: FromDishka[RoleCode],
     jwt_issuer: FromDishka[JwtIssuer],
     refresh_tokens: FromDishka[RefreshTokenService],
 ) -> TokenPairResponse:
     create_handler = CreateUserHandler(
         gateway=gateway,
         password_hasher=password_hasher,
+        default_registration_role=default_registration_role,
     )
     create_cmd = CreateUserCommand(
         email=payload.email,

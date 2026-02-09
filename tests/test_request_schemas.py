@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from backend.domain.core.constants.rbac import SystemRole
 from backend.presentation.http.api.schemas.rbac import RoleChangeRequest
 from backend.presentation.http.api.schemas.users import UserUpdateRequest
 
@@ -20,15 +19,15 @@ def _has_field_error(exc: ValidationError, field_name: str) -> bool:
 
 def test_role_change_request_rejects_unknown_role() -> None:
     with pytest.raises(ValidationError) as exc_info:
-        RoleChangeRequest(role="unknown")
+        RoleChangeRequest(role_code="Unknown")
 
-    assert _has_field_error(exc_info.value, "role")
+    assert _has_field_error(exc_info.value, "role_code")
 
 
 def test_role_change_request_accepts_known_role() -> None:
-    payload = RoleChangeRequest(role=SystemRole.USER)
+    payload = RoleChangeRequest(role_code="user")
 
-    assert payload.role == SystemRole.USER
+    assert payload.role_code == "user"
 
 
 def test_user_update_request_rejects_empty_payload() -> None:

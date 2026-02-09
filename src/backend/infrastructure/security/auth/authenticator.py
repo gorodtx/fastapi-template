@@ -7,7 +7,7 @@ from uuid_utils.compat import UUID
 from backend.application.common.interfaces.auth.ports import (
     Authenticator,
     derive_auth_flags,
-    is_allowed,
+    has_permission,
 )
 from backend.application.common.interfaces.auth.types import (
     AuthUser,
@@ -34,11 +34,16 @@ class AuthenticatorImpl(Authenticator):
         if result.is_err():
             return None
         user = result.unwrap()
-        roles = frozenset(user.roles)
-        is_admin, is_superuser = derive_auth_flags(roles)
+        permissions_result = await self.rbac.get_user_permission_codes(user_id)
+        if permissions_result.is_err():
+            return None
+        role_codes = frozenset(user.roles)
+        permission_codes = frozenset(permissions_result.unwrap())
+        is_admin, is_superuser = derive_auth_flags(role_codes)
         return AuthUser(
             id=user.id,
-            roles=roles,
+            role_codes=role_codes,
+            permission_codes=permission_codes,
             is_active=user.is_active,
             is_admin=is_admin,
             is_superuser=is_superuser,
@@ -52,5 +57,5 @@ class AuthenticatorImpl(Authenticator):
         if auth_user is None or not auth_user.is_active:
             return Permission(allowed=False)
 
-        allowed = is_allowed(auth_user.roles, spec.code)
+        allowed = has_permission(auth_user.permission_codes, spec.code)
         return Permission(allowed=allowed)

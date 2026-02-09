@@ -31,6 +31,7 @@ from backend.domain.core.constants.permission_codes import (
     USERS_DELETE,
     USERS_UPDATE,
 )
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.presentation.http.api.schemas.auth import SuccessResponse
 from backend.presentation.http.api.schemas.users import (
@@ -47,6 +48,7 @@ async def create_user(
     payload: UserCreateRequest,
     gateway: FromDishka[PersistenceGateway],
     password_hasher: FromDishka[PasswordHasherPort],
+    default_registration_role: FromDishka[RoleCode],
     current_user: FromDishka[AuthUser],
     permission_guard: FromDishka[PermissionGuard],
 ) -> UserResponse:
@@ -54,6 +56,7 @@ async def create_user(
     handler = CreateUserHandler(
         gateway=gateway,
         password_hasher=password_hasher,
+        default_registration_role=default_registration_role,
     )
     cmd = CreateUserCommand(
         email=str(payload.email),

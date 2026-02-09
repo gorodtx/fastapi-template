@@ -11,11 +11,13 @@ from backend.application.common.interfaces.auth.types import (
     PermissionSpec,
 )
 from backend.application.handlers.result import Result
-from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.constants.rbac_registry import ROLE_PERMISSIONS
 from backend.domain.core.value_objects.access.permission_code import (
     PermissionCode,
 )
+from backend.domain.core.value_objects.access.role_code import RoleCode
+
+_SUPER_ADMIN_ROLE: RoleCode = RoleCode("super_admin")
+_ADMIN_ROLE: RoleCode = RoleCode("admin")
 
 
 class Authenticator(Protocol):
@@ -66,17 +68,15 @@ class RefreshStore(Protocol):
 
 
 def derive_auth_flags(
-    roles: frozenset[SystemRole],
+    role_codes: frozenset[RoleCode],
 ) -> tuple[bool, bool]:
-    is_superuser = SystemRole.SUPER_ADMIN in roles
-    is_admin = is_superuser or SystemRole.ADMIN in roles
+    is_superuser = _SUPER_ADMIN_ROLE in role_codes
+    is_admin = is_superuser or _ADMIN_ROLE in role_codes
     return is_admin, is_superuser
 
 
-def is_allowed(roles: frozenset[SystemRole], code: PermissionCode) -> bool:
-    if SystemRole.SUPER_ADMIN in roles:
-        return True
-    allowed_codes: set[PermissionCode] = set()
-    for role in roles:
-        allowed_codes.update(ROLE_PERMISSIONS.get(role, frozenset()))
-    return code in allowed_codes
+def has_permission(
+    permission_codes: frozenset[PermissionCode],
+    code: PermissionCode,
+) -> bool:
+    return code in permission_codes

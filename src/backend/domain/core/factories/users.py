@@ -4,10 +4,10 @@ from dataclasses import dataclass
 
 from uuid_utils.compat import UUID
 
-from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.user import User
 from backend.domain.core.exceptions.base import DomainTypeError
 from backend.domain.core.exceptions.user import UserDataCorruptedError
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.domain.core.value_objects.identity.email import Email
 from backend.domain.core.value_objects.identity.login import Login
 from backend.domain.core.value_objects.identity.username import Username
@@ -84,7 +84,7 @@ class UserFactory:
         username: str,
         password_hash: str,
         is_active: bool,
-        roles: set[SystemRole],
+        roles: set[RoleCode],
     ) -> User:
         try:
             email_vo = Email(email)

@@ -4,16 +4,17 @@ from dataclasses import dataclass
 
 from uuid_utils.compat import UUID
 
-from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.value_objects.access.permission_code import (
     PermissionCode,
 )
+from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 @dataclass(frozen=True, slots=True)
 class AuthUser:
     id: UUID
-    roles: frozenset[SystemRole]
+    role_codes: frozenset[RoleCode]
+    permission_codes: frozenset[PermissionCode]
     is_active: bool
     is_admin: bool = False
     is_superuser: bool = False

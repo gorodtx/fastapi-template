@@ -7,8 +7,9 @@ from backend.application.common.exceptions.application import (
     AuthorizationError,
     ConflictError,
     RoleHierarchyViolationError,
+    UnknownRoleError,
 )
-from backend.domain.core.constants.rbac import RoleAction, SystemRole
+from backend.domain.core.constants.rbac import RoleAction
 from backend.domain.core.exceptions.rbac import (
     LastSuperAdminRemovalError,
     RoleAlreadyAssignedError,
@@ -18,23 +19,24 @@ from backend.domain.core.exceptions.rbac import (
 from backend.domain.core.exceptions.rbac import (
     RoleHierarchyViolationError as DomainRoleHierarchyViolationError,
 )
+from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 def map_role_input_error(
-    raw_role: str, *, allow_unassigned: bool = False
+    _raw_role: str, *, allow_unassigned: bool = False
 ) -> Callable[[Exception], AppError]:
     def mapper(exc: Exception) -> AppError:
         if isinstance(exc, ValueError):
-            return ConflictError(f"Unknown role {raw_role!r}")
+            return UnknownRoleError()
         if allow_unassigned and isinstance(exc, RoleNotAssignedError):
-            return ConflictError(str(exc))
+            return ConflictError("Role not assigned")
         raise exc
 
     return mapper
 
 
 def map_role_change_error(
-    *, action: RoleAction, target_role: SystemRole
+    *, action: RoleAction, target_role: RoleCode
 ) -> Callable[[Exception], AppError]:
     def mapper(exc: Exception) -> AppError:
         if isinstance(exc, DomainRoleHierarchyViolationError):
@@ -42,16 +44,22 @@ def map_role_change_error(
                 action=action, target_role=target_role
             )
         if isinstance(exc, RoleSelfModificationError):
-            return AuthorizationError(str(exc))
+            return AuthorizationError("Cannot modify own roles")
         if isinstance(
             exc,
             (
                 RoleAlreadyAssignedError,
                 RoleNotAssignedError,
-                LastSuperAdminRemovalError,
             ),
         ):
-            return ConflictError(str(exc))
+            message = (
+                "Role already assigned"
+                if isinstance(exc, RoleAlreadyAssignedError)
+                else "Role not assigned"
+            )
+            return ConflictError(message)
+        if isinstance(exc, LastSuperAdminRemovalError):
+            return ConflictError("Cannot remove last super_admin role")
         raise exc
 
     return mapper

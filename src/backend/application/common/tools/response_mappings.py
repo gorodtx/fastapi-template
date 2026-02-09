@@ -6,7 +6,6 @@ from backend.application.common.dtos.users import (
 )
 from backend.application.common.tools.response_mapper import ResponseMapper
 from backend.domain.core.entities.user import User
-from backend.domain.core.services.access_control import permissions_for_roles
 
 
 def _user_to_response_dto(user: User) -> UserResponseDTO:
@@ -20,14 +19,13 @@ def _user_to_response_dto(user: User) -> UserResponseDTO:
 
 def _user_to_with_roles_dto(user: User) -> UserWithRolesDTO:
     roles = [role.value for role in user.roles]
-    permissions = [perm.value for perm in permissions_for_roles(user.roles)]
     return UserWithRolesDTO(
         id=user.id,
         email=user.email.value,
         login=user.login.value,
         username=user.username.value,
         roles=roles,
-        permissions=permissions,
+        permissions=[],
     )
 
 

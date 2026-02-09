@@ -10,14 +10,14 @@ from uuid_utils.compat import UUID
 from backend.application.common.interfaces.ports.persistence.manager import (
     SessionProtocol,
 )
-from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.constants.serialization import decode_system_role
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.infrastructure.persistence.mappers.rbac import value_to_uuid
 from backend.infrastructure.persistence.records import UserRoleCodeRecord
 from backend.infrastructure.persistence.sqlalchemy.tables.role import (
     roles_table,
 )
 from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import (
+    role_permissions_table,
     user_roles_table,
 )
 from backend.infrastructure.tools.msgspec_convert import convert_record
@@ -53,19 +53,20 @@ def q_get_user_role_codes(
 
 
 def q_get_role_ids_by_codes(
-    codes: Sequence[SystemRole],
-) -> Callable[[SessionProtocol], Awaitable[list[tuple[SystemRole, UUID]]]]:
-    async def _q(session: SessionProtocol) -> list[tuple[SystemRole, UUID]]:
+    codes: Sequence[RoleCode],
+) -> Callable[[SessionProtocol], Awaitable[list[tuple[RoleCode, UUID]]]]:
+    async def _q(session: SessionProtocol) -> list[tuple[RoleCode, UUID]]:
         async_session = _require_async_session(session)
         if not codes:
             return []
+        code_values = [code.value for code in codes]
         stmt = sa.select(roles_table.c.code, roles_table.c.id).where(
-            roles_table.c.code.in_(codes)
+            roles_table.c.code.in_(code_values)
         )
         res = await async_session.execute(stmt)
-        out: list[tuple[SystemRole, UUID]] = []
+        out: list[tuple[RoleCode, UUID]] = []
         for role_code, role_id in res.all():
-            out.append((decode_system_role(role_code), value_to_uuid(role_id)))
+            out.append((RoleCode(str(role_code)), value_to_uuid(role_id)))
         return out
 
     return _q
@@ -100,5 +101,27 @@ def q_list_user_ids_by_role_id(
         )
         res = await async_session.execute(stmt)
         return [value_to_uuid(row[0]) for row in res.all()]
+
+    return _q
+
+
+def q_get_user_permission_codes(
+    user_id: UUID,
+) -> Callable[[SessionProtocol], Awaitable[list[str]]]:
+    async def _q(session: SessionProtocol) -> list[str]:
+        async_session = _require_async_session(session)
+        join_stmt = user_roles_table.join(
+            roles_table, user_roles_table.c.role_id == roles_table.c.id
+        ).join(
+            role_permissions_table,
+            role_permissions_table.c.role_id == roles_table.c.id,
+        )
+        stmt = (
+            sa.select(sa.distinct(role_permissions_table.c.permission_code))
+            .select_from(join_stmt)
+            .where(user_roles_table.c.user_id == user_id)
+        )
+        res = await async_session.execute(stmt)
+        return [str(row[0]) for row in res.all() if isinstance(row[0], str)]
 
     return _q

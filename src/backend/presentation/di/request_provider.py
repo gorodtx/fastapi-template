@@ -25,7 +25,10 @@ from backend.application.common.interfaces.ports.persistence.manager import (
     TransactionManager,
 )
 from backend.application.common.tools.permission_guard import PermissionGuard
-from backend.domain.core.constants.rbac import SystemRole
+from backend.domain.core.value_objects.access.permission_code import (
+    PermissionCode,
+)
+from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.infrastructure.persistence.manager import TransactionManagerImpl
 from backend.infrastructure.persistence.persistence_gateway import (
     PersistenceGatewayImpl,
@@ -36,6 +39,8 @@ from backend.infrastructure.security.auth.authenticator import (
 
 _AUTH_USER_CACHE_TTL_S: int = 300
 _ROLLBACK_ONLY_SCOPE_KEY: str = "backend.rollback_only"
+_SUPER_ADMIN_ROLE: RoleCode = RoleCode("super_admin")
+_ADMIN_ROLE: RoleCode = RoleCode("admin")
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -58,7 +63,10 @@ def _user_cache_key(user_id: UUID) -> str:
 def _encode_cached_user(user: AuthUser) -> str:
     payload = {
         "id": str(user.id),
-        "roles": [role.value for role in user.roles],
+        "role_codes": [role.value for role in user.role_codes],
+        "permission_codes": [
+            permission.value for permission in user.permission_codes
+        ],
         "is_active": user.is_active,
         "is_superuser": user.is_superuser,
         "is_admin": user.is_admin,
@@ -76,12 +84,14 @@ def _decode_cached_user(raw: str) -> AuthUser | None:
     if data is None:
         return None
     user_id = data.get("id")
-    roles = data.get("roles")
+    roles = data.get("role_codes")
     is_active = data.get("is_active")
     email = data.get("email")
+    permissions = data.get("permission_codes")
     if (
         not isinstance(user_id, str)
         or not _is_object_list(roles)
+        or not _is_object_list(permissions)
         or not isinstance(is_active, bool)
     ):
         return None
@@ -89,16 +99,22 @@ def _decode_cached_user(raw: str) -> AuthUser | None:
         uid = UUID(user_id)
     except ValueError:
         return None
-    role_set: set[SystemRole] = set()
+    role_set: set[RoleCode] = set()
     for raw_role in roles:
         role = _safe_role(raw_role)
         if role is not None:
             role_set.add(role)
-    is_superuser = SystemRole.SUPER_ADMIN in role_set
-    is_admin = is_superuser or SystemRole.ADMIN in role_set
+    permission_set: set[PermissionCode] = set()
+    for raw_permission in permissions:
+        permission = _safe_permission(raw_permission)
+        if permission is not None:
+            permission_set.add(permission)
+    is_superuser = _SUPER_ADMIN_ROLE in role_set
+    is_admin = is_superuser or _ADMIN_ROLE in role_set
     return AuthUser(
         id=uid,
-        roles=frozenset(role_set),
+        role_codes=frozenset(role_set),
+        permission_codes=frozenset(permission_set),
         is_active=is_active,
         is_superuser=is_superuser,
         is_admin=is_admin,
@@ -106,11 +122,20 @@ def _decode_cached_user(raw: str) -> AuthUser | None:
     )
 
 
-def _safe_role(raw: object) -> SystemRole | None:
+def _safe_role(raw: object) -> RoleCode | None:
     if not isinstance(raw, str):
         return None
     try:
-        return SystemRole(raw)
+        return RoleCode(raw)
+    except ValueError:
+        return None
+
+
+def _safe_permission(raw: object) -> PermissionCode | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        return PermissionCode(raw)
     except ValueError:
         return None
 
