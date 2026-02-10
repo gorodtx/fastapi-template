@@ -4,6 +4,10 @@
 ### C ###
 # Prerequisites
 *.d
+!nginx/conf.d/
+!nginx/conf.d/*.conf
+nginx/.uvicorn.pid
+nginx/.uvicorn.log
 
 # Object files
 *.o
