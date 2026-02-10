@@ -103,3 +103,17 @@ class UnauthenticatedError(AppError):
 class AuthorizationError(AppError):
     def __init__(self: AuthorizationError, message: str = "Forbidden") -> None:
         super().__init__(code="auth.forbidden", message=message)
+
+
+class TooManyRequestsError(AppError):
+    def __init__(
+        self: TooManyRequestsError,
+        *,
+        retry_after_s: int,
+        message: str = "Too many requests",
+    ) -> None:
+        super().__init__(
+            code="auth.too_many_requests",
+            message=message,
+            meta={"retry_after_s": retry_after_s},
+        )
