@@ -26,10 +26,8 @@ from backend.domain.core.services.access_control import (
     ensure_can_assign_role,
     ensure_not_self_role_change,
 )
-from backend.domain.core.services.users import assign_user_role
 from backend.domain.core.types.rbac import (
     RoleCode,
-    normalize_role_code,
     validate_role_code,
 )
 
@@ -49,7 +47,7 @@ class AssignRoleToUserHandler(
         /,
     ) -> Result[UserRolesResponseDTO, AppError]:
         def parse_role() -> RoleCode:
-            return validate_role_code(normalize_role_code(cmd.role))
+            return validate_role_code(cmd.role)
 
         role_result = capture(parse_role, map_role_input_error(cmd.role))
         if role_result.is_err():
@@ -79,7 +77,7 @@ class AssignRoleToUserHandler(
         if policy_result.is_err():
             return ResultImpl.err_from(policy_result)
 
-        assign_user_role(user, role)
+        user.roles.add(role)
 
         replace_result = (
             await self.gateway.rbac.replace_user_roles(

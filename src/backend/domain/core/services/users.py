@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from uuid_utils.compat import UUID
 
 from backend.domain.core.entities.user import User
@@ -7,20 +9,25 @@ from backend.domain.core.exceptions.base import DomainTypeError
 from backend.domain.core.exceptions.rbac import RoleNotAssignedError
 from backend.domain.core.exceptions.user import UserDataCorruptedError
 from backend.domain.core.policies.identity import (
-    normalize_email,
-    normalize_login,
-    normalize_password_hash,
-    normalize_username,
     validate_email,
     validate_login,
     validate_password_hash,
     validate_username,
 )
-from backend.domain.core.policies.rbac import (
-    normalize_role_code,
-    validate_role_code,
-)
+from backend.domain.core.policies.rbac import validate_role_code
 from backend.domain.core.types.rbac import RoleCode
+
+_EMAIL_FIELD = "email"
+_LOGIN_FIELD = "login"
+_USERNAME_FIELD = "username"
+_HASH_FIELD = "password_hash"
+_ROLES_FIELD = "roles"
+_USER_FIELD_VALIDATORS: dict[str, Callable[[str], str]] = {
+    _EMAIL_FIELD: validate_email,
+    _LOGIN_FIELD: validate_login,
+    _USERNAME_FIELD: validate_username,
+    _HASH_FIELD: validate_password_hash,
+}
 
 
 def _type_error(field: str, exc: Exception) -> DomainTypeError:
@@ -33,32 +40,30 @@ def _corrupted_error(
     return UserDataCorruptedError(user_id=user_id, details=f"{field}: {exc}")
 
 
-def validate_and_normalize_email(value: str) -> str:
+def _coerce_input(
+    *, field: str, value: str, validator: Callable[[str], str]
+) -> str:
     try:
-        return validate_email(normalize_email(value))
+        return validator(value)
     except (TypeError, ValueError) as exc:
-        raise _type_error("email", exc) from exc
+        raise _type_error(field, exc) from exc
 
 
-def validate_and_normalize_login(value: str) -> str:
+def _coerce_corrupted(
+    *,
+    user_id: UUID,
+    field: str,
+    value: str,
+    validator: Callable[[str], str],
+) -> str:
     try:
-        return validate_login(normalize_login(value))
+        return validator(value)
     except (TypeError, ValueError) as exc:
-        raise _type_error("login", exc) from exc
+        raise _corrupted_error(user_id, field, exc) from exc
 
 
-def validate_and_normalize_username(value: str) -> str:
-    try:
-        return validate_username(normalize_username(value))
-    except (TypeError, ValueError) as exc:
-        raise _type_error("username", exc) from exc
-
-
-def validate_and_normalize_password_hash(value: str) -> str:
-    try:
-        return validate_password_hash(normalize_password_hash(value))
-    except (TypeError, ValueError) as exc:
-        raise _type_error("password_hash", exc) from exc
+def _validate_role(role: str) -> str:
+    return validate_role_code(role)
 
 
 def build_user(
@@ -71,12 +76,25 @@ def build_user(
     is_active: bool = True,
     roles: set[RoleCode] | None = None,
 ) -> User:
+    values: dict[str, str] = {
+        _EMAIL_FIELD: email,
+        _LOGIN_FIELD: login,
+        _USERNAME_FIELD: username,
+        _HASH_FIELD: password_hash,
+    }
+    validated: dict[str, str] = {}
+    for field, value in values.items():
+        validated[field] = _coerce_input(
+            field=field,
+            value=value,
+            validator=_USER_FIELD_VALIDATORS[field],
+        )
     return User(
         id=id,
-        email=validate_and_normalize_email(email),
-        login=validate_and_normalize_login(login),
-        username=validate_and_normalize_username(username),
-        password=validate_and_normalize_password_hash(password_hash),
+        email=validated[_EMAIL_FIELD],
+        login=validated[_LOGIN_FIELD],
+        username=validated[_USERNAME_FIELD],
+        password=validated[_HASH_FIELD],
         is_active=is_active,
         roles=set(roles) if roles is not None else set(),
     )
@@ -92,30 +110,40 @@ def rehydrate_user(
     is_active: bool,
     roles: set[RoleCode],
 ) -> User:
-    try:
-        checked_email = validate_email(normalize_email(email))
-    except (TypeError, ValueError) as exc:
-        raise _corrupted_error(id, "email", exc) from exc
-    try:
-        checked_login = validate_login(normalize_login(login))
-    except (TypeError, ValueError) as exc:
-        raise _corrupted_error(id, "login", exc) from exc
-    try:
-        checked_username = validate_username(normalize_username(username))
-    except (TypeError, ValueError) as exc:
-        raise _corrupted_error(id, "username", exc) from exc
-    try:
-        checked_password = validate_password_hash(
-            normalize_password_hash(password_hash)
-        )
-    except (TypeError, ValueError) as exc:
-        raise _corrupted_error(id, "password_hash", exc) from exc
+    checked_email = _coerce_corrupted(
+        user_id=id,
+        field=_EMAIL_FIELD,
+        value=email,
+        validator=validate_email,
+    )
+    checked_login = _coerce_corrupted(
+        user_id=id,
+        field=_LOGIN_FIELD,
+        value=login,
+        validator=validate_login,
+    )
+    checked_username = _coerce_corrupted(
+        user_id=id,
+        field=_USERNAME_FIELD,
+        value=username,
+        validator=validate_username,
+    )
+    checked_password = _coerce_corrupted(
+        user_id=id,
+        field=_HASH_FIELD,
+        value=password_hash,
+        validator=validate_password_hash,
+    )
     checked_roles: set[RoleCode] = set()
-    try:
-        for role in roles:
-            checked_roles.add(validate_role_code(normalize_role_code(role)))
-    except (TypeError, ValueError) as exc:
-        raise _corrupted_error(id, "roles", exc) from exc
+    for role in roles:
+        checked_roles.add(
+            _coerce_corrupted(
+                user_id=id,
+                field=_ROLES_FIELD,
+                value=role,
+                validator=_validate_role,
+            )
+        )
     return User(
         id=id,
         email=checked_email,
@@ -135,18 +163,29 @@ def apply_user_patch(
     username: str | None = None,
     password_hash: str | None = None,
 ) -> None:
+    updates: dict[str, str] = {}
     if email is not None:
-        user.email = validate_and_normalize_email(email)
+        updates[_EMAIL_FIELD] = email
     if login is not None:
-        user.login = validate_and_normalize_login(login)
+        updates[_LOGIN_FIELD] = login
     if username is not None:
-        user.username = validate_and_normalize_username(username)
+        updates[_USERNAME_FIELD] = username
     if password_hash is not None:
-        user.password = validate_and_normalize_password_hash(password_hash)
-
-
-def assign_user_role(user: User, role: RoleCode) -> None:
-    user.roles.add(role)
+        updates[_HASH_FIELD] = password_hash
+    for field, raw_value in updates.items():
+        checked_value = _coerce_input(
+            field=field,
+            value=raw_value,
+            validator=_USER_FIELD_VALIDATORS[field],
+        )
+        if field == _EMAIL_FIELD:
+            user.email = checked_value
+        elif field == _LOGIN_FIELD:
+            user.login = checked_value
+        elif field == _USERNAME_FIELD:
+            user.username = checked_value
+        else:
+            user.password = checked_value
 
 
 def revoke_user_role(user: User, role: RoleCode) -> None:

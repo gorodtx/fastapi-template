@@ -1,11 +1,7 @@
-"""Template migration for adding roles and permission bindings.
+"""Alembic template: add/update roles and permission bindings.
 
-Fill `NEW_ROLES` and optionally `ROLE_DESCRIPTIONS` / `ROLE_USER_BINDINGS`,
-then run `uv run alembic upgrade head`.
-
-Revision ID: 20260209_0003
-Revises: 20260209_0002
-Create Date: 2026-02-09 00:03:00.000000
+Copy this file into a new file under `migrations/versions/` and fill
+revision metadata plus payload constants.
 """
 
 from __future__ import annotations
@@ -23,8 +19,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.sql import Select
 
 # revision identifiers, used by Alembic.
-revision: str = "20260209_0003"
-down_revision: str | None = "20260209_0002"
+revision: str = "<fill_revision_id>"
+down_revision: str | None = "<fill_down_revision_id>"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
@@ -33,7 +29,7 @@ _PERMISSION_CODE_PATTERN: Final[str] = (
     r"^[a-z][a-z0-9_]*:[a-z][a-z0-9_]{1,63}$"
 )
 
-# Fill this mapping with new roles and their permissions.
+# Fill this mapping with roles and their permissions.
 NEW_ROLES: Final[dict[str, frozenset[str]]] = {}
 
 # Optional role descriptions.
@@ -133,8 +129,7 @@ def _upsert_role(
     select_stmt: Select[tuple[uuid.UUID]] = sa.select(_ROLES_TABLE.c.id).where(
         _ROLES_TABLE.c.code == role_code
     )
-    selected = bind.execute(select_stmt).scalar_one()
-    return selected
+    return bind.execute(select_stmt).scalar_one()
 
 
 def _upsert_permissions(
@@ -160,7 +155,6 @@ def _sync_role_permissions(
         for row in bind.execute(select_stmt).all()
         if isinstance(row[0], str)
     }
-
     missing = sorted(target_codes - current_codes)
     for code in missing:
         stmt = (
@@ -174,7 +168,6 @@ def _sync_role_permissions(
             )
         )
         bind.execute(stmt)
-
     extra = sorted(current_codes - target_codes)
     if extra:
         delete_stmt = sa.delete(_ROLE_PERMISSIONS_TABLE).where(
@@ -219,8 +212,9 @@ def upgrade() -> None:
         role_id = _upsert_role(bind, role_code, description)
         _upsert_permissions(bind, permission_codes)
         _sync_role_permissions(bind, role_id, permission_codes)
-        bindings = ROLE_USER_BINDINGS.get(role_code, ())
-        _bind_users_to_role(bind, role_id, bindings)
+        _bind_users_to_role(
+            bind, role_id, ROLE_USER_BINDINGS.get(role_code, ())
+        )
 
 
 def downgrade() -> None:

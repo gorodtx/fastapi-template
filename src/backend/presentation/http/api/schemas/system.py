@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from backend.presentation.http.api.schemas.base import BaseShema
+from backend.presentation.http.api.schemas.base import BaseSchema
 
 
-class SystemStatusResponse(BaseShema):
+class SystemStatusResponse(BaseSchema):
     status: str

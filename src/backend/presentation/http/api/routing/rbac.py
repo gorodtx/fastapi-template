@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import Annotated, Final
-
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, Path
+from fastapi import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
@@ -34,18 +32,10 @@ from backend.presentation.http.api.schemas.rbac import (
     RoleChangeRequest,
     UserRolesResponse,
 )
+from backend.presentation.http.api.schemas.rbac_fields import RoleCodePath
 from backend.presentation.http.api.tx import run_write_in_tx
 
 router: APIRouter = APIRouter(route_class=DishkaRoute)
-_ROLE_CODE_PATTERN: Final[str] = r"^[a-z][a-z0-9_]{2,63}$"
-type RoleCodePath = Annotated[
-    str,
-    Path(
-        min_length=3,
-        max_length=64,
-        pattern=_ROLE_CODE_PATTERN,
-    ),
-]
 
 
 @router.get("/rbac/users/{user_id}/roles", response_model=UserRolesResponse)

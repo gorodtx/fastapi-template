@@ -47,7 +47,7 @@ class GetUserRolesHandler(
         return ResultImpl.ok(
             present_user_roles(
                 user_id=user.id,
-                roles=user.roles,
+                roles=frozenset(user.roles),
                 permissions=frozenset(permissions_result.unwrap()),
             ),
             AppError,

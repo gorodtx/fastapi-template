@@ -10,11 +10,7 @@ from uuid_utils.compat import UUID
 from backend.application.common.interfaces.ports.persistence.manager import (
     SessionProtocol,
 )
-from backend.domain.core.types.rbac import (
-    RoleCode,
-    normalize_role_code,
-    validate_role_code,
-)
+from backend.domain.core.types.rbac import RoleCode, validate_role_code
 from backend.infrastructure.persistence.mappers.rbac import value_to_uuid
 from backend.infrastructure.persistence.records import UserRoleCodeRecord
 from backend.infrastructure.persistence.sqlalchemy.tables.role import (
@@ -70,10 +66,9 @@ def q_get_role_ids_by_codes(
         res = await async_session.execute(stmt)
         out: list[tuple[RoleCode, UUID]] = []
         for role_code, role_id in res.all():
-            normalized_role = normalize_role_code(str(role_code))
             out.append(
                 (
-                    validate_role_code(normalized_role),
+                    validate_role_code(str(role_code)),
                     value_to_uuid(role_id),
                 )
             )

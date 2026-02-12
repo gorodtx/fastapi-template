@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from backend.application.common.dtos.base import DTO
 
 
-class BaseShema(BaseModel):
+class BaseSchema(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     @classmethod

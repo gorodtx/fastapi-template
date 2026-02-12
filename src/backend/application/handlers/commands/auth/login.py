@@ -67,9 +67,7 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
             return ResultImpl.err_app(invalid_credentials, TokenPairDTO)
 
         def verify_password() -> Awaitable[bool]:
-            return self.password_hasher.verify(
-                cmd.raw_password, user.password.value
-            )
+            return self.password_hasher.verify(cmd.raw_password, user.password)
 
         verify_result = await capture_async(
             verify_password, map_invalid_credentials()

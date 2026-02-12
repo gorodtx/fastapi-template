@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from enum import Enum, unique
 
-from backend.domain.core.policies.rbac import (
-    normalize_role_code,
-    validate_role_code,
-)
+from backend.domain.core.policies.rbac import validate_role_code
 
 RoleCode = str
 
@@ -24,6 +21,5 @@ class PermissionCode(Enum):
 __all__: tuple[str, ...] = (
     "PermissionCode",
     "RoleCode",
-    "normalize_role_code",
     "validate_role_code",
 )

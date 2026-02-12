@@ -28,8 +28,8 @@ from backend.application.handlers.result import (
 )
 from backend.application.handlers.transform import handler
 from backend.domain.core.entities.user import User
-from backend.domain.core.factories.users import UserFactory
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.services.users import build_user
+from backend.domain.core.types.rbac import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 
 
@@ -56,7 +56,7 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
         hashed = hashed_result.unwrap()
 
         def register_user() -> User:
-            return UserFactory.register(
+            return build_user(
                 id=uuid.uuid7(),
                 email=cmd.email,
                 login=cmd.login,
@@ -69,21 +69,20 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
             return ResultImpl.err_from(user_result)
         user = user_result.unwrap()
 
-        async with self.gateway.manager.transaction():
-            user.assign_role(self.default_registration_role)
+        user.roles.add(self.default_registration_role)
 
-            save_result = (
-                await self.gateway.users.save(user, include_roles=False)
-            ).map_err(map_storage_error_to_app())
-            if save_result.is_err():
-                return ResultImpl.err_from(save_result)
+        save_result = (
+            await self.gateway.users.save(user, include_roles=False)
+        ).map_err(map_storage_error_to_app())
+        if save_result.is_err():
+            return ResultImpl.err_from(save_result)
 
-            role_result = (
-                await self.gateway.rbac.replace_user_roles(
-                    user.id, {self.default_registration_role}
-                )
-            ).map_err(map_storage_error_to_app())
-            if role_result.is_err():
-                return ResultImpl.err_from(role_result)
+        role_result = (
+            await self.gateway.rbac.replace_user_roles(
+                user.id, {self.default_registration_role}
+            )
+        ).map_err(map_storage_error_to_app())
+        if role_result.is_err():
+            return ResultImpl.err_from(role_result)
 
-            return save_result.map(present_user_response)
+        return save_result.map(present_user_response)

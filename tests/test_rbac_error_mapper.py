@@ -16,11 +16,11 @@ from backend.domain.core.exceptions.rbac import (
     RoleNotAssignedError,
     RoleSelfModificationError,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.types.rbac import RoleCode
 
 _USER_ID: UUID = UUID("00000000-0000-0000-0000-000000000001")
-_ROLE_USER: RoleCode = RoleCode("user")
-_ROLE_SUPER_ADMIN: RoleCode = RoleCode("super_admin")
+_ROLE_USER: RoleCode = "user"
+_ROLE_SUPER_ADMIN: RoleCode = "super_admin"
 
 
 def test_map_role_input_error_value_error_maps_to_role_unknown() -> None:

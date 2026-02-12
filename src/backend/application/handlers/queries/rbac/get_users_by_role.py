@@ -22,7 +22,7 @@ from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import QueryHandler
 from backend.application.handlers.result import Result, ResultImpl, capture
 from backend.application.handlers.transform import handler
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.types.rbac import RoleCode, validate_role_code
 
 
 class GetUsersByRoleQuery(GetUsersByRoleDTO): ...
@@ -40,7 +40,7 @@ class GetUsersByRoleHandler(
         /,
     ) -> Result[UsersByRoleResponseDTO, AppError]:
         def parse_role() -> RoleCode:
-            return RoleCode(query.role)
+            return validate_role_code(query.role)
 
         role_result = capture(parse_role, map_role_input_error(query.role))
         if role_result.is_err():

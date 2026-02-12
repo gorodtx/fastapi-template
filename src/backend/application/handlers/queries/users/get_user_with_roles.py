@@ -46,13 +46,13 @@ class GetUserWithRolesHandler(
         permissions = sorted(
             permission.value for permission in permissions_result.unwrap()
         )
-        roles = sorted(role.value for role in user.roles)
+        roles = sorted(user.roles)
         return ResultImpl.ok(
             UserWithRolesDTO(
                 id=user.id,
-                email=user.email.value,
-                login=user.login.value,
-                username=user.username.value,
+                email=user.email,
+                login=user.login,
+                username=user.username,
                 roles=roles,
                 permissions=permissions,
             ),

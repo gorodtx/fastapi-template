@@ -28,7 +28,6 @@ from backend.application.common.tools.permission_guard import PermissionGuard
 from backend.domain.core.types.rbac import (
     PermissionCode,
     RoleCode,
-    normalize_role_code,
     validate_role_code,
 )
 from backend.infrastructure.persistence.manager import TransactionManagerImpl
@@ -127,8 +126,7 @@ def _safe_role(raw: object) -> RoleCode | None:
     if not isinstance(raw, str):
         return None
     try:
-        normalized = normalize_role_code(raw)
-        return validate_role_code(normalized)
+        return validate_role_code(raw)
     except ValueError:
         return None
 

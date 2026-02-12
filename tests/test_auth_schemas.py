@@ -42,6 +42,17 @@ def test_login_request_accepts_valid_payload() -> None:
     assert payload.fingerprint == "fp-12345678"
 
 
+def test_login_request_accepts_single_char_password() -> None:
+    one_char_password = chr(120)
+    payload = LoginRequest(
+        email="valid@example.com",
+        raw_password=one_char_password,
+        fingerprint="fp-12345678",
+    )
+
+    assert payload.raw_password == one_char_password
+
+
 def test_login_request_rejects_invalid_email() -> None:
     raw_password = _build_raw_password()
     with pytest.raises(ValidationError) as exc_info:

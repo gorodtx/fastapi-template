@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.application.common.exceptions.error_mappers.auth import (
     map_refresh_replay,
@@ -33,7 +34,7 @@ from backend.application.handlers.commands.users.create import (
     CreateUserCommand,
     CreateUserHandler,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.types.rbac import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.presentation.http.api.schemas.auth import (
     LoginRequest,
@@ -43,6 +44,7 @@ from backend.presentation.http.api.schemas.auth import (
     SuccessResponse,
     TokenPairResponse,
 )
+from backend.presentation.http.api.tx import run_write_in_tx
 
 router: APIRouter = APIRouter(route_class=DishkaRoute)
 
@@ -50,6 +52,7 @@ router: APIRouter = APIRouter(route_class=DishkaRoute)
 @router.post("/auth/register", response_model=TokenPairResponse)
 async def register_user(
     payload: RegisterRequest,
+    session: FromDishka[AsyncSession],
     gateway: FromDishka[PersistenceGateway],
     password_hasher: FromDishka[PasswordHasherPort],
     default_registration_role: FromDishka[RoleCode],
@@ -67,8 +70,7 @@ async def register_user(
         username=payload.username,
         raw_password=payload.raw_password,
     )
-    create_result = await create_handler(create_cmd)
-    user = create_result.unwrap()
+    user = await run_write_in_tx(session, create_handler(create_cmd))
 
     access_token = jwt_issuer.issue_access(user_id=user.id)
     refresh_token, refresh_jti = jwt_issuer.issue_refresh(

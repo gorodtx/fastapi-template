@@ -30,7 +30,6 @@ from backend.domain.core.services.access_control import (
 from backend.domain.core.services.users import revoke_user_role
 from backend.domain.core.types.rbac import (
     RoleCode,
-    normalize_role_code,
     validate_role_code,
 )
 
@@ -52,7 +51,7 @@ class RevokeRoleFromUserHandler(
         /,
     ) -> Result[UserRolesResponseDTO, AppError]:
         def parse_role() -> RoleCode:
-            return validate_role_code(normalize_role_code(cmd.role))
+            return validate_role_code(cmd.role)
 
         role_result = capture(
             parse_role,
