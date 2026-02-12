@@ -6,7 +6,7 @@ from backend.application.common.exceptions.application import (
     AuthorizationError,
 )
 from backend.application.common.interfaces.auth.types import AuthUser
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
 )
 

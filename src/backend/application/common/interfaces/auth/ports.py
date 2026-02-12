@@ -11,13 +11,13 @@ from backend.application.common.interfaces.auth.types import (
     PermissionSpec,
 )
 from backend.application.handlers.result import Result
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
+    RoleCode,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
 
-_SUPER_ADMIN_ROLE: RoleCode = RoleCode("super_admin")
-_ADMIN_ROLE: RoleCode = RoleCode("admin")
+_SUPER_ADMIN_ROLE: RoleCode = "super_admin"
+_ADMIN_ROLE: RoleCode = "admin"
 
 
 class Authenticator(Protocol):

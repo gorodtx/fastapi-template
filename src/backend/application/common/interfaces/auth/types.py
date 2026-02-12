@@ -4,10 +4,10 @@ from dataclasses import dataclass
 
 from uuid_utils.compat import UUID
 
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
+    RoleCode,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 @dataclass(frozen=True, slots=True)

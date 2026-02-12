@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from uuid_utils.compat import UUID
 
 from backend.domain.core.constants.rbac import RoleAction
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
+    RoleCode,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,12 +84,12 @@ class RoleHierarchyViolationError(AppError):
         target_role: RoleCode,
         detail: str | None = None,
     ) -> None:
-        message = f"Cannot {action.value} role {target_role.value!r} with current privileges"
+        message = f"Cannot {action.value} role {target_role!r} with current privileges"
         super().__init__(
             code="rbac.hierarchy_violation",
             message=message,
             detail=detail,
-            meta={"action": action.value, "role": target_role.value},
+            meta={"action": action.value, "role": target_role},
         )
 
 

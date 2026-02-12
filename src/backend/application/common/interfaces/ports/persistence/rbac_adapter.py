@@ -7,10 +7,10 @@ from uuid_utils.compat import UUID
 
 from backend.application.common.exceptions.storage import StorageError
 from backend.application.handlers.result import Result
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
+    RoleCode,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 class RbacAdapter(Protocol):

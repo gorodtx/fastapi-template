@@ -10,16 +10,16 @@ from backend.application.common.dtos.rbac import (
     UsersByRoleResponseDTO,
 )
 from backend.application.common.dtos.users import UserResponseDTO
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
+    RoleCode,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
 
 
 def present_role_assignment(
     user_id: UUID, role: RoleCode
 ) -> RoleAssignmentResultDTO:
-    return RoleAssignmentResultDTO(user_id=user_id, role=role.value)
+    return RoleAssignmentResultDTO(user_id=user_id, role=role)
 
 
 def present_role_assignment_from(
@@ -39,7 +39,7 @@ def present_user_roles(
 ) -> UserRolesResponseDTO:
     return UserRolesResponseDTO(
         user_id=user_id,
-        roles=sorted(role.value for role in roles),
+        roles=sorted(role for role in roles),
         permissions=sorted(permission.value for permission in permissions),
     )
 
@@ -47,7 +47,7 @@ def present_user_roles(
 def present_users_by_role(
     role: RoleCode, users: list[UserResponseDTO]
 ) -> UsersByRoleResponseDTO:
-    return UsersByRoleResponseDTO(role=role.value, users=users)
+    return UsersByRoleResponseDTO(role=role, users=users)
 
 
 def present_users_by_role_from(

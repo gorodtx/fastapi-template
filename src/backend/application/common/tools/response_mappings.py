@@ -11,19 +11,19 @@ from backend.domain.core.entities.user import User
 def _user_to_response_dto(user: User) -> UserResponseDTO:
     return UserResponseDTO(
         id=user.id,
-        email=user.email.value,
-        login=user.login.value,
-        username=user.username.value,
+        email=user.email,
+        login=user.login,
+        username=user.username,
     )
 
 
 def _user_to_with_roles_dto(user: User) -> UserWithRolesDTO:
-    roles = [role.value for role in user.roles]
+    roles = list(user.roles)
     return UserWithRolesDTO(
         id=user.id,
-        email=user.email.value,
-        login=user.login.value,
-        username=user.username.value,
+        email=user.email,
+        login=user.login,
+        username=user.username,
         roles=roles,
         permissions=[],
     )

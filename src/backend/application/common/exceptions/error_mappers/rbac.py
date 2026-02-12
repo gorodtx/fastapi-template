@@ -19,7 +19,7 @@ from backend.domain.core.exceptions.rbac import (
 from backend.domain.core.exceptions.rbac import (
     RoleHierarchyViolationError as DomainRoleHierarchyViolationError,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.types.rbac import RoleCode
 
 
 def map_role_input_error(
