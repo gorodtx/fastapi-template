@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
+from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.auth.types import AuthUser
@@ -31,7 +32,7 @@ from backend.domain.core.constants.permission_codes import (
     USERS_DELETE,
     USERS_UPDATE,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.types.rbac import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.presentation.http.api.schemas.auth import SuccessResponse
 from backend.presentation.http.api.schemas.users import (
@@ -39,6 +40,7 @@ from backend.presentation.http.api.schemas.users import (
     UserResponse,
     UserUpdateRequest,
 )
+from backend.presentation.http.api.tx import run_write_in_tx
 
 router: APIRouter = APIRouter(route_class=DishkaRoute)
 
@@ -46,6 +48,7 @@ router: APIRouter = APIRouter(route_class=DishkaRoute)
 @router.post("/users", response_model=UserResponse)
 async def create_user(
     payload: UserCreateRequest,
+    session: FromDishka[AsyncSession],
     gateway: FromDishka[PersistenceGateway],
     password_hasher: FromDishka[PasswordHasherPort],
     default_registration_role: FromDishka[RoleCode],
@@ -64,8 +67,7 @@ async def create_user(
         username=payload.username,
         raw_password=payload.raw_password,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = await run_write_in_tx(session, handler(cmd))
 
     return UserResponse.from_dto(dto)
 
@@ -86,6 +88,7 @@ async def get_me(
 async def update_user(
     user_id: UUID,
     payload: UserUpdateRequest,
+    session: FromDishka[AsyncSession],
     gateway: FromDishka[PersistenceGateway],
     password_hasher: FromDishka[PasswordHasherPort],
     cache_invalidator: FromDishka[AuthCacheInvalidator],
@@ -96,15 +99,14 @@ async def update_user(
     handler = UpdateUserHandler(
         gateway=gateway,
         password_hasher=password_hasher,
-        cache_invalidator=cache_invalidator,
     )
     cmd = UpdateUserCommand(
         user_id=user_id,
         email=str(payload.email) if payload.email is not None else None,
         raw_password=payload.raw_password,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = await run_write_in_tx(session, handler(cmd))
+    await cache_invalidator.invalidate_user(user_id)
 
     return UserResponse.from_dto(dto)
 
@@ -112,6 +114,7 @@ async def update_user(
 @router.delete("/users/{user_id}", response_model=SuccessResponse)
 async def delete_user(
     user_id: UUID,
+    session: FromDishka[AsyncSession],
     gateway: FromDishka[PersistenceGateway],
     cache_invalidator: FromDishka[AuthCacheInvalidator],
     current_user: FromDishka[AuthUser],
@@ -120,10 +123,9 @@ async def delete_user(
     await permission_guard.require(current_user, USERS_DELETE)
     handler = DeleteUserHandler(
         gateway=gateway,
-        cache_invalidator=cache_invalidator,
     )
     cmd = DeleteUserCommand(user_id=user_id)
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = await run_write_in_tx(session, handler(cmd))
+    await cache_invalidator.invalidate_user(user_id)
 
     return SuccessResponse.from_dto(dto)

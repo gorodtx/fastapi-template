@@ -46,10 +46,9 @@ def create_app() -> FastAPI:
     return app
 
 
-def _app_error_handler(request: Request, exc: Exception) -> Response:
+def _app_error_handler(_request: Request, exc: Exception) -> Response:
     if not isinstance(exc, AppError):
         raise exc
-    request.scope["backend.rollback_only"] = True
     _LOGGER.warning(
         "Handled app error: code=%s detail=%r meta=%r",
         exc.code,

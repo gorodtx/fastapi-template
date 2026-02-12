@@ -7,7 +7,7 @@ from uuid_utils.compat import UUID
 from backend.domain.core.types.rbac import RoleCode
 
 
-@dataclass(slots=True, kw_only=True)
+@dataclass(kw_only=True)
 class User:
     id: UUID
     email: str

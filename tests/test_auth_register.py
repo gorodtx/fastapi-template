@@ -9,7 +9,6 @@ from backend.application.common.dtos.users import UserResponseDTO
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.auth import RefreshTokenReplayError
 from backend.application.handlers.result import ResultImpl
-from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.presentation.http.api.routing import auth as auth_routing
 from backend.presentation.http.api.schemas.auth import RegisterRequest
 
@@ -71,6 +70,31 @@ class _DummyHasher:
     marker: str = "hasher"
 
 
+@dataclass(slots=True)
+class _TxScope:
+    entered: bool = False
+    exited: bool = False
+
+    async def __aenter__(self: _TxScope) -> None:
+        self.entered = True
+
+    async def __aexit__(
+        self: _TxScope,
+        _exc_type: type[BaseException] | None,
+        _exc_value: BaseException | None,
+        _traceback: object,
+    ) -> None:
+        self.exited = True
+
+
+@dataclass(slots=True)
+class _SessionStub:
+    tx: _TxScope
+
+    def begin(self: _SessionStub) -> _TxScope:
+        return self.tx
+
+
 @pytest.mark.asyncio
 async def test_register_user_creates_user_and_returns_tokens(
     monkeypatch: pytest.MonkeyPatch,
@@ -122,12 +146,14 @@ async def test_register_user_creates_user_and_returns_tokens(
         refresh_jti=refresh_jti,
     )
     refresh_tokens = _FakeRefreshTokens()
+    session = _SessionStub(tx=_TxScope())
 
     response = await auth_routing.register_user(
         payload=payload,
+        session=session,
         gateway=_DummyGateway(),
         password_hasher=_DummyHasher(),
-        default_registration_role=RoleCode("user"),
+        default_registration_role="user",
         jwt_issuer=jwt_issuer,
         refresh_tokens=refresh_tokens,
     )
@@ -146,6 +172,8 @@ async def test_register_user_creates_user_and_returns_tokens(
         "",
         refresh_jti,
     )
+    assert session.tx.entered is True
+    assert session.tx.exited is True
     assert response.access_token == access_token
     assert response.refresh_token == refresh_token
 
@@ -191,13 +219,15 @@ async def test_register_user_maps_refresh_replay_to_app_error(
         raw_password=raw_password,
         fingerprint="fp-test-1",
     )
+    session = _SessionStub(tx=_TxScope())
 
     with pytest.raises(AppError) as exc_info:
         await auth_routing.register_user(
             payload=payload,
+            session=session,
             gateway=_DummyGateway(),
             password_hasher=_DummyHasher(),
-            default_registration_role=RoleCode("user"),
+            default_registration_role="user",
             jwt_issuer=_FakeJwtIssuer(
                 access_token=_build_token("access"),
                 refresh_token=_build_token("refresh"),
@@ -208,5 +238,7 @@ async def test_register_user_maps_refresh_replay_to_app_error(
             ),
         )
 
+    assert session.tx.entered is True
+    assert session.tx.exited is True
     assert exc_info.value.code == "auth.unauthenticated"
     assert exc_info.value.message == "Refresh token replay detected"

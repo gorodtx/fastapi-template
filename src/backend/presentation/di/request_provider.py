@@ -25,10 +25,12 @@ from backend.application.common.interfaces.ports.persistence.manager import (
     TransactionManager,
 )
 from backend.application.common.tools.permission_guard import PermissionGuard
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
+    RoleCode,
+    normalize_role_code,
+    validate_role_code,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.infrastructure.persistence.manager import TransactionManagerImpl
 from backend.infrastructure.persistence.persistence_gateway import (
     PersistenceGatewayImpl,
@@ -38,9 +40,8 @@ from backend.infrastructure.security.auth.authenticator import (
 )
 
 _AUTH_USER_CACHE_TTL_S: int = 300
-_ROLLBACK_ONLY_SCOPE_KEY: str = "backend.rollback_only"
-_SUPER_ADMIN_ROLE: RoleCode = RoleCode("super_admin")
-_ADMIN_ROLE: RoleCode = RoleCode("admin")
+_SUPER_ADMIN_ROLE: RoleCode = "super_admin"
+_ADMIN_ROLE: RoleCode = "admin"
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -63,7 +64,7 @@ def _user_cache_key(user_id: UUID) -> str:
 def _encode_cached_user(user: AuthUser) -> str:
     payload = {
         "id": str(user.id),
-        "role_codes": [role.value for role in user.role_codes],
+        "role_codes": list(user.role_codes),
         "permission_codes": [
             permission.value for permission in user.permission_codes
         ],
@@ -126,7 +127,8 @@ def _safe_role(raw: object) -> RoleCode | None:
     if not isinstance(raw, str):
         return None
     try:
-        return RoleCode(raw)
+        normalized = normalize_role_code(raw)
+        return validate_role_code(normalized)
     except ValueError:
         return None
 
@@ -161,29 +163,10 @@ class RequestProvider(Provider):
     @provide(scope=Scope.REQUEST)
     async def session(
         self: Self,
-        request: Request,
         session_factory: async_sessionmaker[AsyncSession],
     ) -> AsyncIterator[AsyncSession]:
-        request.scope.pop(_ROLLBACK_ONLY_SCOPE_KEY, None)
         async with session_factory() as session:
-            await session.begin()
-            try:
-                yield session
-            except Exception:
-                await session.rollback()
-                raise
-            else:
-                if request.scope.get(_ROLLBACK_ONLY_SCOPE_KEY):
-                    try:
-                        await session.rollback()
-                    except Exception:
-                        return
-                else:
-                    try:
-                        await session.commit()
-                    except Exception:
-                        await session.rollback()
-                        raise
+            yield session
 
     @provide(scope=Scope.REQUEST)
     def transaction_manager(

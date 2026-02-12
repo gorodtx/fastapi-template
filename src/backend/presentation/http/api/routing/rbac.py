@@ -4,6 +4,7 @@ from typing import Annotated, Final
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter, Path
+from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.auth.types import AuthUser
@@ -33,6 +34,7 @@ from backend.presentation.http.api.schemas.rbac import (
     RoleChangeRequest,
     UserRolesResponse,
 )
+from backend.presentation.http.api.tx import run_write_in_tx
 
 router: APIRouter = APIRouter(route_class=DishkaRoute)
 _ROLE_CODE_PATTERN: Final[str] = r"^[a-z][a-z0-9_]{2,63}$"
@@ -65,6 +67,7 @@ async def get_user_roles(
 async def assign_role_to_user(
     user_id: UUID,
     payload: RoleChangeRequest,
+    session: FromDishka[AsyncSession],
     gateway: FromDishka[PersistenceGateway],
     cache_invalidator: FromDishka[AuthCacheInvalidator],
     current_user: FromDishka[AuthUser],
@@ -73,7 +76,6 @@ async def assign_role_to_user(
     await permission_guard.require(current_user, RBAC_ASSIGN_ROLE)
     handler = AssignRoleToUserHandler(
         gateway=gateway,
-        cache_invalidator=cache_invalidator,
     )
     cmd = AssignRoleToUserCommand(
         user_id=user_id,
@@ -81,8 +83,8 @@ async def assign_role_to_user(
         actor_id=current_user.id,
         actor_roles=current_user.role_codes,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = await run_write_in_tx(session, handler(cmd))
+    await cache_invalidator.invalidate_user(user_id)
 
     return UserRolesResponse.from_dto(dto)
 
@@ -94,6 +96,7 @@ async def assign_role_to_user(
 async def revoke_role_from_user(
     user_id: UUID,
     role_code: RoleCodePath,
+    session: FromDishka[AsyncSession],
     gateway: FromDishka[PersistenceGateway],
     cache_invalidator: FromDishka[AuthCacheInvalidator],
     current_user: FromDishka[AuthUser],
@@ -102,7 +105,6 @@ async def revoke_role_from_user(
     await permission_guard.require(current_user, RBAC_REVOKE_ROLE)
     handler = RevokeRoleFromUserHandler(
         gateway=gateway,
-        cache_invalidator=cache_invalidator,
     )
     cmd = RevokeRoleFromUserCommand(
         user_id=user_id,
@@ -110,7 +112,7 @@ async def revoke_role_from_user(
         actor_id=current_user.id,
         actor_roles=current_user.role_codes,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = await run_write_in_tx(session, handler(cmd))
+    await cache_invalidator.invalidate_user(user_id)
 
     return UserRolesResponse.from_dto(dto)
