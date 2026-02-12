@@ -1,25 +1,21 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Column, Table, UniqueConstraint, true
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    String,
+    Table,
+    UniqueConstraint,
+    true,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from uuid_utils.compat import UUID
 
 from backend.domain.core.entities.user import User
-from backend.domain.core.value_objects.identity.email import Email
-from backend.domain.core.value_objects.identity.login import Login
-from backend.domain.core.value_objects.identity.username import Username
-from backend.domain.core.value_objects.password import Password
 from backend.infrastructure.persistence.sqlalchemy.tables.base import (
     mapper_registry,
     metadata,
-)
-from backend.infrastructure.persistence.sqlalchemy.types.identity import (
-    EmailType,
-    LoginType,
-    UsernameType,
-)
-from backend.infrastructure.persistence.sqlalchemy.types.security import (
-    PasswordHashType,
 )
 
 user_id_column: Column[UUID] = Column(
@@ -29,27 +25,27 @@ user_id_column: Column[UUID] = Column(
     nullable=False,
 )
 
-user_email_column: Column[Email] = Column(
+user_email_column: Column[str] = Column(
     "email",
-    EmailType(),
+    String(255),
     nullable=False,
 )
 
-user_login_column: Column[Login] = Column(
+user_login_column: Column[str] = Column(
     "login",
-    LoginType(),
+    String(20),
     nullable=False,
 )
 
-user_username_column: Column[Username] = Column(
+user_username_column: Column[str] = Column(
     "username",
-    UsernameType(),
+    String(20),
     nullable=False,
 )
 
-user_password_hash_column: Column[Password] = Column(
+user_password_hash_column: Column[str] = Column(
     "password_hash",
-    PasswordHashType(),
+    String(255),
     nullable=False,
 )
 
@@ -69,22 +65,37 @@ users_table: Table = Table(
     user_username_column,
     user_password_hash_column,
     user_is_active_column,
+    CheckConstraint(
+        "char_length(login) >= 3 AND char_length(login) <= 20",
+        name="ck_users_login_len",
+    ),
+    CheckConstraint(
+        r"login ~ '^[A-Za-z0-9]+$'",
+        name="ck_users_login_alnum",
+    ),
+    CheckConstraint(
+        r"email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$'",
+        name="ck_users_email_format",
+    ),
+    CheckConstraint(
+        "char_length(username) >= 2 AND char_length(username) <= 20",
+        name="ck_users_username_len",
+    ),
+    CheckConstraint(
+        r"username !~ '\s'",
+        name="ck_users_username_no_ws",
+    ),
+    CheckConstraint(
+        r"char_length(password_hash) >= 20 AND password_hash ~ '^\$[a-z0-9-]+\$'",
+        name="ck_users_password_hash_format",
+    ),
     UniqueConstraint(user_email_column),
     UniqueConstraint(user_login_column),
     UniqueConstraint(user_username_column),
 )
 
-_user_properties: dict[str, object] = {
-    "_id": user_id_column,
-    "_email": user_email_column,
-    "_login": user_login_column,
-    "_username": user_username_column,
-    "_password": user_password_hash_column,
-    "_is_active": user_is_active_column,
-}
-
 mapper_registry.map_imperatively(
     User,
     users_table,
-    properties=_user_properties,
+    properties={"password": user_password_hash_column},
 )
