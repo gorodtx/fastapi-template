@@ -6,8 +6,6 @@ from backend.domain.core.exceptions.base import (
     CorruptedInvariantError,
     DomainError,
 )
-from backend.domain.core.value_objects.identity.email import Email
-from backend.domain.core.value_objects.identity.username import Username
 
 
 class UserAlreadyExistsError(DomainError):
@@ -19,17 +17,17 @@ class UserAlreadyExistsError(DomainError):
 class UsernameAlreadyExistsError(UserAlreadyExistsError):
     __slots__: tuple[str, ...] = ("_username",)
 
-    def __init__(self: UsernameAlreadyExistsError, username: Username) -> None:
+    def __init__(self: UsernameAlreadyExistsError, username: str) -> None:
         self._username = username
-        super().__init__(f"Username {username.value!r} is already taken")
+        super().__init__(f"Username {username!r} is already taken")
 
 
 class EmailAlreadyExistsError(UserAlreadyExistsError):
     __slots__: tuple[str, ...] = ("_email",)
 
-    def __init__(self: EmailAlreadyExistsError, email: Email) -> None:
+    def __init__(self: EmailAlreadyExistsError, email: str) -> None:
         self._email = email
-        super().__init__(f"Email {email.value!r} is already registered")
+        super().__init__(f"Email {email!r} is already registered")
 
 
 class UserStateViolationError(DomainError):
@@ -41,29 +39,29 @@ class UserStateViolationError(DomainError):
 class UserAlreadyActiveError(UserStateViolationError):
     __slots__: tuple[str, ...] = ("_username",)
 
-    def __init__(self: UserAlreadyActiveError, username: Username) -> None:
+    def __init__(self: UserAlreadyActiveError, username: str) -> None:
         self._username = username
-        super().__init__(f"User {username.value!r} is already active")
+        super().__init__(f"User {username!r} is already active")
 
 
 class UserAlreadyInactiveError(UserStateViolationError):
     __slots__: tuple[str, ...] = ("_username",)
 
-    def __init__(self: UserAlreadyInactiveError, username: Username) -> None:
+    def __init__(self: UserAlreadyInactiveError, username: str) -> None:
         self._username = username
-        super().__init__(f"User {username.value!r} is already inactive")
+        super().__init__(f"User {username!r} is already inactive")
 
 
 class InactiveUserOperationError(UserStateViolationError):
     __slots__: tuple[str, ...] = ("_operation", "_username")
 
     def __init__(
-        self: InactiveUserOperationError, username: Username, operation: str
+        self: InactiveUserOperationError, username: str, operation: str
     ) -> None:
         self._username = username
         self._operation = operation
         super().__init__(
-            f"Cannot perform {operation} on inactive user {username.value!r}"
+            f"Cannot perform {operation} on inactive user {username!r}"
         )
 
 
@@ -78,13 +76,13 @@ class InsufficientPermissionsError(UserPermissionError):
 
     def __init__(
         self: InsufficientPermissionsError,
-        username: Username,
+        username: str,
         required_permission: str,
     ) -> None:
         self._username = username
         self._required_permission = required_permission
         super().__init__(
-            f"User {username.value!r} lacks required permission: {required_permission}"
+            f"User {username!r} lacks required permission: {required_permission}"
         )
 
 
@@ -93,7 +91,7 @@ class RoleAssignmentNotAllowedError(UserPermissionError):
 
     def __init__(
         self: RoleAssignmentNotAllowedError,
-        username: Username,
+        username: str,
         role: str,
         reason: str,
     ) -> None:
@@ -101,7 +99,7 @@ class RoleAssignmentNotAllowedError(UserPermissionError):
         self._role = role
         self._reason = reason
         super().__init__(
-            f"Cannot assign role {role!r} to user {username.value!r}: {reason}"
+            f"Cannot assign role {role!r} to user {username!r}: {reason}"
         )
 
 
