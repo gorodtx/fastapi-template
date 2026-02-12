@@ -4,7 +4,7 @@ __all__: tuple[str, ...] = (
     "constants",
     "entities",
     "exceptions",
-    "factories",
+    "policies",
     "services",
-    "value_objects",
+    "types",
 )

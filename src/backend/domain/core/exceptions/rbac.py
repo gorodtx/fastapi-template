@@ -4,7 +4,7 @@ from uuid_utils.compat import UUID
 
 from backend.domain.core.constants.rbac import RoleAction
 from backend.domain.core.exceptions.base import DomainError
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.types.rbac import RoleCode
 
 
 class RoleError(DomainError):
@@ -25,9 +25,7 @@ class RoleAlreadyAssignedError(RoleAssignmentError):
     ) -> None:
         self._role = role
         self._user_id = user_id
-        super().__init__(
-            f"Role {role.value!r} already assigned to user {user_id!r}"
-        )
+        super().__init__(f"Role {role!r} already assigned to user {user_id!r}")
 
 
 class RoleNotAssignedError(RoleAssignmentError):
@@ -38,9 +36,7 @@ class RoleNotAssignedError(RoleAssignmentError):
     ) -> None:
         self._role = role
         self._user_id = user_id
-        super().__init__(
-            f"Role {role.value!r} not assigned to user {user_id!r}"
-        )
+        super().__init__(f"Role {role!r} not assigned to user {user_id!r}")
 
 
 class RoleHierarchyViolationError(RoleError):
@@ -54,7 +50,7 @@ class RoleHierarchyViolationError(RoleError):
         self._action = action
         self._target_role = target_role
         super().__init__(
-            f"Cannot {action.value} role {target_role.value!r} with current privileges"
+            f"Cannot {action.value} role {target_role!r} with current privileges"
         )
 
 

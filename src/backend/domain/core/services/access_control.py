@@ -10,11 +10,11 @@ from backend.domain.core.exceptions.rbac import (
     RoleHierarchyViolationError,
     RoleSelfModificationError,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.types.rbac import RoleCode
 
-_SUPER_ADMIN_ROLE: RoleCode = RoleCode("super_admin")
-_ADMIN_ROLE: RoleCode = RoleCode("admin")
-_USER_ROLE: RoleCode = RoleCode("user")
+_SUPER_ADMIN_ROLE: RoleCode = "super_admin"
+_ADMIN_ROLE: RoleCode = "admin"
+_USER_ROLE: RoleCode = "user"
 
 
 def ensure_can_assign_role(

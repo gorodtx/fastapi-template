@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
 )
 

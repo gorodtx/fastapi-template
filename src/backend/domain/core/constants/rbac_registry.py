@@ -12,7 +12,7 @@ from backend.domain.core.constants.permission_codes import (
     USERS_UPDATE,
 )
 from backend.domain.core.constants.rbac import SystemRole
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
 )
 
