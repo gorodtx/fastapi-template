@@ -9,10 +9,10 @@ from backend.application.common.interfaces.ports.persistence.rbac_adapter import
     RbacAdapter,
 )
 from backend.application.handlers.result import Result
-from backend.domain.core.value_objects.access.permission_code import (
+from backend.domain.core.types.rbac import (
     PermissionCode,
+    RoleCode,
 )
-from backend.domain.core.value_objects.access.role_code import RoleCode
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter
 from backend.infrastructure.persistence.mappers.users import (
     role_records_to_set,
@@ -67,8 +67,8 @@ class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
             pairs = await self.manager.send(
                 q_get_role_ids_by_codes(list(payload.roles))
             )
-            got = {role.value for (role, _role_id) in pairs}
-            want = {role.value for role in payload.roles}
+            got = {role for (role, _role_id) in pairs}
+            want = set(payload.roles)
             missing = want - got
             if missing:
                 raise StorageError(

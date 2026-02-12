@@ -8,7 +8,7 @@ from backend.application.common.interfaces.ports.persistence.users_adapter impor
 )
 from backend.application.handlers.result import Result
 from backend.domain.core.entities.user import User
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.types.rbac import RoleCode
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter
 from backend.infrastructure.persistence.mappers.users import (
     role_records_to_set,

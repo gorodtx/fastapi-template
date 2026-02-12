@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from backend.domain.core.entities.user import User
-from backend.domain.core.value_objects.access.role_code import RoleCode
+from backend.domain.core.services.users import rehydrate_user
+from backend.domain.core.types.rbac import (
+    RoleCode,
+    normalize_role_code,
+    validate_role_code,
+)
 from backend.infrastructure.persistence.records import (
     UserRoleCodeRecord,
     UserRowRecord,
@@ -24,16 +29,20 @@ def row_record_to_user(
     *,
     roles: set[RoleCode] | None = None,
 ) -> User:
-    return User.rehydrate(
+    return rehydrate_user(
         id=rec.id,
         email=rec.email,
         login=rec.login,
         username=rec.username,
-        password=rec.password_hash,
+        password_hash=rec.password_hash,
         is_active=rec.is_active,
         roles=roles or set(),
     )
 
 
 def role_records_to_set(records: list[UserRoleCodeRecord]) -> set[RoleCode]:
-    return {RoleCode(record.role) for record in records}
+    role_codes: set[RoleCode] = set()
+    for record in records:
+        role_code = validate_role_code(normalize_role_code(record.role))
+        role_codes.add(role_code)
+    return role_codes

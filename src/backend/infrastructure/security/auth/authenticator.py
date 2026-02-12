@@ -47,7 +47,7 @@ class AuthenticatorImpl(Authenticator):
             is_active=user.is_active,
             is_admin=is_admin,
             is_superuser=is_superuser,
-            email=user.email.value,
+            email=user.email,
         )
 
     async def get_permission_for(
