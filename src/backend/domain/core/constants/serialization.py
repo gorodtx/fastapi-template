@@ -2,28 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, TypeGuard, runtime_checkable
+from typing import Protocol, TypeGuard
 
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.exceptions.serialization import (
     DomainSerializationError,
 )
-from backend.domain.core.value_objects.identity.email import Email
-from backend.domain.core.value_objects.identity.login import Login
-from backend.domain.core.value_objects.identity.username import Username
-from backend.domain.core.value_objects.password import Password
-
-
-@runtime_checkable
-class StrValueObject(Protocol):
-    @property
-    def value(self: StrValueObject) -> str: ...
-
-
-class StrValueObjectCtor(Protocol):
-    __name__: str
-
-    def __call__(self: StrValueObjectCtor, value: str) -> object: ...
 
 
 class Converter(Protocol):
@@ -34,31 +18,6 @@ class Converter(Protocol):
 
 def _is_str(value: object) -> TypeGuard[str]:
     return isinstance(value, str)
-
-
-@dataclass(frozen=True, slots=True)
-class StrValueObjectConverter:
-    vo_type: StrValueObjectCtor
-
-    def encode(self: StrValueObjectConverter, value: object) -> object:
-        raw = value.value if isinstance(value, StrValueObject) else None
-        if not _is_str(raw):
-            raise DomainSerializationError(
-                f"{self.vo_type.__name__}.value must be str, got {type(raw).__name__}"
-            )
-        return raw
-
-    def decode(self: StrValueObjectConverter, value: object) -> object:
-        if not _is_str(value):
-            raise DomainSerializationError(
-                f"Expected str for {self.vo_type.__name__}, got {type(value).__name__}"
-            )
-        try:
-            return self.vo_type(value)
-        except Exception as exc:
-            raise DomainSerializationError(
-                f"{self.vo_type.__name__} decoding failed: {exc}"
-            ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,8 +119,4 @@ def decode_system_role(value: object) -> SystemRole:
 
 
 def register_domain_converters() -> None:
-    CONVERTERS.register(Email, StrValueObjectConverter(Email))
-    CONVERTERS.register(Login, StrValueObjectConverter(Login))
-    CONVERTERS.register(Username, StrValueObjectConverter(Username))
-    CONVERTERS.register(Password, StrValueObjectConverter(Password))
     CONVERTERS.register(SystemRole, StrEnumValueConverter(SystemRole))
