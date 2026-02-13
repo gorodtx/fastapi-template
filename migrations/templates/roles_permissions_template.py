@@ -32,6 +32,10 @@ _PERMISSION_CODE_PATTERN: Final[str] = (
 # Fill this mapping with roles and their permissions.
 NEW_ROLES: Final[dict[str, frozenset[str]]] = {}
 
+# Optional: extra permissions for super_admin. If provided, they will be
+# merged into NEW_ROLES["super_admin"].
+SUPER_ADMIN_EXTRA_PERMISSIONS: Final[frozenset[str]] = frozenset()
+
 # Optional role descriptions.
 ROLE_DESCRIPTIONS: Final[dict[str, str | None]] = {}
 
@@ -66,20 +70,29 @@ _USERS_TABLE = sa.table(
 )
 
 
+def _roles_payload() -> dict[str, frozenset[str]]:
+    if not SUPER_ADMIN_EXTRA_PERMISSIONS:
+        return NEW_ROLES
+    merged = set(NEW_ROLES.get("super_admin", frozenset()))
+    merged.update(SUPER_ADMIN_EXTRA_PERMISSIONS)
+    return {**NEW_ROLES, "super_admin": frozenset(merged)}
+
+
 def _bind() -> Connection:
     return op.get_bind()
 
 
 def _validate_payload() -> None:
+    roles_payload = _roles_payload()
     role_pattern = re.compile(_ROLE_CODE_PATTERN)
     permission_pattern = re.compile(_PERMISSION_CODE_PATTERN)
-    unknown_descriptions = set(ROLE_DESCRIPTIONS) - set(NEW_ROLES)
+    unknown_descriptions = set(ROLE_DESCRIPTIONS) - set(roles_payload)
     if unknown_descriptions:
         raise RuntimeError(
             "ROLE_DESCRIPTIONS contains unknown role codes: "
             f"{sorted(unknown_descriptions)!r}"
         )
-    for role_code, permissions in NEW_ROLES.items():
+    for role_code, permissions in roles_payload.items():
         if not isinstance(role_code, str):
             raise RuntimeError("Role code must be str")
         if role_pattern.fullmatch(role_code) is None:
@@ -98,7 +111,7 @@ def _validate_payload() -> None:
                     f"Invalid permission code format: {permission_code!r}"
                 )
     for role_code in ROLE_USER_BINDINGS:
-        if role_code not in NEW_ROLES:
+        if role_code not in roles_payload:
             raise RuntimeError(
                 f"ROLE_USER_BINDINGS contains unknown role code: {role_code!r}"
             )
@@ -204,10 +217,11 @@ def _bind_users_to_role(
 
 def upgrade() -> None:
     _validate_payload()
-    if not NEW_ROLES:
+    roles_payload = _roles_payload()
+    if not roles_payload:
         return
     bind = _bind()
-    for role_code, permission_codes in NEW_ROLES.items():
+    for role_code, permission_codes in roles_payload.items():
         description = ROLE_DESCRIPTIONS.get(role_code)
         role_id = _upsert_role(bind, role_code, description)
         _upsert_permissions(bind, permission_codes)
@@ -218,10 +232,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    if not NEW_ROLES:
+    roles_payload = _roles_payload()
+    if not roles_payload:
         return
     bind = _bind()
-    for role_code in NEW_ROLES:
+    for role_code in roles_payload:
         role_id_stmt = sa.select(_ROLES_TABLE.c.id).where(
             _ROLES_TABLE.c.code == role_code
         )

@@ -26,12 +26,7 @@ from backend.application.handlers.queries.users.get_user import (
     GetUserHandler,
     GetUserQuery,
 )
-from backend.domain.core.constants.permission_codes import (
-    USERS_CREATE,
-    USERS_DELETE,
-    USERS_UPDATE,
-)
-from backend.domain.core.types.rbac import RoleCode
+from backend.domain.core.types.rbac import PermissionCode, RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.presentation.http.api.routing._helpers import run_best_effort
 from backend.presentation.http.api.schemas.auth import SuccessResponse
@@ -53,7 +48,7 @@ async def create_user(
     current_user: FromDishka[AuthUser],
     permission_guard: FromDishka[PermissionGuard],
 ) -> UserResponse:
-    await permission_guard.require(current_user, USERS_CREATE)
+    await permission_guard.require(current_user, PermissionCode.USERS_CREATE)
     handler = CreateUserHandler(
         gateway=gateway,
         password_hasher=password_hasher,
@@ -93,7 +88,7 @@ async def update_user(
     current_user: FromDishka[AuthUser],
     permission_guard: FromDishka[PermissionGuard],
 ) -> UserResponse:
-    await permission_guard.require(current_user, USERS_UPDATE)
+    await permission_guard.require(current_user, PermissionCode.USERS_UPDATE)
     handler = UpdateUserHandler(
         gateway=gateway,
         password_hasher=password_hasher,
@@ -121,7 +116,7 @@ async def delete_user(
     current_user: FromDishka[AuthUser],
     permission_guard: FromDishka[PermissionGuard],
 ) -> SuccessResponse:
-    await permission_guard.require(current_user, USERS_DELETE)
+    await permission_guard.require(current_user, PermissionCode.USERS_DELETE)
     handler = DeleteUserHandler(
         gateway=gateway,
     )

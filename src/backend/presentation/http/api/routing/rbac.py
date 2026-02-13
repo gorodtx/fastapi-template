@@ -22,11 +22,7 @@ from backend.application.handlers.queries.rbac.get_user_roles import (
     GetUserRolesHandler,
     GetUserRolesQuery,
 )
-from backend.domain.core.constants.permission_codes import (
-    RBAC_ASSIGN_ROLE,
-    RBAC_READ_ROLES,
-    RBAC_REVOKE_ROLE,
-)
+from backend.domain.core.types.rbac import PermissionCode
 from backend.presentation.http.api.routing._helpers import run_best_effort
 from backend.presentation.http.api.schemas.rbac import (
     RoleChangeRequest,
@@ -44,7 +40,9 @@ async def get_user_roles(
     current_user: FromDishka[AuthUser],
     permission_guard: FromDishka[PermissionGuard],
 ) -> UserRolesResponse:
-    await permission_guard.require(current_user, RBAC_READ_ROLES)
+    await permission_guard.require(
+        current_user, PermissionCode.RBAC_READ_ROLES
+    )
     handler = GetUserRolesHandler(gateway=gateway)
     result = await handler(GetUserRolesQuery(user_id=user_id))
     dto = result.unwrap()
@@ -61,7 +59,9 @@ async def assign_role_to_user(
     current_user: FromDishka[AuthUser],
     permission_guard: FromDishka[PermissionGuard],
 ) -> UserRolesResponse:
-    await permission_guard.require(current_user, RBAC_ASSIGN_ROLE)
+    await permission_guard.require(
+        current_user, PermissionCode.RBAC_ASSIGN_ROLE
+    )
     handler = AssignRoleToUserHandler(
         gateway=gateway,
     )
@@ -93,7 +93,9 @@ async def revoke_role_from_user(
     current_user: FromDishka[AuthUser],
     permission_guard: FromDishka[PermissionGuard],
 ) -> UserRolesResponse:
-    await permission_guard.require(current_user, RBAC_REVOKE_ROLE)
+    await permission_guard.require(
+        current_user, PermissionCode.RBAC_REVOKE_ROLE
+    )
     handler = RevokeRoleFromUserHandler(
         gateway=gateway,
     )

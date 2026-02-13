@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from backend.application.common.exceptions.application import AppError
-from backend.domain.core.constants.serialization import (
+from backend.infrastructure.tools.serialization import (
     register_domain_converters,
 )
 from backend.presentation.di.container import setup_di

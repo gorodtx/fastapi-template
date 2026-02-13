@@ -10,12 +10,12 @@ from typing import Final, Literal, Protocol, runtime_checkable
 import msgspec
 from uuid_utils.compat import UUID
 
-from backend.domain.core.constants.serialization import (
-    decode_value,
-    encode_str,
-)
 from backend.domain.core.exceptions.serialization import (
     DomainSerializationError,
+)
+from backend.infrastructure.tools.serialization import (
+    decode_value,
+    encode_str,
 )
 
 DEFAULT_CONVERT_TO_TYPES: Final[tuple[type, ...]] = (

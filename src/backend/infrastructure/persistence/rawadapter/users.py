@@ -5,30 +5,26 @@ from collections.abc import Awaitable, Callable
 import sqlalchemy as sa
 from sqlalchemy import RowMapping
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.ports.persistence.manager import (
     SessionProtocol,
 )
 from backend.infrastructure.persistence.records import UserRowRecord
+from backend.infrastructure.persistence.sqlalchemy.session_db import (
+    require_async_session,
+)
 from backend.infrastructure.persistence.sqlalchemy.tables.users import (
     users_table,
 )
 from backend.infrastructure.tools.msgspec_convert import convert_record
 
 
-def _require_async_session(session: SessionProtocol) -> AsyncSession:
-    if isinstance(session, AsyncSession):
-        return session
-    raise TypeError("SessionProtocol must be AsyncSession")
-
-
 def q_get_user_row_by_id(
     user_id: UUID,
 ) -> Callable[[SessionProtocol], Awaitable[UserRowRecord | None]]:
     async def _q(session: SessionProtocol) -> UserRowRecord | None:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         stmt = (
             sa.select(
                 users_table.c.id.label("id"),
@@ -54,7 +50,7 @@ def q_get_user_row_by_email(
     email: str,
 ) -> Callable[[SessionProtocol], Awaitable[UserRowRecord | None]]:
     async def _q(session: SessionProtocol) -> UserRowRecord | None:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         stmt = (
             sa.select(
                 users_table.c.id.label("id"),
@@ -80,7 +76,7 @@ def q_upsert_user_row(
     row: UserRowRecord,
 ) -> Callable[[SessionProtocol], Awaitable[UserRowRecord]]:
     async def _q(session: SessionProtocol) -> UserRowRecord:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         values = {
             "id": row.id,
             "email": row.email,
@@ -118,7 +114,7 @@ def q_delete_user(
     user_id: UUID,
 ) -> Callable[[SessionProtocol], Awaitable[bool]]:
     async def _q(session: SessionProtocol) -> bool:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         stmt = (
             sa.delete(users_table)
             .where(users_table.c.id == user_id)

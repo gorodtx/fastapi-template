@@ -9,6 +9,10 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from backend.application.common.interfaces.ports.persistence.manager import (
+    SessionProtocol,
+)
+
 
 def create_engine(
     url: str,
@@ -28,6 +32,12 @@ def create_session_factory(
         bind=engine,
         expire_on_commit=False,
     )
+
+
+def require_async_session(session: SessionProtocol) -> AsyncSession:
+    if isinstance(session, AsyncSession):
+        return session
+    raise TypeError("SessionProtocol must be AsyncSession")
 
 
 async def session_dependency(

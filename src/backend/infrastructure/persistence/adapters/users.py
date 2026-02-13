@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 from uuid_utils.compat import UUID
 
 from backend.application.common.exceptions.storage import StorageError
@@ -24,11 +26,31 @@ from backend.infrastructure.persistence.rawadapter.users import (
     q_get_user_row_by_id,
     q_upsert_user_row,
 )
+from backend.infrastructure.persistence.records import UserRowRecord
 from backend.infrastructure.tools.storage_result import storage_result
 
 
 class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
     __slots__: tuple[str, ...] = ()
+
+    async def _fetch_user(
+        self: SqlUsersAdapter,
+        fetch_row: Callable[[], Awaitable[UserRowRecord | None]],
+        *,
+        include_roles: bool,
+    ) -> User:
+        rec = await fetch_row()
+        rec = self.require_found(
+            rec,
+            code="user.not_found",
+            message="User not found",
+            detail="not found",
+        )
+        roles: set[RoleCode] = set()
+        if include_roles:
+            role_rows = await self.manager.send(q_get_user_role_codes(rec.id))
+            roles = role_records_to_set(role_rows)
+        return row_record_to_user(rec, roles=roles)
 
     async def get_by_id(
         self: SqlUsersAdapter,
@@ -38,20 +60,13 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
         include_roles: bool = True,
     ) -> Result[User, StorageError]:
         async def _call() -> User:
-            rec = await self.manager.send(q_get_user_row_by_id(user_id))
-            rec = self.require_found(
-                rec,
-                code="user.not_found",
-                message="User not found",
-                detail="not found",
+            async def fetch_row() -> UserRowRecord | None:
+                return await self.manager.send(q_get_user_row_by_id(user_id))
+
+            return await self._fetch_user(
+                fetch_row,
+                include_roles=include_roles,
             )
-            roles: set[RoleCode] = set()
-            if include_roles:
-                role_rows = await self.manager.send(
-                    q_get_user_role_codes(user_id)
-                )
-                roles = role_records_to_set(role_rows)
-            return row_record_to_user(rec, roles=roles)
 
         return await storage_result(_call)
 
@@ -63,20 +78,13 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
         include_roles: bool = True,
     ) -> Result[User, StorageError]:
         async def _call() -> User:
-            rec = await self.manager.send(q_get_user_row_by_email(email))
-            rec = self.require_found(
-                rec,
-                code="user.not_found",
-                message="User not found",
-                detail="not found",
+            async def fetch_row() -> UserRowRecord | None:
+                return await self.manager.send(q_get_user_row_by_email(email))
+
+            return await self._fetch_user(
+                fetch_row,
+                include_roles=include_roles,
             )
-            roles: set[RoleCode] = set()
-            if include_roles:
-                role_rows = await self.manager.send(
-                    q_get_user_role_codes(rec.id)
-                )
-                roles = role_records_to_set(role_rows)
-            return row_record_to_user(rec, roles=roles)
 
         return await storage_result(_call)
 

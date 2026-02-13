@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable, Sequence
 
 import sqlalchemy as sa
 from sqlalchemy import RowMapping
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.ports.persistence.manager import (
@@ -13,6 +12,9 @@ from backend.application.common.interfaces.ports.persistence.manager import (
 from backend.domain.core.types.rbac import RoleCode
 from backend.infrastructure.persistence.mappers.rbac import value_to_uuid
 from backend.infrastructure.persistence.records import UserRoleCodeRecord
+from backend.infrastructure.persistence.sqlalchemy.session_db import (
+    require_async_session,
+)
 from backend.infrastructure.persistence.sqlalchemy.tables.role import (
     roles_table,
 )
@@ -23,17 +25,11 @@ from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import
 from backend.infrastructure.tools.msgspec_convert import convert_record
 
 
-def _require_async_session(session: SessionProtocol) -> AsyncSession:
-    if isinstance(session, AsyncSession):
-        return session
-    raise TypeError("SessionProtocol must be AsyncSession")
-
-
 def q_get_user_role_codes(
     user_id: UUID,
 ) -> Callable[[SessionProtocol], Awaitable[list[UserRoleCodeRecord]]]:
     async def _q(session: SessionProtocol) -> list[UserRoleCodeRecord]:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         join_stmt = user_roles_table.join(
             roles_table, user_roles_table.c.role_id == roles_table.c.id
         )
@@ -56,7 +52,7 @@ def q_get_role_ids_by_codes(
     codes: Sequence[RoleCode],
 ) -> Callable[[SessionProtocol], Awaitable[list[tuple[RoleCode, UUID]]]]:
     async def _q(session: SessionProtocol) -> list[tuple[RoleCode, UUID]]:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         if not codes:
             return []
         code_values = list(codes)
@@ -76,7 +72,7 @@ def q_replace_user_roles(
     user_id: UUID, role_ids: list[UUID]
 ) -> Callable[[SessionProtocol], Awaitable[None]]:
     async def _q(session: SessionProtocol) -> None:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         await async_session.execute(
             sa.delete(user_roles_table).where(
                 user_roles_table.c.user_id == user_id
@@ -95,7 +91,7 @@ def q_list_user_ids_by_role_id(
     role_id: UUID,
 ) -> Callable[[SessionProtocol], Awaitable[list[UUID]]]:
     async def _q(session: SessionProtocol) -> list[UUID]:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         stmt = sa.select(user_roles_table.c.user_id).where(
             user_roles_table.c.role_id == role_id
         )
@@ -109,7 +105,7 @@ def q_get_user_permission_codes(
     user_id: UUID,
 ) -> Callable[[SessionProtocol], Awaitable[list[str]]]:
     async def _q(session: SessionProtocol) -> list[str]:
-        async_session = _require_async_session(session)
+        async_session = require_async_session(session)
         join_stmt = user_roles_table.join(
             roles_table, user_roles_table.c.role_id == roles_table.c.id
         ).join(
