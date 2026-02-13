@@ -17,10 +17,10 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.users import present_user_response
+from backend.application.common.tools.tx_result import run_in_tx
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
     Result,
-    ResultImpl,
     capture,
     capture_async,
 )
@@ -40,50 +40,50 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
     async def __call__(
         self: UpdateUserHandler, cmd: UpdateUserCommand, /
     ) -> Result[UserResponseDTO, AppError]:
-        user_result = (
-            await self.gateway.users.get_by_id(
-                cmd.user_id,
-                include_roles=False,
+        async def action() -> UserResponseDTO:
+            user = (
+                (
+                    await self.gateway.users.get_by_id(
+                        cmd.user_id,
+                        include_roles=False,
+                    )
+                )
+                .map_err(map_storage_error_to_app())
+                .unwrap()
             )
-        ).map_err(map_storage_error_to_app())
-        if user_result.is_err():
-            return ResultImpl.err_from(user_result)
 
-        user = user_result.unwrap()
+            if cmd.email is not None:
 
-        if cmd.email is not None:
+                def apply_email() -> None:
+                    apply_user_patch(user, email=cmd.email)
 
-            def apply_email() -> None:
-                apply_user_patch(user, email=cmd.email)
+                capture(apply_email, map_user_input_error()).unwrap()
 
-            change_result = capture(apply_email, map_user_input_error())
-            if change_result.is_err():
-                return ResultImpl.err_from(change_result)
+            if cmd.raw_password is not None:
+                raw_password = cmd.raw_password
 
-        if cmd.raw_password is not None:
-            raw_password = cmd.raw_password
+                def hash_password() -> Awaitable[str]:
+                    return self.password_hasher.hash(raw_password)
 
-            def hash_password() -> Awaitable[str]:
-                return self.password_hasher.hash(raw_password)
+                hashed = (
+                    await capture_async(hash_password, map_user_input_error())
+                ).unwrap()
 
-            hashed_result = await capture_async(
-                hash_password, map_user_input_error()
+                def apply_password() -> None:
+                    apply_user_patch(user, password_hash=hashed)
+
+                capture(apply_password, map_user_input_error()).unwrap()
+
+            saved_user = (
+                (await self.gateway.users.save(user, include_roles=False))
+                .map_err(map_storage_error_to_app())
+                .unwrap()
             )
-            if hashed_result.is_err():
-                return ResultImpl.err_from(hashed_result)
-            hashed = hashed_result.unwrap()
 
-            def apply_password() -> None:
-                apply_user_patch(user, password_hash=hashed)
+            return present_user_response(saved_user)
 
-            change_result = capture(apply_password, map_user_input_error())
-            if change_result.is_err():
-                return ResultImpl.err_from(change_result)
-
-        save_result = (
-            await self.gateway.users.save(user, include_roles=False)
-        ).map_err(map_storage_error_to_app())
-        if save_result.is_err():
-            return ResultImpl.err_from(save_result)
-
-        return save_result.map(present_user_response)
+        return await run_in_tx(
+            manager=self.gateway.manager,
+            action=action,
+            value_type=UserResponseDTO,
+        )

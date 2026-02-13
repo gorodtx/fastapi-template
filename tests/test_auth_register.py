@@ -70,31 +70,6 @@ class _DummyHasher:
     marker: str = "hasher"
 
 
-@dataclass(slots=True)
-class _TxScope:
-    entered: bool = False
-    exited: bool = False
-
-    async def __aenter__(self: _TxScope) -> None:
-        self.entered = True
-
-    async def __aexit__(
-        self: _TxScope,
-        _exc_type: type[BaseException] | None,
-        _exc_value: BaseException | None,
-        _traceback: object,
-    ) -> None:
-        self.exited = True
-
-
-@dataclass(slots=True)
-class _SessionStub:
-    tx: _TxScope
-
-    def begin(self: _SessionStub) -> _TxScope:
-        return self.tx
-
-
 @pytest.mark.asyncio
 async def test_register_user_creates_user_and_returns_tokens(
     monkeypatch: pytest.MonkeyPatch,
@@ -146,11 +121,9 @@ async def test_register_user_creates_user_and_returns_tokens(
         refresh_jti=refresh_jti,
     )
     refresh_tokens = _FakeRefreshTokens()
-    session = _SessionStub(tx=_TxScope())
 
     response = await auth_routing.register_user(
         payload=payload,
-        session=session,
         gateway=_DummyGateway(),
         password_hasher=_DummyHasher(),
         default_registration_role="user",
@@ -172,8 +145,6 @@ async def test_register_user_creates_user_and_returns_tokens(
         "",
         refresh_jti,
     )
-    assert session.tx.entered is True
-    assert session.tx.exited is True
     assert response.access_token == access_token
     assert response.refresh_token == refresh_token
 
@@ -219,12 +190,10 @@ async def test_register_user_maps_refresh_replay_to_app_error(
         raw_password=raw_password,
         fingerprint="fp-test-1",
     )
-    session = _SessionStub(tx=_TxScope())
 
     with pytest.raises(AppError) as exc_info:
         await auth_routing.register_user(
             payload=payload,
-            session=session,
             gateway=_DummyGateway(),
             password_hasher=_DummyHasher(),
             default_registration_role="user",
@@ -238,7 +207,5 @@ async def test_register_user_maps_refresh_replay_to_app_error(
             ),
         )
 
-    assert session.tx.entered is True
-    assert session.tx.exited is True
     assert exc_info.value.code == "auth.unauthenticated"
     assert exc_info.value.message == "Refresh token replay detected"

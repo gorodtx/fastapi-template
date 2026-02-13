@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
 from fastapi import APIRouter
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid_utils.compat import UUID
 
 from backend.application.common.interfaces.auth.types import AuthUser
@@ -28,12 +27,12 @@ from backend.domain.core.constants.permission_codes import (
     RBAC_READ_ROLES,
     RBAC_REVOKE_ROLE,
 )
+from backend.presentation.http.api.post_commit import run_best_effort
 from backend.presentation.http.api.schemas.rbac import (
     RoleChangeRequest,
     UserRolesResponse,
 )
 from backend.presentation.http.api.schemas.rbac_fields import RoleCodePath
-from backend.presentation.http.api.tx import run_write_in_tx
 
 router: APIRouter = APIRouter(route_class=DishkaRoute)
 
@@ -57,7 +56,6 @@ async def get_user_roles(
 async def assign_role_to_user(
     user_id: UUID,
     payload: RoleChangeRequest,
-    session: FromDishka[AsyncSession],
     gateway: FromDishka[PersistenceGateway],
     cache_invalidator: FromDishka[AuthCacheInvalidator],
     current_user: FromDishka[AuthUser],
@@ -73,8 +71,12 @@ async def assign_role_to_user(
         actor_id=current_user.id,
         actor_roles=current_user.role_codes,
     )
-    dto = await run_write_in_tx(session, handler(cmd))
-    await cache_invalidator.invalidate_user(user_id)
+    result = await handler(cmd)
+    dto = result.unwrap()
+    await run_best_effort(
+        cache_invalidator.invalidate_user(user_id),
+        effect="auth-cache invalidation after role assign",
+    )
 
     return UserRolesResponse.from_dto(dto)
 
@@ -86,7 +88,6 @@ async def assign_role_to_user(
 async def revoke_role_from_user(
     user_id: UUID,
     role_code: RoleCodePath,
-    session: FromDishka[AsyncSession],
     gateway: FromDishka[PersistenceGateway],
     cache_invalidator: FromDishka[AuthCacheInvalidator],
     current_user: FromDishka[AuthUser],
@@ -102,7 +103,11 @@ async def revoke_role_from_user(
         actor_id=current_user.id,
         actor_roles=current_user.role_codes,
     )
-    dto = await run_write_in_tx(session, handler(cmd))
-    await cache_invalidator.invalidate_user(user_id)
+    result = await handler(cmd)
+    dto = result.unwrap()
+    await run_best_effort(
+        cache_invalidator.invalidate_user(user_id),
+        effect="auth-cache invalidation after role revoke",
+    )
 
     return UserRolesResponse.from_dto(dto)

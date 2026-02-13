@@ -5,11 +5,9 @@ from dataclasses import dataclass
 import pytest
 
 from backend.application.common.exceptions.application import (
-    AppError,
     UnauthenticatedError,
 )
-from backend.application.handlers.result import Result, ResultImpl
-from backend.presentation.http.api.tx import run_write_in_tx
+from backend.application.common.tools.tx_result import run_in_tx
 
 
 @dataclass(slots=True)
@@ -32,38 +30,41 @@ class _TxScope:
 
 
 @dataclass(slots=True)
-class _SessionStub:
+class _ManagerStub:
     tx: _TxScope
 
-    def begin(self: _SessionStub) -> _TxScope:
+    def transaction(self: _ManagerStub, *, nested: bool = False) -> _TxScope:
+        _ = nested
         return self.tx
 
 
 @pytest.mark.asyncio
-async def test_run_write_in_tx_unwraps_ok_result() -> None:
-    session = _SessionStub(tx=_TxScope())
+async def test_run_in_tx_returns_ok_value() -> None:
+    manager = _ManagerStub(tx=_TxScope())
 
-    async def action() -> Result[int, AppError]:
-        return ResultImpl.ok(7, AppError)
+    async def action() -> int:
+        return 17
 
-    value = await run_write_in_tx(session, action())
+    result = await run_in_tx(manager, action, int)
 
-    assert value == 7
-    assert session.tx.entered is True
-    assert session.tx.exited is True
-    assert session.tx.seen_exc is None
+    assert result.is_ok()
+    assert result.unwrap() == 17
+    assert manager.tx.entered is True
+    assert manager.tx.exited is True
+    assert manager.tx.seen_exc is None
 
 
 @pytest.mark.asyncio
-async def test_run_write_in_tx_rolls_back_on_err_result() -> None:
-    session = _SessionStub(tx=_TxScope())
+async def test_run_in_tx_maps_app_error_to_err_result() -> None:
+    manager = _ManagerStub(tx=_TxScope())
 
-    async def action() -> Result[int, AppError]:
-        return ResultImpl.err_app(UnauthenticatedError(), int)
+    async def action() -> int:
+        raise UnauthenticatedError()
 
-    with pytest.raises(UnauthenticatedError):
-        await run_write_in_tx(session, action())
+    result = await run_in_tx(manager, action, int)
 
-    assert session.tx.entered is True
-    assert session.tx.exited is True
-    assert session.tx.seen_exc is UnauthenticatedError
+    assert result.is_err()
+    assert isinstance(result.unwrap_err(), UnauthenticatedError)
+    assert manager.tx.entered is True
+    assert manager.tx.exited is True
+    assert manager.tx.seen_exc is UnauthenticatedError

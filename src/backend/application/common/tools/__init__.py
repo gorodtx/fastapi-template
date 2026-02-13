@@ -6,4 +6,5 @@ __all__: tuple[str, ...] = (
     "permission_guard",
     "response_mapper",
     "response_mappings",
+    "tx_result",
 )

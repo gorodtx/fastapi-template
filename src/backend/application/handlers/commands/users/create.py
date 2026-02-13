@@ -19,10 +19,10 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.users import present_user_response
+from backend.application.common.tools.tx_result import run_in_tx
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
     Result,
-    ResultImpl,
     capture,
     capture_async,
 )
@@ -45,44 +45,43 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
     async def __call__(
         self: CreateUserHandler, cmd: CreateUserCommand, /
     ) -> Result[UserResponseDTO, AppError]:
-        def hash_password() -> Awaitable[str]:
-            return self.password_hasher.hash(cmd.raw_password)
+        async def action() -> UserResponseDTO:
+            def hash_password() -> Awaitable[str]:
+                return self.password_hasher.hash(cmd.raw_password)
 
-        hashed_result = await capture_async(
-            hash_password, map_user_input_error()
+            hashed = (
+                await capture_async(hash_password, map_user_input_error())
+            ).unwrap()
+
+            def register_user() -> User:
+                return build_user(
+                    id=uuid.uuid7(),
+                    email=cmd.email,
+                    login=cmd.login,
+                    username=cmd.username,
+                    password_hash=hashed,
+                )
+
+            user = capture(register_user, map_user_input_error()).unwrap()
+
+            user.roles.add(self.default_registration_role)
+
+            saved_user = (
+                (await self.gateway.users.save(user, include_roles=False))
+                .map_err(map_storage_error_to_app())
+                .unwrap()
+            )
+
+            (
+                await self.gateway.rbac.replace_user_roles(
+                    user.id, {self.default_registration_role}
+                )
+            ).map_err(map_storage_error_to_app()).unwrap()
+
+            return present_user_response(saved_user)
+
+        return await run_in_tx(
+            manager=self.gateway.manager,
+            action=action,
+            value_type=UserResponseDTO,
         )
-        if hashed_result.is_err():
-            return ResultImpl.err_from(hashed_result)
-        hashed = hashed_result.unwrap()
-
-        def register_user() -> User:
-            return build_user(
-                id=uuid.uuid7(),
-                email=cmd.email,
-                login=cmd.login,
-                username=cmd.username,
-                password_hash=hashed,
-            )
-
-        user_result = capture(register_user, map_user_input_error())
-        if user_result.is_err():
-            return ResultImpl.err_from(user_result)
-        user = user_result.unwrap()
-
-        user.roles.add(self.default_registration_role)
-
-        save_result = (
-            await self.gateway.users.save(user, include_roles=False)
-        ).map_err(map_storage_error_to_app())
-        if save_result.is_err():
-            return ResultImpl.err_from(save_result)
-
-        role_result = (
-            await self.gateway.rbac.replace_user_roles(
-                user.id, {self.default_registration_role}
-            )
-        ).map_err(map_storage_error_to_app())
-        if role_result.is_err():
-            return ResultImpl.err_from(role_result)
-
-        return save_result.map(present_user_response)
