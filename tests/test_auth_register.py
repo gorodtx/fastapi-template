@@ -8,9 +8,14 @@ from uuid_utils.compat import UUID
 from backend.application.common.dtos.users import UserResponseDTO
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.auth import RefreshTokenReplayError
+from backend.application.handlers.commands.auth import (
+    register as register_handler,
+)
+from backend.application.handlers.commands.auth.register import (
+    RegisterUserCommand,
+    RegisterUserHandler,
+)
 from backend.application.handlers.result import ResultImpl
-from backend.presentation.http.api.routing import auth as auth_routing
-from backend.presentation.http.api.schemas.auth import RegisterRequest
 
 _USER_ID: UUID = UUID("11111111-1111-1111-1111-111111111111")
 
@@ -105,16 +110,9 @@ async def test_register_user_creates_user_and_returns_tokens(
             )
 
     monkeypatch.setattr(
-        auth_routing, "CreateUserHandler", _FakeCreateUserHandler
+        register_handler, "CreateUserHandler", _FakeCreateUserHandler
     )
 
-    payload = RegisterRequest(
-        email="new@example.com",
-        login="newuser",
-        username="newuser",
-        raw_password=raw_password,
-        fingerprint="fp-test-1",
-    )
     jwt_issuer = _FakeJwtIssuer(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -122,17 +120,26 @@ async def test_register_user_creates_user_and_returns_tokens(
     )
     refresh_tokens = _FakeRefreshTokens()
 
-    response = await auth_routing.register_user(
-        payload=payload,
+    handler = RegisterUserHandler(
         gateway=_DummyGateway(),
         password_hasher=_DummyHasher(),
         default_registration_role="user",
         jwt_issuer=jwt_issuer,
         refresh_tokens=refresh_tokens,
     )
+    result = await handler(
+        RegisterUserCommand(
+            email="new@example.com",
+            login="newuser",
+            username="newuser",
+            raw_password=raw_password,
+            fingerprint="fp-test-1",
+        )
+    )
+    dto = result.unwrap()
 
     cmd = captured_cmd["cmd"]
-    assert isinstance(cmd, auth_routing.CreateUserCommand)
+    assert isinstance(cmd, register_handler.CreateUserCommand)
     assert cmd.email == "new@example.com"
     assert cmd.login == "newuser"
     assert cmd.username == "newuser"
@@ -145,8 +152,8 @@ async def test_register_user_creates_user_and_returns_tokens(
         "",
         refresh_jti,
     )
-    assert response.access_token == access_token
-    assert response.refresh_token == refresh_token
+    assert dto.access_token == access_token
+    assert dto.refresh_token == refresh_token
 
 
 @pytest.mark.asyncio
@@ -180,32 +187,33 @@ async def test_register_user_maps_refresh_replay_to_app_error(
             )
 
     monkeypatch.setattr(
-        auth_routing, "CreateUserHandler", _FakeCreateUserHandler
+        register_handler, "CreateUserHandler", _FakeCreateUserHandler
     )
 
-    payload = RegisterRequest(
-        email="new@example.com",
-        login="newuser",
-        username="newuser",
-        raw_password=raw_password,
-        fingerprint="fp-test-1",
+    handler = RegisterUserHandler(
+        gateway=_DummyGateway(),
+        password_hasher=_DummyHasher(),
+        default_registration_role="user",
+        jwt_issuer=_FakeJwtIssuer(
+            access_token=_build_token("access"),
+            refresh_token=_build_token("refresh"),
+            refresh_jti="refresh-jti-value",
+        ),
+        refresh_tokens=_FakeRefreshTokens(
+            raised=RefreshTokenReplayError("replay")
+        ),
     )
 
-    with pytest.raises(AppError) as exc_info:
-        await auth_routing.register_user(
-            payload=payload,
-            gateway=_DummyGateway(),
-            password_hasher=_DummyHasher(),
-            default_registration_role="user",
-            jwt_issuer=_FakeJwtIssuer(
-                access_token=_build_token("access"),
-                refresh_token=_build_token("refresh"),
-                refresh_jti="refresh-jti-value",
-            ),
-            refresh_tokens=_FakeRefreshTokens(
-                raised=RefreshTokenReplayError("replay")
-            ),
+    result = await handler(
+        RegisterUserCommand(
+            email="new@example.com",
+            login="newuser",
+            username="newuser",
+            raw_password=raw_password,
+            fingerprint="fp-test-1",
         )
+    )
 
-    assert exc_info.value.code == "auth.unauthenticated"
-    assert exc_info.value.message == "Refresh token replay detected"
+    err = result.unwrap_err()
+    assert err.code == "auth.unauthenticated"
+    assert err.message == "Refresh token replay detected"

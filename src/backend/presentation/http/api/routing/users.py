@@ -33,7 +33,7 @@ from backend.domain.core.constants.permission_codes import (
 )
 from backend.domain.core.types.rbac import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
-from backend.presentation.http.api.post_commit import run_best_effort
+from backend.presentation.http.api.routing._helpers import run_best_effort
 from backend.presentation.http.api.schemas.auth import SuccessResponse
 from backend.presentation.http.api.schemas.users import (
     UserCreateRequest,

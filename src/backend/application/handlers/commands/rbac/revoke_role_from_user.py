@@ -7,7 +7,6 @@ from backend.application.common.dtos.rbac import (
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.error_mappers.rbac import (
     map_role_change_error,
-    map_role_input_error,
 )
 from backend.application.common.exceptions.error_mappers.storage import (
     map_storage_error_to_app,
@@ -29,10 +28,7 @@ from backend.domain.core.services.access_control import (
     ensure_not_self_role_change,
 )
 from backend.domain.core.services.users import revoke_user_role
-from backend.domain.core.types.rbac import (
-    RoleCode,
-    validate_role_code,
-)
+from backend.domain.core.types.rbac import RoleCode
 
 _SUPER_ADMIN_ROLE: RoleCode = "super_admin"
 
@@ -52,13 +48,7 @@ class RevokeRoleFromUserHandler(
         /,
     ) -> Result[UserRolesResponseDTO, AppError]:
         async def action() -> UserRolesResponseDTO:
-            def parse_role() -> RoleCode:
-                return validate_role_code(cmd.role)
-
-            role = capture(
-                parse_role,
-                map_role_input_error(cmd.role, allow_unassigned=True),
-            ).unwrap()
+            role: RoleCode = cmd.role
 
             user = (
                 (await self.gateway.users.get_by_id(cmd.user_id))
@@ -66,19 +56,20 @@ class RevokeRoleFromUserHandler(
                 .unwrap()
             )
 
-            def enforce_policy() -> None:
-                ensure_not_self_role_change(
+            map_change_error = map_role_change_error(
+                action=RoleAction.REVOKE, target_role=role
+            )
+            capture(
+                lambda: ensure_not_self_role_change(
                     actor_id=cmd.actor_id,
                     target_user_id=user.id,
                     action=RoleAction.REVOKE,
-                )
-                ensure_can_revoke_role(set(cmd.actor_roles), role)
-
-            capture(
-                enforce_policy,
-                map_role_change_error(
-                    action=RoleAction.REVOKE, target_role=role
                 ),
+                map_change_error,
+            ).unwrap()
+            capture(
+                lambda: ensure_can_revoke_role(set(cmd.actor_roles), role),
+                map_change_error,
             ).unwrap()
 
             if role == _SUPER_ADMIN_ROLE and _SUPER_ADMIN_ROLE in user.roles:
@@ -91,24 +82,17 @@ class RevokeRoleFromUserHandler(
                     [uid for uid in user_ids if uid != user.id]
                 )
 
-                def ensure_last_super_admin() -> None:
-                    ensure_not_last_super_admin(
+                capture(
+                    lambda: ensure_not_last_super_admin(
                         target_user_id=user.id,
                         remaining_super_admins=remaining_super_admins,
-                    )
-
-                capture(
-                    ensure_last_super_admin,
-                    map_role_change_error(
-                        action=RoleAction.REVOKE, target_role=role
                     ),
+                    map_change_error,
                 ).unwrap()
 
             capture(
                 lambda: revoke_user_role(user, role),
-                map_role_change_error(
-                    action=RoleAction.REVOKE, target_role=role
-                ),
+                map_change_error,
             ).unwrap()
 
             (

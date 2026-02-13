@@ -7,7 +7,6 @@ from backend.application.common.dtos.rbac import (
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.exceptions.error_mappers.rbac import (
     map_role_change_error,
-    map_role_input_error,
 )
 from backend.application.common.exceptions.error_mappers.storage import (
     map_storage_error_to_app,
@@ -27,10 +26,7 @@ from backend.domain.core.services.access_control import (
     ensure_can_assign_role,
     ensure_not_self_role_change,
 )
-from backend.domain.core.types.rbac import (
-    RoleCode,
-    validate_role_code,
-)
+from backend.domain.core.types.rbac import RoleCode
 
 
 class AssignRoleToUserCommand(AssignRoleToUserDTO): ...
@@ -48,10 +44,7 @@ class AssignRoleToUserHandler(
         /,
     ) -> Result[UserRolesResponseDTO, AppError]:
         async def action() -> UserRolesResponseDTO:
-            def parse_role() -> RoleCode:
-                return validate_role_code(cmd.role)
-
-            role = capture(parse_role, map_role_input_error(cmd.role)).unwrap()
+            role: RoleCode = cmd.role
 
             user = (
                 (await self.gateway.users.get_by_id(cmd.user_id))
@@ -59,19 +52,20 @@ class AssignRoleToUserHandler(
                 .unwrap()
             )
 
-            def enforce_policy() -> None:
-                ensure_not_self_role_change(
+            map_change_error = map_role_change_error(
+                action=RoleAction.ASSIGN, target_role=role
+            )
+            capture(
+                lambda: ensure_not_self_role_change(
                     actor_id=cmd.actor_id,
                     target_user_id=user.id,
                     action=RoleAction.ASSIGN,
-                )
-                ensure_can_assign_role(set(cmd.actor_roles), role)
-
-            capture(
-                enforce_policy,
-                map_role_change_error(
-                    action=RoleAction.ASSIGN, target_role=role
                 ),
+                map_change_error,
+            ).unwrap()
+            capture(
+                lambda: ensure_can_assign_role(set(cmd.actor_roles), role),
+                map_change_error,
             ).unwrap()
 
             user.roles.add(role)

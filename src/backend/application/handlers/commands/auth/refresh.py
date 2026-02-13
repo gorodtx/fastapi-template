@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable
-
 from backend.application.common.dtos.auth import RefreshUserDTO, TokenPairDTO
 from backend.application.common.exceptions.application import (
     AppError,
@@ -55,16 +53,14 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
             fingerprint=cmd.fingerprint,
         )
 
-        def rotate_refresh() -> Awaitable[None]:
-            return self.refresh_tokens.rotate(
+        rotate_result = await capture_async(
+            lambda: self.refresh_tokens.rotate(
                 user_id=user_id,
                 fingerprint=cmd.fingerprint,
                 old_jti=old_jti,
                 new_jti=refresh_jti,
-            )
-
-        rotate_result = await capture_async(
-            rotate_refresh, map_refresh_token_error()
+            ),
+            map_refresh_token_error(),
         )
         if rotate_result.is_err():
             return ResultImpl.err_from(rotate_result)

@@ -28,7 +28,6 @@ from backend.application.common.tools.permission_guard import PermissionGuard
 from backend.domain.core.types.rbac import (
     PermissionCode,
     RoleCode,
-    validate_role_code,
 )
 from backend.infrastructure.persistence.manager import TransactionManagerImpl
 from backend.infrastructure.persistence.persistence_gateway import (
@@ -125,10 +124,7 @@ def _decode_cached_user(raw: str) -> AuthUser | None:
 def _safe_role(raw: object) -> RoleCode | None:
     if not isinstance(raw, str):
         return None
-    try:
-        return validate_role_code(raw)
-    except ValueError:
-        return None
+    return raw
 
 
 def _safe_permission(raw: object) -> PermissionCode | None:

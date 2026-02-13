@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable
-
 from backend.application.common.dtos.users import (
     UserResponseDTO,
     UserUpdateDTO,
@@ -53,26 +51,23 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
             )
 
             if cmd.email is not None:
-
-                def apply_email() -> None:
-                    apply_user_patch(user, email=cmd.email)
-
-                capture(apply_email, map_user_input_error()).unwrap()
+                capture(
+                    lambda: apply_user_patch(user, email=cmd.email),
+                    map_user_input_error(),
+                ).unwrap()
 
             if cmd.raw_password is not None:
                 raw_password = cmd.raw_password
-
-                def hash_password() -> Awaitable[str]:
-                    return self.password_hasher.hash(raw_password)
-
                 hashed = (
-                    await capture_async(hash_password, map_user_input_error())
+                    await capture_async(
+                        lambda: self.password_hasher.hash(raw_password),
+                        map_user_input_error(),
+                    )
                 ).unwrap()
-
-                def apply_password() -> None:
-                    apply_user_patch(user, password_hash=hashed)
-
-                capture(apply_password, map_user_input_error()).unwrap()
+                capture(
+                    lambda: apply_user_patch(user, password_hash=hashed),
+                    map_user_input_error(),
+                ).unwrap()
 
             saved_user = (
                 (await self.gateway.users.save(user, include_roles=False))

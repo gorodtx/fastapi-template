@@ -59,6 +59,6 @@ def ensure_not_last_super_admin(
 def _can_manage_role(
     actor_roles: Set[RoleCode], target_role: RoleCode
 ) -> bool:
-    if _SUPER_ADMIN_ROLE in actor_roles:
-        return True
-    return bool(_ADMIN_ROLE in actor_roles and target_role == _USER_ROLE)
+    return (_SUPER_ADMIN_ROLE in actor_roles) or (
+        _ADMIN_ROLE in actor_roles and target_role == _USER_ROLE
+    )

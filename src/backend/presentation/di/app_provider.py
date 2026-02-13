@@ -23,7 +23,7 @@ from backend.application.common.tools.auth_cache import AuthCacheInvalidator
 from backend.application.common.tools.refresh_tokens import (
     RefreshTokenService,
 )
-from backend.domain.core.types.rbac import RoleCode, validate_role_code
+from backend.domain.core.types.rbac import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.infrastructure.lock.redis_lock import RedisSharedLock
 from backend.infrastructure.persistence.cache.redis import RedisCache
@@ -76,13 +76,7 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     def default_registration_role(self: Self) -> RoleCode:
-        raw_role = self._settings.default_registration_role_code
-        try:
-            return validate_role_code(raw_role)
-        except ValueError as exc:
-            raise RuntimeError(
-                "Invalid DEFAULT_REGISTRATION_ROLE_CODE setting"
-            ) from exc
+        return self._settings.default_registration_role_code
 
     @provide(scope=Scope.APP)
     def engine(self: Self) -> AsyncEngine:

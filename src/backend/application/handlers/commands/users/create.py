@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable
-
 import uuid_utils.compat as uuid
 
 from backend.application.common.dtos.users import (
@@ -27,7 +25,6 @@ from backend.application.handlers.result import (
     capture_async,
 )
 from backend.application.handlers.transform import handler
-from backend.domain.core.entities.user import User
 from backend.domain.core.services.users import build_user
 from backend.domain.core.types.rbac import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
@@ -46,23 +43,22 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
         self: CreateUserHandler, cmd: CreateUserCommand, /
     ) -> Result[UserResponseDTO, AppError]:
         async def action() -> UserResponseDTO:
-            def hash_password() -> Awaitable[str]:
-                return self.password_hasher.hash(cmd.raw_password)
-
             hashed = (
-                await capture_async(hash_password, map_user_input_error())
+                await capture_async(
+                    lambda: self.password_hasher.hash(cmd.raw_password),
+                    map_user_input_error(),
+                )
             ).unwrap()
-
-            def register_user() -> User:
-                return build_user(
+            user = capture(
+                lambda: build_user(
                     id=uuid.uuid7(),
                     email=cmd.email,
                     login=cmd.login,
                     username=cmd.username,
                     password_hash=hashed,
-                )
-
-            user = capture(register_user, map_user_input_error()).unwrap()
+                ),
+                map_user_input_error(),
+            ).unwrap()
 
             user.roles.add(self.default_registration_role)
 

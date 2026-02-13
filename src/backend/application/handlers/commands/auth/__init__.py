@@ -1,3 +1,3 @@
 from __future__ import annotations
 
-__all__: tuple[str, ...] = ("login", "logout", "refresh")
+__all__: tuple[str, ...] = ("login", "logout", "refresh", "register")

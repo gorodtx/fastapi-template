@@ -12,6 +12,15 @@ class TokenPairDTO:
 
 
 @dto
+class RegisterUserDTO:
+    email: str
+    login: str
+    username: str
+    raw_password: str
+    fingerprint: str
+
+
+@dto
 class LoginUserDTO:
     email: str
     raw_password: str

@@ -12,11 +12,6 @@ from backend.domain.core.policies.rbac import (
     validate_role_code,
 )
 
-
-def _validate_role_code(value: str) -> str:
-    return validate_role_code(value)
-
-
 type RoleCodeStr = Annotated[
     str,
     StringConstraints(
@@ -25,7 +20,7 @@ type RoleCodeStr = Annotated[
         max_length=MAX_ROLE_CODE_LENGTH,
         pattern=ROLE_CODE_PATTERN,
     ),
-    AfterValidator(_validate_role_code),
+    AfterValidator(validate_role_code),
 ]
 type RoleCodePath = Annotated[
     str,

@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from backend.presentation.http.api.post_commit import run_best_effort
+from backend.presentation.http.api.routing._helpers import run_best_effort
 
 
 @pytest.mark.asyncio

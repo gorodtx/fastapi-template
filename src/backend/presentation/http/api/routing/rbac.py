@@ -27,7 +27,7 @@ from backend.domain.core.constants.permission_codes import (
     RBAC_READ_ROLES,
     RBAC_REVOKE_ROLE,
 )
-from backend.presentation.http.api.post_commit import run_best_effort
+from backend.presentation.http.api.routing._helpers import run_best_effort
 from backend.presentation.http.api.schemas.rbac import (
     RoleChangeRequest,
     UserRolesResponse,

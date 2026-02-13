@@ -6,9 +6,6 @@ from backend.application.common.dtos.rbac import (
 )
 from backend.application.common.dtos.users import UserResponseDTO
 from backend.application.common.exceptions.application import AppError
-from backend.application.common.exceptions.error_mappers.rbac import (
-    map_role_input_error,
-)
 from backend.application.common.exceptions.error_mappers.storage import (
     map_storage_error_to_app,
 )
@@ -20,9 +17,9 @@ from backend.application.common.presenters.rbac import (
 )
 from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import QueryHandler
-from backend.application.handlers.result import Result, ResultImpl, capture
+from backend.application.handlers.result import Result, ResultImpl
 from backend.application.handlers.transform import handler
-from backend.domain.core.types.rbac import RoleCode, validate_role_code
+from backend.domain.core.types.rbac import RoleCode
 
 
 class GetUsersByRoleQuery(GetUsersByRoleDTO): ...
@@ -39,14 +36,7 @@ class GetUsersByRoleHandler(
         query: GetUsersByRoleQuery,
         /,
     ) -> Result[UsersByRoleResponseDTO, AppError]:
-        def parse_role() -> RoleCode:
-            return validate_role_code(query.role)
-
-        role_result = capture(parse_role, map_role_input_error(query.role))
-        if role_result.is_err():
-            return ResultImpl.err_from(role_result)
-
-        role = role_result.unwrap()
+        role: RoleCode = query.role
         ids_result = (
             await self.gateway.rbac.list_user_ids_by_role(role)
         ).map_err(map_storage_error_to_app())

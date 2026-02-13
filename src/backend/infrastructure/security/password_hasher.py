@@ -11,7 +11,7 @@ from argon2.exceptions import (
     VerifyMismatchError,
 )
 
-from backend.application.common.tools.password_validator import (
+from backend.domain.core.policies.identity import (
     MAX_PASSWORD_LENGTH,
     normalize_password,
 )
