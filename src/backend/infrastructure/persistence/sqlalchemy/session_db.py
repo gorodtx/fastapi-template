@@ -18,10 +18,21 @@ def create_engine(
     url: str,
     *,
     echo: bool = False,
+    pool_size: int = 10,
+    max_overflow: int = 20,
+    pool_timeout_s: int = 30,
+    pool_recycle_s: int = 1800,
+    connect_timeout_s: int = 10,
 ) -> AsyncEngine:
     return create_async_engine(
         url,
         echo=echo,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        pool_timeout=pool_timeout_s,
+        pool_recycle=pool_recycle_s,
+        pool_pre_ping=True,
+        connect_args={"timeout": connect_timeout_s},
     )
 
 

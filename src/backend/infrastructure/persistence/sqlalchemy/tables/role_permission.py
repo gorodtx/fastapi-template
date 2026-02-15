@@ -31,7 +31,7 @@ role_permission_code_column: Column[str] = Column(
     nullable=False,
 )
 
-# TODO: Seed from ROLE_PERMISSIONS once a project seeding pattern is defined.
+# Seed source of truth is `ROLE_PERMISSIONS` in the bootstrap migration.
 role_permissions_table: Table = Table(
     "role_permissions",
     metadata,

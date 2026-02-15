@@ -25,6 +25,11 @@ class Settings:
     database_url: str
     redis_url: str | None
     default_registration_role_code: str
+    db_pool_size: int
+    db_max_overflow: int
+    db_pool_timeout_s: int
+    db_pool_recycle_s: int
+    db_connect_timeout_s: int
 
     jwt_issuer: str
     jwt_audience: str
@@ -46,6 +51,11 @@ class Settings:
             database_url=_require_str(env, "DATABASE_URL"),
             redis_url=redis_url,
             default_registration_role_code=default_registration_role_code,
+            db_pool_size=env.int("DB_POOL_SIZE", default=10),
+            db_max_overflow=env.int("DB_MAX_OVERFLOW", default=20),
+            db_pool_timeout_s=env.int("DB_POOL_TIMEOUT_S", default=30),
+            db_pool_recycle_s=env.int("DB_POOL_RECYCLE_S", default=1800),
+            db_connect_timeout_s=env.int("DB_CONNECT_TIMEOUT_S", default=10),
             jwt_issuer=_require_str(env, "JWT_ISSUER"),
             jwt_audience=_require_str(env, "JWT_AUDIENCE"),
             jwt_alg=_require_str(env, "JWT_ALG"),

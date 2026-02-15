@@ -80,7 +80,14 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     def engine(self: Self) -> AsyncEngine:
-        return create_engine(self._settings.database_url)
+        return create_engine(
+            self._settings.database_url,
+            pool_size=self._settings.db_pool_size,
+            max_overflow=self._settings.db_max_overflow,
+            pool_timeout_s=self._settings.db_pool_timeout_s,
+            pool_recycle_s=self._settings.db_pool_recycle_s,
+            connect_timeout_s=self._settings.db_connect_timeout_s,
+        )
 
     @provide(scope=Scope.APP)
     def session_factory(

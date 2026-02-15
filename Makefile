@@ -1,4 +1,4 @@
-.PHONY: bootstrap fmt lint ty ty-watch mypy typecheck check run clean
+.PHONY: bootstrap fmt lint ty ty-watch mypy typecheck check pytest run clean
 
 bootstrap:
 	uv sync --dev
@@ -20,7 +20,10 @@ mypy:
 
 typecheck: ty mypy
 
-check: lint fmt typecheck
+check: lint fmt typecheck pytest
+
+pytest:
+	uv run pytest
 
 run:
 	uv run uvicorn --app-dir src backend.main:create_app --factory --reload --port 8000

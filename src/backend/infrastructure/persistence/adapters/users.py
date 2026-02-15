@@ -19,6 +19,7 @@ from backend.infrastructure.persistence.mappers.users import (
 )
 from backend.infrastructure.persistence.rawadapter.rbac import (
     q_get_user_role_codes,
+    q_get_user_role_codes_by_user_ids,
 )
 from backend.infrastructure.persistence.rawadapter.users import (
     q_delete_user,
@@ -102,6 +103,16 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
 
             rows = await self.manager.send(q_get_user_rows_by_ids(user_ids))
             rows_by_id = {row.id: row for row in rows}
+            roles_by_user_id: dict[UUID, set[RoleCode]] = {}
+            if include_roles:
+                role_rows = await self.manager.send(
+                    q_get_user_role_codes_by_user_ids(user_ids)
+                )
+                for role_row in role_rows:
+                    roles = roles_by_user_id.setdefault(
+                        role_row.user_id, set()
+                    )
+                    roles.add(role_row.role)
             users: list[User] = []
             for user_id in user_ids:
                 row = self.require_found(
@@ -110,12 +121,7 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
                     message="User not found",
                     detail="not found",
                 )
-                roles: set[RoleCode] = set()
-                if include_roles:
-                    role_rows = await self.manager.send(
-                        q_get_user_role_codes(user_id)
-                    )
-                    roles = role_records_to_set(role_rows)
+                roles = roles_by_user_id.get(user_id, set())
                 users.append(row_record_to_user(row, roles=roles))
             return users
 

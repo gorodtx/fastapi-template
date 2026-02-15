@@ -31,19 +31,34 @@ services:
       timeout: 5s
       retries: 10
 
-  app:
-    image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
-    working_dir: /home/den/template
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
       REDIS_URL: redis://redis:6379/0
-    volumes:
-      - .:/home/den/template
-      - ${HOME}/.local/share/uv/python:${HOME}/.local/share/uv/python:ro
-    command: ["/bin/sh", "/home/den/template/nginx/app-up.sh"]
+    command: ["/bin/sh", "/app/nginx/migrate-up.sh"]
     depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
+      REDIS_URL: redis://redis:6379/0
+    command: ["/bin/sh", "/app/nginx/app-up.sh"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
