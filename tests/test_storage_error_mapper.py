@@ -77,10 +77,10 @@ def test_not_found_storage_error_masks_detail_and_meta() -> None:
     assert mapped.meta is None
 
 
-def test_rbac_seed_mismatch_maps_to_unknown_role_without_detail() -> None:
+def test_rbac_role_unknown_maps_to_unknown_role_without_detail() -> None:
     error = StorageError(
-        code="rbac.seed_mismatch",
-        message="RBAC roles are missing in DB (seed mismatch)",
+        code="rbac.role_unknown",
+        message="Role does not exist",
         detail="missing=['manager']",
         meta={"debug": "value"},
     )

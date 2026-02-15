@@ -39,7 +39,7 @@ def map_storage_error_to_app() -> Callable[[StorageError], AppError]:
                 f"Resource with this {field} already exists",
                 meta={"field": field},
             )
-        if error.code == "rbac.seed_mismatch":
+        if error.code in {"rbac.role_unknown", "rbac.seed_mismatch"}:
             return UnknownRoleError()
         if error.code.startswith(_DB_ERROR_PREFIX):
             return AppError(

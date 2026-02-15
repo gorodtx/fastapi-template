@@ -24,6 +24,7 @@ from backend.infrastructure.persistence.rawadapter.users import (
     q_delete_user,
     q_get_user_row_by_email,
     q_get_user_row_by_id,
+    q_get_user_rows_by_ids,
     q_upsert_user_row,
 )
 from backend.infrastructure.persistence.records import UserRowRecord
@@ -85,6 +86,38 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
                 fetch_row,
                 include_roles=include_roles,
             )
+
+        return await storage_result(_call)
+
+    async def get_by_ids(
+        self: SqlUsersAdapter,
+        user_ids: list[UUID],
+        /,
+        *,
+        include_roles: bool = False,
+    ) -> Result[list[User], StorageError]:
+        async def _call() -> list[User]:
+            if not user_ids:
+                return []
+
+            rows = await self.manager.send(q_get_user_rows_by_ids(user_ids))
+            rows_by_id = {row.id: row for row in rows}
+            users: list[User] = []
+            for user_id in user_ids:
+                row = self.require_found(
+                    rows_by_id.get(user_id),
+                    code="user.not_found",
+                    message="User not found",
+                    detail="not found",
+                )
+                roles: set[RoleCode] = set()
+                if include_roles:
+                    role_rows = await self.manager.send(
+                        q_get_user_role_codes(user_id)
+                    )
+                    roles = role_records_to_set(role_rows)
+                users.append(row_record_to_user(row, roles=roles))
+            return users
 
         return await storage_result(_call)
 

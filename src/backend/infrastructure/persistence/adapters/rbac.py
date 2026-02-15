@@ -72,8 +72,9 @@ class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
             missing = want - got
             if missing:
                 raise StorageError(
-                    code="rbac.seed_mismatch",
-                    message="RBAC roles are missing in DB (seed mismatch)",
+                    code="rbac.role_unknown",
+                    message="Role does not exist",
+                    meta={"missing_roles": sorted(missing)},
                 )
             role_ids = [rid for (_role, rid) in pairs]
             await self.manager.send(
@@ -89,8 +90,9 @@ class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
             pairs = await self.manager.send(q_get_role_ids_by_codes([role]))
             if not pairs:
                 raise StorageError(
-                    code="rbac.seed_mismatch",
-                    message="RBAC roles are missing in DB (seed mismatch)",
+                    code="rbac.role_unknown",
+                    message="Role does not exist",
+                    meta={"missing_roles": [role]},
                 )
             role_id = pairs[0][1]
             return await self.manager.send(q_list_user_ids_by_role_id(role_id))

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from uuid_utils.compat import UUID
 
 from backend.application.common.dtos.rbac import (
@@ -22,15 +20,6 @@ def present_role_assignment(
     return RoleAssignmentResultDTO(user_id=user_id, role=role)
 
 
-def present_role_assignment_from(
-    user_id: UUID, role: RoleCode
-) -> Callable[[object], RoleAssignmentResultDTO]:
-    def presenter(_unused: object) -> RoleAssignmentResultDTO:
-        return present_role_assignment(user_id, role)
-
-    return presenter
-
-
 def present_user_roles(
     *,
     user_id: UUID,
@@ -48,12 +37,3 @@ def present_users_by_role(
     role: RoleCode, users: list[UserResponseDTO]
 ) -> UsersByRoleResponseDTO:
     return UsersByRoleResponseDTO(role=role, users=users)
-
-
-def present_users_by_role_from(
-    role: RoleCode, users: list[UserResponseDTO]
-) -> Callable[[object], UsersByRoleResponseDTO]:
-    def presenter(_unused: object) -> UsersByRoleResponseDTO:
-        return present_users_by_role(role, users)
-
-    return presenter

@@ -18,9 +18,9 @@ from argon2 import PasswordHasher, Type
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from backend.domain.core.constants.permission_codes import ALL_PERMISSION_CODES
 from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.constants.rbac_registry import ROLE_PERMISSIONS
+from backend.domain.core.types.rbac import PermissionCode
 
 # revision identifiers, used by Alembic.
 revision: str = "20260203_0001"
@@ -276,9 +276,7 @@ def upgrade() -> None:
             "code": permission.value,
             "description": None,
         }
-        for permission in sorted(
-            ALL_PERMISSION_CODES, key=lambda item: item.value
-        )
+        for permission in sorted(PermissionCode, key=lambda item: item.value)
     ]
     op.bulk_insert(permissions_table, permission_rows)
 

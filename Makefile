@@ -23,7 +23,7 @@ typecheck: ty mypy
 check: lint fmt typecheck
 
 run:
-	uv run uvicorn template.main:app --reload --port 8000
+	uv run uvicorn --app-dir src backend.main:create_app --factory --reload --port 8000
 
 clean:
 	rm -rf .pytest_cache .ruff_cache

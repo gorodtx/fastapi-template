@@ -13,7 +13,7 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.rbac import (
-    present_users_by_role_from,
+    present_users_by_role,
 )
 from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import QueryHandler
@@ -37,20 +37,23 @@ class GetUsersByRoleHandler(
         /,
     ) -> Result[UsersByRoleResponseDTO, AppError]:
         role: RoleCode = query.role
+        map_storage_error = map_storage_error_to_app()
         ids_result = (
             await self.gateway.rbac.list_user_ids_by_role(role)
-        ).map_err(map_storage_error_to_app())
+        ).map_err(map_storage_error)
         if ids_result.is_err():
             return ResultImpl.err_from(ids_result)
 
-        users: list[UserResponseDTO] = []
-        for user_id in ids_result.unwrap():
-            user_result = (
-                await self.gateway.users.get_by_id(user_id)
-            ).map_err(map_storage_error_to_app())
-            if user_result.is_err():
-                return ResultImpl.err_from(user_result)
-            users.append(present_user_response(user_result.unwrap()))
+        users_result = (
+            await self.gateway.users.get_by_ids(
+                ids_result.unwrap(),
+                include_roles=False,
+            )
+        ).map_err(map_storage_error)
+        if users_result.is_err():
+            return ResultImpl.err_from(users_result)
 
-        presenter = present_users_by_role_from(role, users)
-        return ids_result.map(presenter)
+        users: list[UserResponseDTO] = [
+            present_user_response(user) for user in users_result.unwrap()
+        ]
+        return ResultImpl.ok(present_users_by_role(role, users), AppError)

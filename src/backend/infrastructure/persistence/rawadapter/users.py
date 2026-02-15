@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 
 import sqlalchemy as sa
 from sqlalchemy import RowMapping
@@ -68,6 +68,33 @@ def q_get_user_row_by_email(
         if row is None:
             return None
         return convert_record(dict(row), UserRowRecord)
+
+    return _q
+
+
+def q_get_user_rows_by_ids(
+    user_ids: Sequence[UUID],
+) -> Callable[[SessionProtocol], Awaitable[list[UserRowRecord]]]:
+    async def _q(session: SessionProtocol) -> list[UserRowRecord]:
+        async_session = require_async_session(session)
+        id_values = list(user_ids)
+        if not id_values:
+            return []
+        stmt = (
+            sa.select(
+                users_table.c.id.label("id"),
+                users_table.c.email.label("email"),
+                users_table.c.login.label("login"),
+                users_table.c.username.label("username"),
+                users_table.c.password_hash.label("password_hash"),
+                users_table.c.is_active.label("is_active"),
+            )
+            .select_from(users_table)
+            .where(users_table.c.id.in_(id_values))
+        )
+        res = await async_session.execute(stmt)
+        rows: Sequence[RowMapping] = res.mappings().all()
+        return [convert_record(dict(row), UserRowRecord) for row in rows]
 
     return _q
 

@@ -109,14 +109,5 @@ def decode_value(value: object, target_type: type[object]) -> object:
     return CONVERTERS.decode(value, target_type)
 
 
-def decode_system_role(value: object) -> SystemRole:
-    decoded = CONVERTERS.decode(value, SystemRole)
-    if not isinstance(decoded, SystemRole):
-        raise DomainSerializationError(
-            f"Decoded {type(decoded).__name__} is not SystemRole"
-        )
-    return decoded
-
-
 def register_domain_converters() -> None:
     CONVERTERS.register(SystemRole, StrEnumValueConverter(SystemRole))

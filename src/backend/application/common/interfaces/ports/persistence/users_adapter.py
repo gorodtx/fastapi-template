@@ -27,6 +27,14 @@ class UsersAdapter(Protocol):
         include_roles: bool = True,
     ) -> Awaitable[Result[User, StorageError]]: ...
 
+    def get_by_ids(
+        self: UsersAdapter,
+        user_ids: list[UUID],
+        /,
+        *,
+        include_roles: bool = False,
+    ) -> Awaitable[Result[list[User], StorageError]]: ...
+
     def save(
         self: UsersAdapter,
         user: User,

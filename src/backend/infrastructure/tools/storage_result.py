@@ -13,8 +13,6 @@ from backend.infrastructure.errors.sqlalchemy_errors import (
 
 
 def _default_map_exc(exc: Exception) -> StorageError:
-    if isinstance(exc, StorageError):
-        return exc
     if isinstance(exc, IntegrityError):
         return map_integrity_error(exc)
     if isinstance(exc, DBAPIError):

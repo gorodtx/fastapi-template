@@ -32,7 +32,7 @@ services:
       retries: 10
 
   app:
-    image: debian:bookworm-slim
+    image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
     working_dir: /home/den/template
     env_file:
       - .env
@@ -41,7 +41,7 @@ services:
       REDIS_URL: redis://redis:6379/0
     volumes:
       - .:/home/den/template
-      - /home/den/.local/share/uv/python:/home/den/.local/share/uv/python:ro
+      - ${HOME}/.local/share/uv/python:${HOME}/.local/share/uv/python:ro
     command: ["/bin/sh", "/home/den/template/nginx/app-up.sh"]
     depends_on:
       postgres:
