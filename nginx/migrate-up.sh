@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
 set -eu
 
-exec uv run alembic upgrade head
+exec uv run --no-dev --no-sync --frozen alembic upgrade head

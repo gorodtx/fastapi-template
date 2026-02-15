@@ -116,5 +116,4 @@ class RevokeRoleFromUserHandler(
         return await run_in_tx(
             manager=self.gateway.manager,
             action=action,
-            value_type=UserRolesResponseDTO,
         )

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, nullcontext
 from types import TracebackType
 
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
@@ -13,67 +12,34 @@ from backend.application.common.interfaces.ports.persistence.manager import (
 )
 
 
-class _NoopTxScope(AbstractAsyncContextManager["TransactionManagerImpl"]):
-    __slots__: tuple[str, ...] = ("_tm",)
-
-    def __init__(self: _NoopTxScope, tm: TransactionManagerImpl) -> None:
-        self._tm = tm
-
-    async def __aenter__(self: _NoopTxScope) -> TransactionManagerImpl:
-        return self._tm
-
-    async def __aexit__(
-        self: _NoopTxScope,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        return None
-
-
-class _TxScope(AbstractAsyncContextManager["TransactionManagerImpl"]):
+class _ManagedTxScope(AbstractAsyncContextManager["TransactionManagerImpl"]):
     __slots__: tuple[str, ...] = ("_tm", "_tx")
 
     def __init__(
-        self: _TxScope, tm: TransactionManagerImpl, tx: AsyncSessionTransaction
+        self: _ManagedTxScope,
+        tm: TransactionManagerImpl,
+        *,
+        tx: AsyncSessionTransaction | None = None,
     ) -> None:
         self._tm = tm
         self._tx = tx
 
-    async def __aenter__(self: _TxScope) -> TransactionManagerImpl:
+    async def __aenter__(self: _ManagedTxScope) -> TransactionManagerImpl:
         self._tm.enter_scope()
-        await self._tx.__aenter__()
+        if self._tx is not None:
+            await self._tx.__aenter__()
         return self._tm
 
     async def __aexit__(
-        self: _TxScope,
+        self: _ManagedTxScope,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
         try:
-            await self._tx.__aexit__(exc_type, exc_value, traceback)
-        finally:
-            self._tm.leave_scope()
-
-
-class _CurrentTxScope(AbstractAsyncContextManager["TransactionManagerImpl"]):
-    __slots__: tuple[str, ...] = ("_tm",)
-
-    def __init__(self: _CurrentTxScope, tm: TransactionManagerImpl) -> None:
-        self._tm = tm
-
-    async def __aenter__(self: _CurrentTxScope) -> TransactionManagerImpl:
-        self._tm.enter_scope()
-        return self._tm
-
-    async def __aexit__(
-        self: _CurrentTxScope,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        try:
+            if self._tx is not None:
+                await self._tx.__aexit__(exc_type, exc_value, traceback)
+                return None
             if not self._tm.conn.in_transaction():
                 return None
             if exc_type is None:
@@ -95,11 +61,6 @@ class TransactionManagerImpl(TransactionManager):
     async def send[T](self: TransactionManagerImpl, query: Query[T], /) -> T:
         return await query(self.conn)
 
-    __call__: Callable[
-        [TransactionManagerImpl, Query[object]],
-        Awaitable[object],
-    ] = send
-
     def enter_scope(self: TransactionManagerImpl) -> None:
         self._scope_depth += 1
 
@@ -116,12 +77,18 @@ class TransactionManagerImpl(TransactionManager):
                 raise RuntimeError(
                     "Nested transaction requires an outer transaction"
                 )
-            return _TxScope(self, self.conn.begin_nested())
+            return _ManagedTxScope(
+                self,
+                tx=self.conn.begin_nested(),
+            )
 
         if self._scope_depth > 0:
-            return _NoopTxScope(self)
+            return nullcontext(self)
 
         if self.conn.in_transaction():
-            return _CurrentTxScope(self)
+            return _ManagedTxScope(self)
 
-        return _TxScope(self, self.conn.begin())
+        return _ManagedTxScope(
+            self,
+            tx=self.conn.begin(),
+        )

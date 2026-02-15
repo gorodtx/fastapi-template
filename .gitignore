@@ -1,6 +1,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+all,vs,jupyternotebooks,c,c++
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm+all,vs,jupyternotebooks,c,c++
-
+.github
+.uv_cache_local
 ### C ###
 # Prerequisites
 *.d

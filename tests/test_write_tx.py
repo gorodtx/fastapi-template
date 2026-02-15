@@ -45,7 +45,7 @@ async def test_run_in_tx_returns_ok_value() -> None:
     async def action() -> int:
         return 17
 
-    result = await run_in_tx(manager, action, int)
+    result = await run_in_tx(manager, action)
 
     assert result.is_ok()
     assert result.unwrap() == 17
@@ -61,7 +61,7 @@ async def test_run_in_tx_maps_app_error_to_err_result() -> None:
     async def action() -> int:
         raise UnauthenticatedError()
 
-    result = await run_in_tx(manager, action, int)
+    result = await run_in_tx(manager, action)
 
     assert result.is_err()
     assert isinstance(result.unwrap_err(), UnauthenticatedError)

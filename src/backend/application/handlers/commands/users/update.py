@@ -80,5 +80,4 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
         return await run_in_tx(
             manager=self.gateway.manager,
             action=action,
-            value_type=UserResponseDTO,
         )

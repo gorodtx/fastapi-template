@@ -35,6 +35,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
     env_file:
       - .env
     environment:
@@ -50,6 +51,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
     env_file:
       - .env
     environment:
