@@ -35,7 +35,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      network: host
+      network: ${DOCKER_BUILD_NETWORK:-default}
     env_file:
       - .env
     environment:
@@ -51,7 +51,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      network: host
+      network: ${DOCKER_BUILD_NETWORK:-default}
     env_file:
       - .env
     environment:

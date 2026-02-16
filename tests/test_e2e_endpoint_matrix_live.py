@@ -162,9 +162,33 @@ def _assert_public_routes_and_openapi(
     assert actual_paths == _expected_openapi_paths()
 
     assert _request(target=target, method="GET", path="/docs").status == 200
-    assert _request(target=target, method="GET", path="/system").status == 200
+    system_response = _request(target=target, method="GET", path="/system")
+    assert system_response.status == 200
+    system_payload = _parse_json_object(system_response.body)
+    assert _require_str(system_payload, "status") == "ok"
+    checks = system_payload.get("checks")
+    assert isinstance(checks, dict)
+    assert checks.get("db") == "ok"
+    assert checks.get("redis") == "ok"
     assert (
         _request(target=target, method="GET", path="/users/me").status == 401
+    )
+    assert _request(target=target, method="POST", path="/system").status == 405
+    assert (
+        _request(target=target, method="GET", path="/auth/login").status == 405
+    )
+    assert (
+        _request(target=target, method="GET", path="/auth/register").status
+        == 405
+    )
+    assert _request(target=target, method="GET", path="/users").status == 405
+    assert (
+        _request(
+            target=target,
+            method="GET",
+            path="/this-path-does-not-exist",
+        ).status
+        == 404
     )
 
     return {"/system", "/users/me"}
@@ -559,6 +583,184 @@ def _run_missing_and_validation_flow(
     }
 
 
+def _run_additional_hardening_flow(
+    target: _ApiTarget,
+    session: _UserSession,
+) -> set[str]:
+    seed = str(int(time.time() * 1000))
+    login = f"hard{seed}"
+    email = f"{login}@example.com"
+
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/auth/register",
+            payload={
+                "email": email,
+                "login": login,
+                "username": login,
+                "raw_password": "short",
+                "fingerprint": f"fp-{seed}-device",
+            },
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/auth/register",
+            payload={
+                "email": email,
+                "login": login,
+                "username": login,
+                "raw_password": _build_password(),
+                "fingerprint": f"fp-{seed}-device",
+                "extra": "forbidden",
+            },
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/auth/login",
+            payload={
+                "email": session.email,
+                "raw_password": session.raw_password,
+                "fingerprint": session.fingerprint,
+                "extra": "forbidden",
+            },
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/auth/login",
+            payload={
+                "email": session.email,
+                "raw_password": session.raw_password,
+            },
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/auth/refresh",
+            payload={"refresh_token": "invalid"},
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/auth/refresh",
+            payload={
+                "refresh_token": "invalid",
+                "fingerprint": "@@@",
+            },
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/auth/logout",
+            payload={
+                "fingerprint": session.fingerprint,
+            },
+            bearer_token=session.access_token,
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/auth/logout",
+            payload={
+                "refresh_token": "invalid",
+                "fingerprint": "@@@",
+            },
+            bearer_token=session.access_token,
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path="/users",
+            payload={
+                "email": f"noauth_{seed}@example.com",
+                "login": f"noauth{seed}",
+                "username": f"noauth{seed}",
+                "raw_password": _build_password(),
+            },
+        ).status
+        == 401
+    )
+    assert (
+        _request(
+            target=target,
+            method="PATCH",
+            path=f"/users/{session.user_id}",
+            payload={"email": "newmail@example.com", "extra": "forbidden"},
+            bearer_token=session.access_token,
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path=f"/rbac/users/{session.user_id}/roles",
+            payload={},
+            bearer_token=session.access_token,
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="POST",
+            path=f"/rbac/users/{session.user_id}/roles",
+            payload={"role_code": "user", "extra": "forbidden"},
+            bearer_token=session.access_token,
+        ).status
+        == 422
+    )
+    assert (
+        _request(
+            target=target,
+            method="DELETE",
+            path=f"/rbac/users/{session.user_id}/roles/USER",
+            bearer_token=session.access_token,
+        ).status
+        == 422
+    )
+
+    return {
+        "/system",
+        "/auth/register",
+        "/auth/login",
+        "/auth/refresh",
+        "/auth/logout",
+        "/users",
+        "/users/{user_id}",
+        "/rbac/users/{user_id}/roles",
+        "/rbac/users/{user_id}/roles/{role_code}",
+    }
+
+
 def _run_optional_admin_flow(target: _ApiTarget, seed: str) -> set[str]:
     admin_bearer = os.getenv("E2E_ADMIN_BEARER")
     if admin_bearer is None or not admin_bearer:
@@ -649,6 +851,7 @@ def test_live_endpoint_matrix_all_paths() -> None:
     covered |= auth_covered
     covered |= _run_users_and_rbac_forbidden_flow(target, session)
     covered |= _run_missing_and_validation_flow(target, session)
+    covered |= _run_additional_hardening_flow(target, session)
     covered |= _run_optional_admin_flow(target, seed=str(int(time.time())))
 
     final_me = _request(

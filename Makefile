@@ -1,7 +1,4 @@
-.PHONY: bootstrap fmt lint ty ty-watch mypy typecheck check pytest run clean
-
-bootstrap:
-	uv sync --dev
+.PHONY: fmt lint typecheck check pytest run clean
 
 fmt:
 	uv run ruff format .
@@ -9,16 +6,8 @@ fmt:
 lint:
 	uv run ruff check . --fix
 
-ty:
+typecheck:
 	uv run ty check --error-on-warning
-
-ty-watch:
-	uv run ty check --watch --error-on-warning
-
-mypy:
-	uv run mypy
-
-typecheck: ty mypy
 
 check: lint fmt typecheck pytest
 
@@ -26,7 +15,7 @@ pytest:
 	uv run pytest
 
 run:
-	uv run uvicorn --app-dir src backend.main:create_app --factory --reload --port 8000
+	uv run --no-dev --no-sync --frozen uvicorn --app-dir src backend.main:create_app --factory --host 0.0.0.0 --port 8000
 
 clean:
 	rm -rf .pytest_cache .ruff_cache
