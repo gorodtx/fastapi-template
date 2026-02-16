@@ -1,55 +1,51 @@
 # FastAPI Clean/DDD Template
 
+[English](#english) | [Русский](#русский)
+
 Production-oriented backend template: FastAPI + Clean/DDD + SQLAlchemy + Postgres + Redis + Alembic + JWT.
 
-## Technology Matrix / Матрица технологий
+## Quick Deploy / Быстрый запуск
+
+1. Create env file from template:
+   - `cp .env.example .env`
+2. Start services:
+   - `docker compose up -d --build postgres redis migrate app nginx`
+3. Run smoke checks:
+   - `curl -i http://127.0.0.1:8080/system`
+   - `curl -i http://127.0.0.1:8080/openapi.json`
+   - `curl -i http://127.0.0.1:8080/docs`
+
+## Technology Stack / Стек технологий
 
 ### Runtime
 
-FastAPI | Pydantic | Uvicorn | Dishka
-------- | -------- | ------- | ------
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) | [![Pydantic](https://img.shields.io/badge/Pydantic-E92063?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/) | [![Uvicorn](https://img.shields.io/badge/Uvicorn-499848?logo=uvicorn&logoColor=white)](https://www.uvicorn.org/) | [![Dishka](https://img.shields.io/badge/Dishka-DI-4B5563)](https://github.com/reagento/dishka)
-
-PostgreSQL | SQLAlchemy | asyncpg | Alembic
----------- | ---------- | ------- | -------
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/) | [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/) | [![asyncpg](https://img.shields.io/badge/asyncpg-driver-2D3748)](https://github.com/MagicStack/asyncpg) | [![Alembic](https://img.shields.io/badge/Alembic-migrations-8A2BE2)](https://alembic.sqlalchemy.org/)
-
-Redis | Nginx | Docker | Docker Compose
------ | ----- | ------ | --------------
-[![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/) | [![Nginx](https://img.shields.io/badge/Nginx-009639?logo=nginx&logoColor=white)](https://nginx.org/) | [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/) | [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-
-PyJWT | Argon2 | msgspec | environs
------ | ------ | ------- | --------
-[![PyJWT](https://img.shields.io/badge/PyJWT-JWT-111827)](https://pyjwt.readthedocs.io/) | [![Argon2](https://img.shields.io/badge/Argon2-password%20hashing-0F766E)](https://argon2-cffi.readthedocs.io/) | [![msgspec](https://img.shields.io/badge/msgspec-serialization-7C3AED)](https://jcristharif.com/msgspec/) | [![environs](https://img.shields.io/badge/environs-config-334155)](https://github.com/sloria/environs)
+- `FastAPI`
+- `Pydantic`
+- `Uvicorn`
+- `Dishka`
+- `PostgreSQL`
+- `SQLAlchemy`
+- `asyncpg`
+- `Alembic`
+- `Redis`
+- `Nginx`
+- `Docker`
+- `Docker Compose`
+- `PyJWT`
+- `argon2-cffi`
+- `msgspec`
+- `environs`
 
 ### Tooling & Quality
 
-uv | Ruff | ty | Pytest
--- | ---- | -- | ------
-[![uv](https://img.shields.io/badge/uv-package%20manager-6A5ACD)](https://docs.astral.sh/uv/) | [![Ruff](https://img.shields.io/badge/Ruff-lint%2Fformat-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/) | [![ty](https://img.shields.io/badge/ty-type%20check-1F2937)](https://github.com/astral-sh/ty) | [![Pytest](https://img.shields.io/badge/Pytest-tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
-
-GitHub Actions | make check | Live E2E | Release
--------------- | ---------- | -------- | -------
-[![GitHub Actions CI](https://github.com/gorodtx/fastapi-template/actions/workflows/ci.yml/badge.svg)](https://github.com/gorodtx/fastapi-template/actions/workflows/ci.yml) | [![make check required](https://img.shields.io/badge/make%20check-required-2ea44f)](#10-quality-and-tests) | [![live e2e opt-in](https://img.shields.io/badge/live%20e2e-opt--in-0a66c2)](#10-quality-and-tests) | [![GitHub Release](https://img.shields.io/github/v/release/gorodtx/fastapi-template)](https://github.com/gorodtx/fastapi-template/releases)
-
-### Release / Релиз (manual)
-
-Latest release:
-
-- [![GitHub Release](https://img.shields.io/github/v/release/gorodtx/fastapi-template)](https://github.com/gorodtx/fastapi-template/releases/latest)
-
-Manual release flow:
-
-1. Run quality gates: `make check`
-2. Create a semantic tag: `git tag -a vX.Y.Z -m "vX.Y.Z"`
-3. Push tag: `git push origin vX.Y.Z`
-4. Create GitHub Release from that tag and include:
-   - deploy notes
-   - migration notes
-   - runtime bundle list (`compose.yaml`, `compose.linux-hostnet.yaml`, `nginx/`, `migrations/`, `alembic.ini`, `.env.example`)
-
-- [English](#english)
-- [Русский](#русский)
+- `uv`
+- `Ruff`
+- `ty`
+- `Pytest`
+- `GitHub Actions`
+- `make check`
+- `Live E2E matrix`
+- `GitHub Releases`
 
 ---
 
