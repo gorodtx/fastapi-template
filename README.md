@@ -14,11 +14,11 @@ Use release tag (например `v1.0.0`) and run one command:
 TAG=v1.0.0 && git clone --depth 1 --branch "$TAG" https://github.com/gorodtx/fastapi-template.git && cd fastapi-template && cp .env.example .env && docker compose up -d --build postgres redis migrate app nginx
 ```
 
-What to download from release / Что скачивать из релиза:
+What to use from release / Что использовать из релиза:
 
-- release source by tag (`Source code (tar.gz|zip)` or clone by tag) — reproducible version / воспроизводимая версия
+- clone by semantic tag (`git clone --branch vX.Y.Z`) as the single install path / клон по тегу — единый путь установки
 - `.env.example` -> `.env` with real credentials before first start / реальные значения перед стартом
-- runtime bundle from source: `compose.yaml`, `nginx/`, `migrations/`, `alembic.ini`, `src/`
+- runtime files from tag: `compose.yaml`, `nginx/`, `migrations/`, `alembic.ini`, `src/`
 
 Smoke checks / Проверка:
 
