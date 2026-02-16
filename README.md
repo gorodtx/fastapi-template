@@ -6,46 +6,61 @@ Production-oriented backend template: FastAPI + Clean/DDD + SQLAlchemy + Postgre
 
 ## Quick Deploy / Быстрый запуск
 
-1. Create env file from template:
-   - `cp .env.example .env`
-2. Start services:
-   - `docker compose up -d --build postgres redis migrate app nginx`
-3. Run smoke checks:
-   - `curl -i http://127.0.0.1:8080/system`
-   - `curl -i http://127.0.0.1:8080/openapi.json`
-   - `curl -i http://127.0.0.1:8080/docs`
+Release / Релиз: <https://github.com/gorodtx/fastapi-template/releases/latest>
+
+Use release tag (например `v1.0.0`) and run one command:
+
+```bash
+TAG=v1.0.0 && git clone --depth 1 --branch "$TAG" https://github.com/gorodtx/fastapi-template.git && cd fastapi-template && cp .env.example .env && docker compose up -d --build postgres redis migrate app nginx
+```
+
+What to download from release / Что скачивать из релиза:
+
+- release source by tag (`Source code (tar.gz|zip)` or clone by tag) — reproducible version / воспроизводимая версия
+- `.env.example` -> `.env` with real credentials before first start / реальные значения перед стартом
+- runtime bundle from source: `compose.yaml`, `nginx/`, `migrations/`, `alembic.ini`, `src/`
+
+Smoke checks / Проверка:
+
+- `curl -i http://127.0.0.1:8080/system`
+- `curl -i http://127.0.0.1:8080/openapi.json`
+- `curl -i http://127.0.0.1:8080/docs`
 
 ## Technology Stack / Стек технологий
 
 ### Runtime
 
-- `FastAPI`
-- `Pydantic`
-- `Uvicorn`
-- `Dishka`
-- `PostgreSQL`
-- `SQLAlchemy`
-- `asyncpg`
-- `Alembic`
-- `Redis`
-- `Nginx`
-- `Docker`
-- `Docker Compose`
-- `PyJWT`
-- `argon2-cffi`
-- `msgspec`
-- `environs`
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Pydantic](https://img.shields.io/badge/Pydantic-E92063?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
+[![Uvicorn](https://img.shields.io/badge/Uvicorn-499848?logo=uvicorn&logoColor=white)](https://www.uvicorn.org/)
+[![Dishka](https://img.shields.io/badge/Dishka-DI-4B5563)](https://github.com/reagento/dishka)
+
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
+[![asyncpg](https://img.shields.io/badge/asyncpg-driver-2D3748)](https://github.com/MagicStack/asyncpg)
+[![Alembic](https://img.shields.io/badge/Alembic-migrations-8A2BE2)](https://alembic.sqlalchemy.org/)
+
+[![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Nginx](https://img.shields.io/badge/Nginx-009639?logo=nginx&logoColor=white)](https://nginx.org/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Docker Compose](https://img.shields.io/badge/Docker%20Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+
+[![PyJWT](https://img.shields.io/badge/PyJWT-JWT-111827)](https://pyjwt.readthedocs.io/)
+[![Argon2](https://img.shields.io/badge/Argon2-password%20hashing-0F766E)](https://argon2-cffi.readthedocs.io/)
+[![msgspec](https://img.shields.io/badge/msgspec-serialization-7C3AED)](https://jcristharif.com/msgspec/)
+[![environs](https://img.shields.io/badge/environs-config-334155)](https://github.com/sloria/environs)
 
 ### Tooling & Quality
 
-- `uv`
-- `Ruff`
-- `ty`
-- `Pytest`
-- `GitHub Actions`
-- `make check`
-- `Live E2E matrix`
-- `GitHub Releases`
+[![uv](https://img.shields.io/badge/uv-package%20manager-6A5ACD)](https://docs.astral.sh/uv/)
+[![Ruff](https://img.shields.io/badge/Ruff-lint%2Fformat-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
+[![ty](https://img.shields.io/badge/ty-type%20check-1F2937)](https://github.com/astral-sh/ty)
+[![Pytest](https://img.shields.io/badge/Pytest-tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+
+[![GitHub Actions CI](https://github.com/gorodtx/fastapi-template/actions/workflows/ci.yml/badge.svg)](https://github.com/gorodtx/fastapi-template/actions/workflows/ci.yml)
+[![make check required](https://img.shields.io/badge/make%20check-required-2ea44f)](#10-quality-and-tests)
+[![live e2e opt-in](https://img.shields.io/badge/live%20e2e-opt--in-0a66c2)](#10-quality-and-tests)
+[![GitHub Release](https://img.shields.io/github/v/release/gorodtx/fastapi-template)](https://github.com/gorodtx/fastapi-template/releases/latest)
 
 ---
 
@@ -238,18 +253,10 @@ docker compose down -v --remove-orphans
 docker compose up -d --build postgres redis migrate app nginx
 ```
 
-Linux fallback (for environments where bridge+ports is broken):
-
-```bash
-docker compose down -v --remove-orphans
-docker compose -f compose.yaml -f compose.linux-hostnet.yaml up -d --build postgres redis migrate app nginx
-```
-
 If Docker build has DNS issues with PyPI:
 
 ```bash
 DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate app nginx
-DOCKER_BUILD_NETWORK=host docker compose -f compose.yaml -f compose.linux-hostnet.yaml up -d --build postgres redis migrate app nginx
 ```
 
 Runtime entrypoints:
@@ -493,18 +500,10 @@ docker compose down -v --remove-orphans
 docker compose up -d --build postgres redis migrate app nginx
 ```
 
-Linux fallback (если в окружении ломается bridge+ports):
-
-```bash
-docker compose down -v --remove-orphans
-docker compose -f compose.yaml -f compose.linux-hostnet.yaml up -d --build postgres redis migrate app nginx
-```
-
 Если в Docker build проблемы DNS с PyPI:
 
 ```bash
 DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate app nginx
-DOCKER_BUILD_NETWORK=host docker compose -f compose.yaml -f compose.linux-hostnet.yaml up -d --build postgres redis migrate app nginx
 ```
 
 Entrypoint’ы runtime:
