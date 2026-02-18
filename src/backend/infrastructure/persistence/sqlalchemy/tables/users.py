@@ -70,11 +70,11 @@ users_table: Table = Table(
         name="ck_users_login_len",
     ),
     CheckConstraint(
-        r"login ~ '^[A-Za-z0-9]+$'",
+        r"login ~ '^[[:alnum:]]+$'",
         name="ck_users_login_alnum",
     ),
     CheckConstraint(
-        r"email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$'",
+        r"email ~ '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'",
         name="ck_users_email_format",
     ),
     CheckConstraint(

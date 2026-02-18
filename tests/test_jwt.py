@@ -128,3 +128,70 @@ def test_verify_access_requires_jti_claim() -> None:
 
     assert err.code == "auth.unauthenticated"
     assert err.message == "Invalid access token"
+
+
+def test_verify_access_rejects_refresh_token_type() -> None:
+    jwt_impl = JwtImpl(cfg=_config())
+    refresh_token, _ = jwt_impl.issue_refresh(
+        user_id=_USER_ID, fingerprint="fp"
+    )
+
+    err = jwt_impl.verify_access(refresh_token).unwrap_err()
+
+    assert err.code == "auth.unauthenticated"
+    assert err.message == "Invalid access token"
+
+
+def test_verify_refresh_rejects_access_token_type() -> None:
+    jwt_impl = JwtImpl(cfg=_config())
+    access_token = jwt_impl.issue_access(user_id=_USER_ID)
+
+    err = jwt_impl.verify_refresh(access_token).unwrap_err()
+
+    assert err.code == "auth.unauthenticated"
+    assert err.message == "Invalid refresh token"
+
+
+def test_verify_access_rejects_invalid_sub_uuid() -> None:
+    jwt_impl = JwtImpl(cfg=_config())
+    now = datetime.now(tz=UTC)
+    payload = {
+        "iss": jwt_impl.cfg.issuer,
+        "aud": jwt_impl.cfg.audience,
+        "sub": "not-a-uuid",
+        "typ": "access",
+        "jti": "test-jti",
+        "iat": int(now.timestamp()),
+        "exp": int((now + jwt_impl.cfg.access_ttl).timestamp()),
+    }
+    token = jwt_encode(
+        payload, jwt_impl.cfg.secret, algorithm=jwt_impl.cfg.alg
+    )
+
+    err = jwt_impl.verify_access(token).unwrap_err()
+
+    assert err.code == "auth.unauthenticated"
+    assert err.message == "Invalid access token"
+
+
+def test_verify_refresh_rejects_invalid_sub_uuid() -> None:
+    jwt_impl = JwtImpl(cfg=_config())
+    now = datetime.now(tz=UTC)
+    payload = {
+        "iss": jwt_impl.cfg.issuer,
+        "aud": jwt_impl.cfg.audience,
+        "sub": "not-a-uuid",
+        "typ": "refresh",
+        "fpr": "fp",
+        "jti": "test-jti",
+        "iat": int(now.timestamp()),
+        "exp": int((now + jwt_impl.cfg.refresh_ttl).timestamp()),
+    }
+    token = jwt_encode(
+        payload, jwt_impl.cfg.secret, algorithm=jwt_impl.cfg.alg
+    )
+
+    err = jwt_impl.verify_refresh(token).unwrap_err()
+
+    assert err.code == "auth.unauthenticated"
+    assert err.message == "Invalid refresh token"

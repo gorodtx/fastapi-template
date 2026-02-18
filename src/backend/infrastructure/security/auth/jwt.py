@@ -22,16 +22,20 @@ from backend.application.common.interfaces.auth.ports import (
 from backend.application.handlers.result import Result, ResultImpl
 
 _REQUIRED_CLAIMS: Final[list[str]] = ["exp", "iat", "sub", "iss", "aud"]
+_ACCESS_KIND: Final[str] = "access"
+_REFRESH_KIND: Final[str] = "refresh"
+_ACCESS_ERROR_MESSAGE: Final[str] = "Invalid access token"
+_REFRESH_ERROR_MESSAGE: Final[str] = "Invalid refresh token"
 
 
-def _jwt_encode_raw(
+def _jwt_encode(
     payload: Mapping[str, object], key: str, *, algorithm: str
 ) -> str:
     payload_dict: dict[str, object] = dict(payload)
     return _jwt_encode_impl(payload_dict, key, algorithm=algorithm)
 
 
-def _jwt_decode_raw(
+def _jwt_decode(
     token: str,
     key: str,
     *,
@@ -39,7 +43,7 @@ def _jwt_decode_raw(
     audience: str,
     issuer: str,
     options: dict[str, object],
-) -> Mapping[str, object]:
+) -> dict[str, object]:
     raw = _jwt_decode_impl(
         token,
         key,
@@ -56,41 +60,12 @@ def _jwt_decode_raw(
     return out
 
 
-def _jwt_encode(
-    payload: Mapping[str, object], key: str, *, algorithm: str
-) -> str:
-    return _jwt_encode_raw(payload, key, algorithm=algorithm)
+def _access_error() -> Result[UUID, AppError]:
+    return ResultImpl.err_app(UnauthenticatedError(_ACCESS_ERROR_MESSAGE))
 
 
-def _jwt_decode(
-    token: str,
-    key: str,
-    *,
-    algorithms: list[str],
-    audience: str,
-    issuer: str,
-    options: dict[str, object],
-) -> dict[str, object]:
-    data = _jwt_decode_raw(
-        token,
-        key,
-        algorithms=algorithms,
-        audience=audience,
-        issuer=issuer,
-        options=options,
-    )
-    out: dict[str, object] = {}
-    for key_item, value in data.items():
-        out[str(key_item)] = value
-    return out
-
-
-def _access_error(message: str) -> Result[UUID, AppError]:
-    return ResultImpl.err_app(UnauthenticatedError(message))
-
-
-def _refresh_error(message: str) -> Result[tuple[UUID, str, str], AppError]:
-    return ResultImpl.err_app(UnauthenticatedError(message))
+def _refresh_error() -> Result[tuple[UUID, str, str], AppError]:
+    return ResultImpl.err_app(UnauthenticatedError(_REFRESH_ERROR_MESSAGE))
 
 
 def _refresh_payload(
@@ -116,13 +91,34 @@ class JwtImpl(JwtIssuer, JwtVerifier):
     def _now(self: JwtImpl) -> datetime:
         return datetime.now(tz=UTC)
 
+    def _decode_typed_payload(
+        self: JwtImpl,
+        token: str,
+        *,
+        expected_type: str,
+    ) -> dict[str, object] | None:
+        try:
+            data = _jwt_decode(
+                token,
+                self.cfg.secret,
+                algorithms=[self.cfg.alg],
+                audience=self.cfg.audience,
+                issuer=self.cfg.issuer,
+                options={"require": _REQUIRED_CLAIMS},
+            )
+        except (PyJWTError, TypeError):
+            return None
+        if data.get("typ") != expected_type:
+            return None
+        return data
+
     def issue_access(self: JwtImpl, *, user_id: UUID) -> str:
         now = self._now()
         payload = {
             "iss": self.cfg.issuer,
             "aud": self.cfg.audience,
             "sub": str(user_id),
-            "typ": "access",
+            "typ": _ACCESS_KIND,
             "jti": str(uuid4()),
             "iat": int(now.timestamp()),
             "exp": int((now + self.cfg.access_ttl).timestamp()),
@@ -138,7 +134,7 @@ class JwtImpl(JwtIssuer, JwtVerifier):
             "iss": self.cfg.issuer,
             "aud": self.cfg.audience,
             "sub": str(user_id),
-            "typ": "refresh",
+            "typ": _REFRESH_KIND,
             "fpr": fingerprint,
             "jti": jti,
             "iat": int(now.timestamp()),
@@ -148,46 +144,24 @@ class JwtImpl(JwtIssuer, JwtVerifier):
         return token, jti
 
     def verify_access(self: JwtImpl, token: str) -> Result[UUID, AppError]:
-        try:
-            data = _jwt_decode(
-                token,
-                self.cfg.secret,
-                algorithms=[self.cfg.alg],
-                audience=self.cfg.audience,
-                issuer=self.cfg.issuer,
-                options={"require": _REQUIRED_CLAIMS},
-            )
-        except PyJWTError:
-            return _access_error("Invalid access token")
-
-        if data.get("typ") != "access":
-            return _access_error("Invalid access token")
+        data = self._decode_typed_payload(token, expected_type=_ACCESS_KIND)
+        if data is None:
+            return _access_error()
         sub = data.get("sub")
         jti = data.get("jti")
         if not isinstance(sub, str) or not isinstance(jti, str) or not jti:
-            return _access_error("Invalid access token")
+            return _access_error()
         try:
-            return ResultImpl.ok(UUID(sub), AppError)
+            return ResultImpl.ok(UUID(sub))
         except ValueError:
-            return _access_error("Invalid access token")
+            return _access_error()
 
     def verify_refresh(
         self: JwtImpl, token: str
     ) -> Result[tuple[UUID, str, str], AppError]:
-        try:
-            data = _jwt_decode(
-                token,
-                self.cfg.secret,
-                algorithms=[self.cfg.alg],
-                audience=self.cfg.audience,
-                issuer=self.cfg.issuer,
-                options={"require": _REQUIRED_CLAIMS},
-            )
-        except PyJWTError:
-            return _refresh_error("Invalid refresh token")
-
-        if data.get("typ") != "refresh":
-            return _refresh_error("Invalid refresh token")
+        data = self._decode_typed_payload(token, expected_type=_REFRESH_KIND)
+        if data is None:
+            return _refresh_error()
         sub = data.get("sub")
         fpr = data.get("fpr")
         jti = data.get("jti")
@@ -198,9 +172,9 @@ class JwtImpl(JwtIssuer, JwtVerifier):
             or not isinstance(jti, str)
             or not jti
         ):
-            return _refresh_error("Invalid refresh token")
+            return _refresh_error()
         try:
             user_id = UUID(sub)
-            return ResultImpl.ok(_refresh_payload(user_id, fpr, jti), AppError)
+            return ResultImpl.ok(_refresh_payload(user_id, fpr, jti))
         except ValueError:
-            return _refresh_error("Invalid refresh token")
+            return _refresh_error()

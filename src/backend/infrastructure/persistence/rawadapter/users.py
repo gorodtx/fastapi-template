@@ -10,6 +10,12 @@ from uuid_utils.compat import UUID
 from backend.application.common.interfaces.ports.persistence.manager import (
     SessionProtocol,
 )
+from backend.infrastructure.persistence.rawadapter.sql_helpers import (
+    USER_ROW_COLUMNS,
+    map_many_user_rows,
+    map_one_user_row,
+    select_user_rows,
+)
 from backend.infrastructure.persistence.records import UserRowRecord
 from backend.infrastructure.persistence.sqlalchemy.session_db import (
     require_async_session,
@@ -17,7 +23,6 @@ from backend.infrastructure.persistence.sqlalchemy.session_db import (
 from backend.infrastructure.persistence.sqlalchemy.tables.users import (
     users_table,
 )
-from backend.infrastructure.tools.msgspec_convert import convert_record
 
 
 def q_get_user_row_by_id(
@@ -25,23 +30,10 @@ def q_get_user_row_by_id(
 ) -> Callable[[SessionProtocol], Awaitable[UserRowRecord | None]]:
     async def _q(session: SessionProtocol) -> UserRowRecord | None:
         async_session = require_async_session(session)
-        stmt = (
-            sa.select(
-                users_table.c.id.label("id"),
-                users_table.c.email.label("email"),
-                users_table.c.login.label("login"),
-                users_table.c.username.label("username"),
-                users_table.c.password_hash.label("password_hash"),
-                users_table.c.is_active.label("is_active"),
-            )
-            .select_from(users_table)
-            .where(users_table.c.id == user_id)
-        )
+        stmt = select_user_rows(users_table.c.id == user_id)
         res = await async_session.execute(stmt)
         row: RowMapping | None = res.mappings().first()
-        if row is None:
-            return None
-        return convert_record(dict(row), UserRowRecord)
+        return map_one_user_row(row)
 
     return _q
 
@@ -51,23 +43,10 @@ def q_get_user_row_by_email(
 ) -> Callable[[SessionProtocol], Awaitable[UserRowRecord | None]]:
     async def _q(session: SessionProtocol) -> UserRowRecord | None:
         async_session = require_async_session(session)
-        stmt = (
-            sa.select(
-                users_table.c.id.label("id"),
-                users_table.c.email.label("email"),
-                users_table.c.login.label("login"),
-                users_table.c.username.label("username"),
-                users_table.c.password_hash.label("password_hash"),
-                users_table.c.is_active.label("is_active"),
-            )
-            .select_from(users_table)
-            .where(users_table.c.email == email)
-        )
+        stmt = select_user_rows(users_table.c.email == email)
         res = await async_session.execute(stmt)
         row: RowMapping | None = res.mappings().first()
-        if row is None:
-            return None
-        return convert_record(dict(row), UserRowRecord)
+        return map_one_user_row(row)
 
     return _q
 
@@ -80,21 +59,10 @@ def q_get_user_rows_by_ids(
         id_values = list(user_ids)
         if not id_values:
             return []
-        stmt = (
-            sa.select(
-                users_table.c.id.label("id"),
-                users_table.c.email.label("email"),
-                users_table.c.login.label("login"),
-                users_table.c.username.label("username"),
-                users_table.c.password_hash.label("password_hash"),
-                users_table.c.is_active.label("is_active"),
-            )
-            .select_from(users_table)
-            .where(users_table.c.id.in_(id_values))
-        )
+        stmt = select_user_rows(users_table.c.id.in_(id_values))
         res = await async_session.execute(stmt)
         rows: Sequence[RowMapping] = res.mappings().all()
-        return [convert_record(dict(row), UserRowRecord) for row in rows]
+        return map_many_user_rows(rows)
 
     return _q
 
@@ -119,20 +87,14 @@ def q_upsert_user_row(
                 index_elements=[users_table.c.id],
                 set_=values,
             )
-            .returning(
-                users_table.c.id.label("id"),
-                users_table.c.email.label("email"),
-                users_table.c.login.label("login"),
-                users_table.c.username.label("username"),
-                users_table.c.password_hash.label("password_hash"),
-                users_table.c.is_active.label("is_active"),
-            )
+            .returning(*USER_ROW_COLUMNS)
         )
         res = await async_session.execute(stmt)
         row_mapping: RowMapping | None = res.mappings().first()
-        if row_mapping is None:
+        converted = map_one_user_row(row_mapping)
+        if converted is None:
             raise RuntimeError("Failed to upsert user row")
-        return convert_record(dict(row_mapping), UserRowRecord)
+        return converted
 
     return _q
 

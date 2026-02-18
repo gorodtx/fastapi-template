@@ -4,6 +4,7 @@ import msgspec
 import pytest
 from uuid_utils.compat import UUID
 
+from backend.domain.core.constants.rbac import SystemRole
 from backend.infrastructure.persistence.records import UserRowRecord
 from backend.infrastructure.tools.msgspec_convert import convert_record
 
@@ -40,3 +41,26 @@ def test_convert_record_rejects_int_boolean_is_active() -> None:
 
     with pytest.raises(msgspec.ValidationError):
         convert_record(row, UserRowRecord)
+
+
+class _RoleRecord(msgspec.Struct, frozen=True):
+    role: SystemRole
+
+
+def test_convert_record_decodes_system_role_without_app_startup() -> None:
+    record = convert_record({"role": "admin"}, _RoleRecord)
+
+    assert record.role is SystemRole.ADMIN
+
+
+def test_convert_record_encodes_system_role_to_string_field() -> None:
+    record = convert_record(
+        {"role": SystemRole.SUPER_ADMIN},
+        _StringRoleRecord,
+    )
+
+    assert record.role == "super_admin"
+
+
+class _StringRoleRecord(msgspec.Struct, frozen=True):
+    role: str

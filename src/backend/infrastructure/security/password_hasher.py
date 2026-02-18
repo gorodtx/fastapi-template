@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from typing import Final
+from dataclasses import dataclass
 
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import (
@@ -16,21 +16,27 @@ from backend.domain.core.policies.identity import (
     normalize_password,
 )
 
-ARGON2_TIME_COST: Final[int] = 3
-ARGON2_MEMORY_COST_KIB: Final[int] = 65536
-ARGON2_PARALLELISM: Final[int] = 4
-ARGON2_HASH_LEN: Final[int] = 32
-ARGON2_SALT_LEN: Final[int] = 16
+
+@dataclass(frozen=True, slots=True)
+class Argon2Config:
+    time_cost: int = 3
+    memory_cost_kib: int = 65536
+    parallelism: int = 4
+    hash_len: int = 32
+    salt_len: int = 16
 
 
 class Argon2PasswordHasher:
-    def __init__(self: Argon2PasswordHasher) -> None:
+    def __init__(
+        self: Argon2PasswordHasher, *, cfg: Argon2Config | None = None
+    ) -> None:
+        config = cfg or Argon2Config()
         self._hasher = PasswordHasher(
-            time_cost=ARGON2_TIME_COST,
-            memory_cost=ARGON2_MEMORY_COST_KIB,
-            parallelism=ARGON2_PARALLELISM,
-            hash_len=ARGON2_HASH_LEN,
-            salt_len=ARGON2_SALT_LEN,
+            time_cost=config.time_cost,
+            memory_cost=config.memory_cost_kib,
+            parallelism=config.parallelism,
+            hash_len=config.hash_len,
+            salt_len=config.salt_len,
             type=Type.ID,
         )
 

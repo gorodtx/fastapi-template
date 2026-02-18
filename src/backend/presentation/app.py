@@ -10,9 +10,6 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from backend.application.common.exceptions.application import AppError
-from backend.infrastructure.tools.serialization import (
-    register_domain_converters,
-)
 from backend.presentation.di.container import setup_di
 from backend.presentation.di.startup_checks import assert_closed_by_default
 from backend.presentation.http.api.routing.router import api_router
@@ -26,7 +23,6 @@ _PUBLIC_META_FIELDS_BY_CODE: dict[str, tuple[str, ...]] = {
 
 
 def create_app() -> FastAPI:
-    register_domain_converters()
     env = Env()
     if os.environ.get("APP_ENV", "").lower() not in {"prod", "production"}:
         env.read_env()

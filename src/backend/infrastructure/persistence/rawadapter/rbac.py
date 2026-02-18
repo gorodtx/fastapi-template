@@ -11,6 +11,11 @@ from backend.application.common.interfaces.ports.persistence.manager import (
 )
 from backend.domain.core.types.rbac import RoleCode
 from backend.infrastructure.persistence.mappers.rbac import value_to_uuid
+from backend.infrastructure.persistence.rawadapter.sql_helpers import (
+    map_many_user_role_rows,
+    select_user_roles,
+    user_permissions_join,
+)
 from backend.infrastructure.persistence.records import UserRoleCodeRecord
 from backend.infrastructure.persistence.sqlalchemy.session_db import (
     require_async_session,
@@ -22,7 +27,6 @@ from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import
     role_permissions_table,
     user_roles_table,
 )
-from backend.infrastructure.tools.msgspec_convert import convert_record
 
 
 def q_get_user_role_codes(
@@ -30,20 +34,10 @@ def q_get_user_role_codes(
 ) -> Callable[[SessionProtocol], Awaitable[list[UserRoleCodeRecord]]]:
     async def _q(session: SessionProtocol) -> list[UserRoleCodeRecord]:
         async_session = require_async_session(session)
-        join_stmt = user_roles_table.join(
-            roles_table, user_roles_table.c.role_id == roles_table.c.id
-        )
-        stmt = (
-            sa.select(
-                user_roles_table.c.user_id.label("user_id"),
-                roles_table.c.code.label("role"),
-            )
-            .select_from(join_stmt)
-            .where(user_roles_table.c.user_id == user_id)
-        )
+        stmt = select_user_roles(user_roles_table.c.user_id == user_id)
         res = await async_session.execute(stmt)
         rows: Sequence[RowMapping] = res.mappings().all()
-        return [convert_record(dict(row), UserRoleCodeRecord) for row in rows]
+        return map_many_user_role_rows(rows)
 
     return _q
 
@@ -56,20 +50,10 @@ def q_get_user_role_codes_by_user_ids(
         id_values = list(user_ids)
         if not id_values:
             return []
-        join_stmt = user_roles_table.join(
-            roles_table, user_roles_table.c.role_id == roles_table.c.id
-        )
-        stmt = (
-            sa.select(
-                user_roles_table.c.user_id.label("user_id"),
-                roles_table.c.code.label("role"),
-            )
-            .select_from(join_stmt)
-            .where(user_roles_table.c.user_id.in_(id_values))
-        )
+        stmt = select_user_roles(user_roles_table.c.user_id.in_(id_values))
         res = await async_session.execute(stmt)
         rows: Sequence[RowMapping] = res.mappings().all()
-        return [convert_record(dict(row), UserRoleCodeRecord) for row in rows]
+        return map_many_user_role_rows(rows)
 
     return _q
 
@@ -132,12 +116,7 @@ def q_get_user_permission_codes(
 ) -> Callable[[SessionProtocol], Awaitable[list[str]]]:
     async def _q(session: SessionProtocol) -> list[str]:
         async_session = require_async_session(session)
-        join_stmt = user_roles_table.join(
-            roles_table, user_roles_table.c.role_id == roles_table.c.id
-        ).join(
-            role_permissions_table,
-            role_permissions_table.c.role_id == roles_table.c.id,
-        )
+        join_stmt = user_permissions_join()
         stmt = (
             sa.select(sa.distinct(role_permissions_table.c.permission_code))
             .select_from(join_stmt)

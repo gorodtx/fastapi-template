@@ -37,6 +37,13 @@ class Settings:
     jwt_secret: str
     jwt_access_ttl_s: int
     jwt_refresh_ttl_s: int
+    refresh_lock_ttl_s: float
+    refresh_lock_wait_timeout_s: float
+    argon2_time_cost: int
+    argon2_memory_cost_kib: int
+    argon2_parallelism: int
+    argon2_hash_len: int
+    argon2_salt_len: int
 
     @staticmethod
     def from_env(env: Env) -> Settings:
@@ -62,6 +69,18 @@ class Settings:
             jwt_secret=_require_str(env, "JWT_SECRET"),
             jwt_access_ttl_s=_require_int(env, "JWT_ACCESS_TTL_S"),
             jwt_refresh_ttl_s=_require_int(env, "JWT_REFRESH_TTL_S"),
+            refresh_lock_ttl_s=env.float("REFRESH_LOCK_TTL_S", default=10.0),
+            refresh_lock_wait_timeout_s=env.float(
+                "REFRESH_LOCK_WAIT_TIMEOUT_S",
+                default=1.0,
+            ),
+            argon2_time_cost=env.int("ARGON2_TIME_COST", default=3),
+            argon2_memory_cost_kib=env.int(
+                "ARGON2_MEMORY_COST_KIB", default=65536
+            ),
+            argon2_parallelism=env.int("ARGON2_PARALLELISM", default=4),
+            argon2_hash_len=env.int("ARGON2_HASH_LEN", default=32),
+            argon2_salt_len=env.int("ARGON2_SALT_LEN", default=16),
         )
 
 

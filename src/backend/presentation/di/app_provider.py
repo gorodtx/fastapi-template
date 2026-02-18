@@ -34,6 +34,7 @@ from backend.infrastructure.persistence.sqlalchemy.session_db import (
 from backend.infrastructure.security.auth.jwt import JwtConfig, JwtImpl
 from backend.infrastructure.security.auth.refresh_store import RefreshStoreImpl
 from backend.infrastructure.security.password_hasher import (
+    Argon2Config,
     Argon2PasswordHasher,
 )
 from backend.presentation.settings import Settings
@@ -109,7 +110,11 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     def shared_lock(self: Self, client: Redis) -> RedisSharedLock:
-        return RedisSharedLock(client=client)
+        return RedisSharedLock(
+            client=client,
+            ttl_s=self._settings.refresh_lock_ttl_s,
+            wait_timeout_s=self._settings.refresh_lock_wait_timeout_s,
+        )
 
     @provide(scope=Scope.APP)
     def refresh_store(self: Self, cache: StrCache) -> RefreshStore:
@@ -127,7 +132,15 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     def password_hasher(self: Self) -> PasswordHasherPort:
-        return Argon2PasswordHasher()
+        return Argon2PasswordHasher(
+            cfg=Argon2Config(
+                time_cost=self._settings.argon2_time_cost,
+                memory_cost_kib=self._settings.argon2_memory_cost_kib,
+                parallelism=self._settings.argon2_parallelism,
+                hash_len=self._settings.argon2_hash_len,
+                salt_len=self._settings.argon2_salt_len,
+            )
+        )
 
     @provide(scope=Scope.APP)
     def jwt_config(self: Self) -> JwtConfig:

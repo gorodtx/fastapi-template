@@ -10,7 +10,13 @@ from backend.application.common.interfaces.auth.ports import (
     derive_auth_flags,
 )
 from backend.application.common.interfaces.auth.types import AuthUser
+from backend.domain.core.constants.rbac import SystemRole
+from backend.domain.core.policies.rbac import validate_role_code
 from backend.domain.core.types.rbac import PermissionCode, RoleCode
+
+_ALLOWED_SYSTEM_ROLES: frozenset[RoleCode] = frozenset(
+    role.value for role in SystemRole
+)
 
 
 def encode_cached_user(user: AuthUser) -> str:
@@ -79,7 +85,13 @@ def decode_cached_user(raw: str) -> AuthUser | None:
 def _safe_role(raw: object) -> RoleCode | None:
     if not isinstance(raw, str):
         return None
-    return raw
+    try:
+        role = validate_role_code(raw)
+    except ValueError:
+        return None
+    if role not in _ALLOWED_SYSTEM_ROLES:
+        return None
+    return role
 
 
 def _safe_permission(raw: object) -> PermissionCode | None:

@@ -17,13 +17,12 @@ from backend.application.common.exceptions.auth import (
 )
 from backend.application.common.interfaces.ports.shared_lock import SharedLock
 
-_LOCK_TTL_S: float = 10.0
-_LOCK_WAIT_TIMEOUT_S: float = 1.0
-
 
 @dataclass(slots=True)
 class RedisSharedLock(SharedLock):
     client: Redis
+    ttl_s: float = 10.0
+    wait_timeout_s: float = 1.0
 
     def __call__(
         self: RedisSharedLock, key: str
@@ -34,8 +33,8 @@ class RedisSharedLock(SharedLock):
     async def _lock(self: RedisSharedLock, key: str) -> AsyncIterator[None]:
         lock: Lock = self.client.lock(
             key,
-            timeout=_LOCK_TTL_S,
-            blocking_timeout=_LOCK_WAIT_TIMEOUT_S,
+            timeout=self.ttl_s,
+            blocking_timeout=self.wait_timeout_s,
         )
         acquired: bool = await lock.acquire()
         if not acquired:
