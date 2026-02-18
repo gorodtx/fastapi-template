@@ -11,9 +11,9 @@ from backend.application.common.exceptions.error_mappers.storage import (
 from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
-from backend.application.common.tools.tx_result import run_in_tx
+from backend.application.common.tools.tx_result import run_result_in_tx
 from backend.application.handlers.base import CommandHandler
-from backend.application.handlers.result import Result
+from backend.application.handlers.result import Err, Result, ResultImpl
 from backend.application.handlers.transform import handler
 
 
@@ -27,21 +27,27 @@ class DeleteUserHandler(CommandHandler[DeleteUserCommand, SuccessDTO]):
     async def __call__(
         self: DeleteUserHandler, cmd: DeleteUserCommand, /
     ) -> Result[SuccessDTO, AppError]:
-        async def action() -> SuccessDTO:
-            (
-                await self.gateway.users.get_by_id(
-                    cmd.user_id,
-                    include_roles=False,
-                )
-            ).map_err(map_storage_error_to_app()).unwrap()
-
-            (await self.gateway.users.delete(cmd.user_id)).map_err(
-                map_storage_error_to_app()
-            ).unwrap()
-
-            return SuccessDTO()
-
-        return await run_in_tx(
+        return await run_result_in_tx(
             manager=self.gateway.manager,
-            action=action,
+            action=self._execute(cmd),
         )
+
+    async def _execute(
+        self: DeleteUserHandler, cmd: DeleteUserCommand
+    ) -> Result[SuccessDTO, AppError]:
+        user_result = (
+            await self.gateway.users.get_by_id(
+                cmd.user_id,
+                include_roles=False,
+            )
+        ).map_err(map_storage_error_to_app())
+        if isinstance(user_result, Err):
+            return ResultImpl.err_from(user_result)
+
+        delete_result = (await self.gateway.users.delete(cmd.user_id)).map_err(
+            map_storage_error_to_app()
+        )
+        if isinstance(delete_result, Err):
+            return ResultImpl.err_from(delete_result)
+
+        return ResultImpl.ok(SuccessDTO())

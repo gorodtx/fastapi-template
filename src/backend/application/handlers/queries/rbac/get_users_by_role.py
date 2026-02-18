@@ -17,7 +17,7 @@ from backend.application.common.presenters.rbac import (
 )
 from backend.application.common.presenters.users import present_user_response
 from backend.application.handlers.base import QueryHandler
-from backend.application.handlers.result import Result, ResultImpl
+from backend.application.handlers.result import Err, Result, ResultImpl
 from backend.application.handlers.transform import handler
 from backend.domain.core.types.rbac import RoleCode
 
@@ -41,19 +41,20 @@ class GetUsersByRoleHandler(
         ids_result = (
             await self.gateway.rbac.list_user_ids_by_role(role)
         ).map_err(map_storage_error)
-        if ids_result.is_err():
+        if isinstance(ids_result, Err):
             return ResultImpl.err_from(ids_result)
+        user_ids = ids_result.value
 
         users_result = (
             await self.gateway.users.get_by_ids(
-                ids_result.unwrap(),
+                user_ids,
                 include_roles=False,
             )
         ).map_err(map_storage_error)
-        if users_result.is_err():
+        if isinstance(users_result, Err):
             return ResultImpl.err_from(users_result)
 
         users: list[UserResponseDTO] = [
-            present_user_response(user) for user in users_result.unwrap()
+            present_user_response(user) for user in users_result.value
         ]
-        return ResultImpl.ok(present_users_by_role(role, users), AppError)
+        return ResultImpl.ok(present_users_by_role(role, users))

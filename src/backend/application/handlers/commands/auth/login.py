@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 from backend.application.common.dtos.auth import LoginUserDTO, TokenPairDTO
 from backend.application.common.exceptions.application import (
     AppError,
@@ -24,6 +26,7 @@ from backend.application.common.tools.refresh_tokens import (
 )
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
+    Err,
     Result,
     ResultImpl,
     capture_async,
@@ -52,28 +55,28 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
             cmd.email,
             include_roles=False,
         )
-        if user_result.is_err():
-            err = user_result.unwrap_err()
+        if isinstance(user_result, Err):
+            err = user_result.error
             if isinstance(err, NotFoundStorageError):
-                return ResultImpl.err_app(invalid_credentials, TokenPairDTO)
-            return ResultImpl.err_app(
-                map_storage_error_to_app()(err), TokenPairDTO
-            )
+                return ResultImpl.err_app(invalid_credentials)
+            return ResultImpl.err_app(map_storage_error_to_app()(err))
 
-        user = user_result.unwrap()
+        user = user_result.value
         if not user.is_active:
-            return ResultImpl.err_app(invalid_credentials, TokenPairDTO)
+            return ResultImpl.err_app(invalid_credentials)
 
         verify_result = await capture_async(
-            lambda: self.password_hasher.verify(
-                cmd.raw_password, user.password
+            partial(
+                self.password_hasher.verify,
+                cmd.raw_password,
+                user.password,
             ),
             map_invalid_credentials(),
         )
-        if verify_result.is_err():
+        if isinstance(verify_result, Err):
             return ResultImpl.err_from(verify_result)
-        if not verify_result.unwrap():
-            return ResultImpl.err_app(invalid_credentials, TokenPairDTO)
+        if not verify_result.value:
+            return ResultImpl.err_app(invalid_credentials)
 
         user_id = user.id
         access_token = self.jwt_issuer.issue_access(user_id=user_id)
@@ -83,7 +86,8 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
         )
 
         rotate_result = await capture_async(
-            lambda: self.refresh_tokens.rotate(
+            partial(
+                self.refresh_tokens.rotate,
                 user_id=user_id,
                 fingerprint=cmd.fingerprint,
                 old_jti="",
@@ -91,13 +95,12 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
             ),
             map_refresh_replay(),
         )
-        if rotate_result.is_err():
+        if isinstance(rotate_result, Err):
             return ResultImpl.err_from(rotate_result)
 
         return ResultImpl.ok(
             TokenPairDTO(
                 access_token=access_token,
                 refresh_token=refresh_token,
-            ),
-            AppError,
+            )
         )

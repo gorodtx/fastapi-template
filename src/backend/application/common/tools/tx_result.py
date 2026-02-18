@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable
 
 from backend.application.common.exceptions.application import AppError
 from backend.application.common.interfaces.ports.persistence.manager import (
@@ -9,13 +9,13 @@ from backend.application.common.interfaces.ports.persistence.manager import (
 from backend.application.handlers.result import Result, ResultImpl
 
 
-async def run_in_tx[T](
+async def run_result_in_tx[T](
     manager: TransactionManager,
-    action: Callable[[], Awaitable[T]],
+    action: Awaitable[Result[T, AppError]],
 ) -> Result[T, AppError]:
     try:
         async with manager.transaction():
-            value = await action()
-            return ResultImpl.ok(value, AppError)
+            value = (await action).unwrap()
+            return ResultImpl.ok(value)
     except AppError as exc:
         return ResultImpl.err_app(exc)

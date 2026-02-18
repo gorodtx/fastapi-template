@@ -13,7 +13,7 @@ from backend.application.common.tools.user_access import (
     fetch_user_and_permissions,
 )
 from backend.application.handlers.base import QueryHandler
-from backend.application.handlers.result import Result, ResultImpl
+from backend.application.handlers.result import Err, Result, ResultImpl
 from backend.application.handlers.transform import handler
 
 
@@ -34,9 +34,9 @@ class GetUserRolesHandler(
         data_result = await fetch_user_and_permissions(
             self.gateway, query.user_id
         )
-        if data_result.is_err():
+        if isinstance(data_result, Err):
             return ResultImpl.err_from(data_result)
-        user, permissions = data_result.unwrap()
+        user, permissions = data_result.value
 
         return ResultImpl.ok(
             present_user_roles(
@@ -44,5 +44,4 @@ class GetUserRolesHandler(
                 roles=frozenset(user.roles),
                 permissions=frozenset(permissions),
             ),
-            AppError,
         )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 from backend.application.common.dtos.auth import (
     RegisterUserDTO,
     TokenPairDTO,
@@ -21,6 +23,7 @@ from backend.application.handlers.commands.users.create import (
     CreateUserHandler,
 )
 from backend.application.handlers.result import (
+    Err,
     Result,
     ResultImpl,
     capture_async,
@@ -58,17 +61,18 @@ class RegisterUserHandler(CommandHandler[RegisterUserCommand, TokenPairDTO]):
             raw_password=cmd.raw_password,
         )
         create_result = await create_handler(create_cmd)
-        if create_result.is_err():
-            return ResultImpl.err_from(create_result, TokenPairDTO)
+        if isinstance(create_result, Err):
+            return ResultImpl.err_from(create_result)
 
-        user = create_result.unwrap()
+        user = create_result.value
         access_token = self.jwt_issuer.issue_access(user_id=user.id)
         refresh_token, refresh_jti = self.jwt_issuer.issue_refresh(
             user_id=user.id,
             fingerprint=cmd.fingerprint,
         )
         rotate_result = await capture_async(
-            lambda: self.refresh_tokens.rotate(
+            partial(
+                self.refresh_tokens.rotate,
                 user_id=user.id,
                 fingerprint=cmd.fingerprint,
                 old_jti="",
@@ -76,13 +80,12 @@ class RegisterUserHandler(CommandHandler[RegisterUserCommand, TokenPairDTO]):
             ),
             map_refresh_replay(),
         )
-        if rotate_result.is_err():
-            return ResultImpl.err_from(rotate_result, TokenPairDTO)
+        if isinstance(rotate_result, Err):
+            return ResultImpl.err_from(rotate_result)
 
         return ResultImpl.ok(
             TokenPairDTO(
                 access_token=access_token,
                 refresh_token=refresh_token,
-            ),
-            AppError,
+            )
         )

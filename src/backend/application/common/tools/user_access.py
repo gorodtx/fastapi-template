@@ -9,7 +9,7 @@ from backend.application.common.exceptions.error_mappers.storage import (
 from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
-from backend.application.handlers.result import Result, ResultImpl
+from backend.application.handlers.result import Err, Result, ResultImpl
 from backend.domain.core.entities.user import User
 from backend.domain.core.types.rbac import PermissionCode
 
@@ -21,16 +21,13 @@ async def fetch_user_and_permissions(
     user_result = (await gateway.users.get_by_id(user_id)).map_err(
         map_storage_error
     )
-    if user_result.is_err():
+    if isinstance(user_result, Err):
         return ResultImpl.err_from(user_result)
 
     permissions_result = (
         await gateway.rbac.get_user_permission_codes(user_id)
     ).map_err(map_storage_error)
-    if permissions_result.is_err():
+    if isinstance(permissions_result, Err):
         return ResultImpl.err_from(permissions_result)
 
-    return ResultImpl.ok(
-        (user_result.unwrap(), permissions_result.unwrap()),
-        AppError,
-    )
+    return ResultImpl.ok((user_result.value, permissions_result.value))

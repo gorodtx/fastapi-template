@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 from backend.application.common.dtos.auth import RefreshUserDTO, TokenPairDTO
 from backend.application.common.exceptions.application import (
     AppError,
@@ -17,6 +19,7 @@ from backend.application.common.tools.refresh_tokens import (
 )
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
+    Err,
     Result,
     ResultImpl,
     capture_async,
@@ -39,13 +42,13 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
         /,
     ) -> Result[TokenPairDTO, AppError]:
         verify_result = self.jwt_verifier.verify_refresh(cmd.refresh_token)
-        if verify_result.is_err():
+        if isinstance(verify_result, Err):
             return ResultImpl.err_from(verify_result)
 
-        user_id, token_fingerprint, old_jti = verify_result.unwrap()
+        user_id, token_fingerprint, old_jti = verify_result.value
         if token_fingerprint != cmd.fingerprint:
             err = UnauthenticatedError("Refresh token fingerprint mismatch")
-            return ResultImpl.err_app(err, TokenPairDTO)
+            return ResultImpl.err_app(err)
 
         access_token = self.jwt_issuer.issue_access(user_id=user_id)
         refresh_token, refresh_jti = self.jwt_issuer.issue_refresh(
@@ -54,7 +57,8 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
         )
 
         rotate_result = await capture_async(
-            lambda: self.refresh_tokens.rotate(
+            partial(
+                self.refresh_tokens.rotate,
                 user_id=user_id,
                 fingerprint=cmd.fingerprint,
                 old_jti=old_jti,
@@ -62,13 +66,12 @@ class RefreshUserHandler(CommandHandler[RefreshUserCommand, TokenPairDTO]):
             ),
             map_refresh_token_error(),
         )
-        if rotate_result.is_err():
+        if isinstance(rotate_result, Err):
             return ResultImpl.err_from(rotate_result)
 
         return ResultImpl.ok(
             TokenPairDTO(
                 access_token=access_token,
                 refresh_token=refresh_token,
-            ),
-            AppError,
+            )
         )

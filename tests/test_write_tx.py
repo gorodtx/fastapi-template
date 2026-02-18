@@ -7,7 +7,8 @@ import pytest
 from backend.application.common.exceptions.application import (
     UnauthenticatedError,
 )
-from backend.application.common.tools.tx_result import run_in_tx
+from backend.application.common.tools.tx_result import run_result_in_tx
+from backend.application.handlers.result import ResultImpl
 
 
 @dataclass(slots=True)
@@ -39,13 +40,13 @@ class _ManagerStub:
 
 
 @pytest.mark.asyncio
-async def test_run_in_tx_returns_ok_value() -> None:
+async def test_run_result_in_tx_unwraps_ok_result() -> None:
     manager = _ManagerStub(tx=_TxScope())
 
-    async def action() -> int:
-        return 17
+    async def action() -> object:
+        return ResultImpl.ok(17, UnauthenticatedError)
 
-    result = await run_in_tx(manager, action)
+    result = await run_result_in_tx(manager, action())
 
     assert result.is_ok()
     assert result.unwrap() == 17
@@ -55,13 +56,29 @@ async def test_run_in_tx_returns_ok_value() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_in_tx_maps_app_error_to_err_result() -> None:
+async def test_run_result_in_tx_maps_raised_app_error_to_err_result() -> None:
     manager = _ManagerStub(tx=_TxScope())
 
-    async def action() -> int:
+    async def action() -> object:
         raise UnauthenticatedError()
 
-    result = await run_in_tx(manager, action)
+    result = await run_result_in_tx(manager, action())
+
+    assert result.is_err()
+    assert isinstance(result.unwrap_err(), UnauthenticatedError)
+    assert manager.tx.entered is True
+    assert manager.tx.exited is True
+    assert manager.tx.seen_exc is UnauthenticatedError
+
+
+@pytest.mark.asyncio
+async def test_run_result_in_tx_maps_err_result_and_rolls_back() -> None:
+    manager = _ManagerStub(tx=_TxScope())
+
+    async def action() -> object:
+        return ResultImpl.err_app(UnauthenticatedError(), int)
+
+    result = await run_result_in_tx(manager, action())
 
     assert result.is_err()
     assert isinstance(result.unwrap_err(), UnauthenticatedError)

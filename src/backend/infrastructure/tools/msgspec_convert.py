@@ -22,7 +22,7 @@ def _row_dec_hook(tp: type[object], obj: object) -> object:
     if tp is bool:
         if isinstance(obj, bool):
             return obj
-        return bool(obj)
+        raise TypeError("Expected bool")
     if tp is str:
         if isinstance(obj, str):
             return obj

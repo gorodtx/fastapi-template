@@ -25,9 +25,6 @@ class Ok[T, E: Exception]:
     def unwrap_err(self: Ok[T, E]) -> NoReturn:
         raise RuntimeError("Result has no error")
 
-    def unwrap_or(self: Ok[T, E], _default: T) -> T:
-        return self.value
-
     def unwrap_or_raise(self: Ok[T, E], _err: Exception) -> T:
         return self.value
 
@@ -38,11 +35,6 @@ class Ok[T, E: Exception]:
         self: Ok[T, E], _fn: Callable[[E], F]
     ) -> Result[T, F]:
         return Ok(self.value)
-
-    def and_then[U](
-        self: Ok[T, E], fn: Callable[[T], Result[U, E]]
-    ) -> Result[U, E]:
-        return fn(self.value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,11 +64,6 @@ class Err[T, E: Exception]:
     ) -> Result[T, F]:
         return Err(fn(self.error))
 
-    def and_then[U](
-        self: Err[T, E], _fn: Callable[[T], Result[U, E]]
-    ) -> Result[U, E]:
-        return Err(self.error)
-
 
 class ResultImpl:
     @staticmethod
@@ -101,7 +88,9 @@ class ResultImpl:
     def err_from[T, U, E: Exception](
         other: Result[U, E], _value_type: type[T] | None = None
     ) -> Err[T, E]:
-        return Err(other.unwrap_err())
+        if isinstance(other, Err):
+            return Err(other.error)
+        raise RuntimeError("Result has no error")
 
 
 def capture[T, E: Exception](
