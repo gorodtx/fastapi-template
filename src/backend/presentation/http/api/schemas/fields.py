@@ -4,7 +4,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, StringConstraints
 
-from backend.domain.core.policies.identity import (
+from backend.presentation.http.api.schemas.validation_identity import (
     FINGERPRINT_PATTERN,
     MAX_EMAIL_LENGTH,
     MAX_FINGERPRINT_LENGTH,

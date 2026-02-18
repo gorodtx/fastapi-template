@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import Path
 from pydantic import AfterValidator, StringConstraints
 
-from backend.domain.core.policies.rbac import (
+from backend.presentation.http.api.schemas.validation_rbac import (
     MAX_ROLE_CODE_LENGTH,
     MIN_ROLE_CODE_LENGTH,
     ROLE_CODE_PATTERN,

@@ -1,0 +1,26 @@
+services:
+  postgres:
+    network_mode: host
+    ports: []
+
+  redis:
+    network_mode: host
+    ports: []
+
+  migrate:
+    network_mode: host
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/postgres
+      REDIS_URL: redis://127.0.0.1:6379/0
+
+  app:
+    network_mode: host
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/postgres
+      REDIS_URL: redis://127.0.0.1:6379/0
+
+  nginx:
+    network_mode: host
+    ports: []
+    environment:
+      APP_UPSTREAM: 127.0.0.1:8000

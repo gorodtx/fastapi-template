@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from uuid_utils.compat import UUID
 
+from backend.domain.core.constants.rbac import SystemRole
 from backend.domain.core.entities.user import User
 from backend.domain.core.exceptions.rbac import RoleNotAssignedError
 from backend.domain.core.exceptions.user import UserDataCorruptedError
+from backend.domain.core.policies.rbac import validate_role_code
 from backend.domain.core.types.rbac import RoleCode
+
+_ALLOWED_SYSTEM_ROLES: frozenset[RoleCode] = frozenset(
+    role.value for role in SystemRole
+)
 
 
 def build_user(
@@ -39,11 +45,20 @@ def rehydrate_user(
     is_active: bool,
     roles: set[RoleCode],
 ) -> User:
+    checked_roles: set[RoleCode] = set()
     for role in roles:
-        if not isinstance(role, str):
+        try:
+            checked_role = validate_role_code(role)
+        except (TypeError, ValueError) as exc:
             raise UserDataCorruptedError(
-                user_id=id, details="roles: invalid role entry"
+                user_id=id, details=f"roles: invalid role entry: {exc}"
+            ) from exc
+        if checked_role not in _ALLOWED_SYSTEM_ROLES:
+            raise UserDataCorruptedError(
+                user_id=id,
+                details=f"roles: unknown role code: {checked_role}",
             )
+        checked_roles.add(checked_role)
     return User(
         id=id,
         email=email,
@@ -51,7 +66,7 @@ def rehydrate_user(
         username=username,
         password=password_hash,
         is_active=is_active,
-        roles=set(roles),
+        roles=checked_roles,
     )
 
 
