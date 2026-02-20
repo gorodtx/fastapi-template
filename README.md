@@ -87,20 +87,21 @@ Smoke checks / Проверка:
 - Request lifecycle:
   - one request-scoped `AsyncSession`
   - one request-scoped `TransactionManager`
-- Write use-cases run in short transactions (`run_in_tx` + `manager.transaction()`).
+- Write use-cases run in short transactions (`run_result_in_tx` + `manager.transaction()`).
 - Nested behavior is explicit:
   - `nested=True` -> savepoint (`begin_nested`)
   - already-inside scope -> no extra scope (`nullcontext`)
   - existing DB transaction without scope -> controlled commit/rollback scope
 - Startup behavior:
-  - app factory calls `register_domain_converters()` before wiring routes
-  - converter/mapping registration is startup initialization
-  - DB transactions are applied to write use-cases, not to converter registration
+  - app factory builds `Settings` from env and disables docs/openapi in `prod|production`
+  - DI is wired via `setup_di(app, settings)` with Dishka route integration
+  - app-level `AppError` handler sanitizes payload/meta and maps status codes
+  - `assert_closed_by_default(app)` enforces auth dependency for non-public routes
 
-### 3) RBAC contract: fixed role/permission catalog
+### 3) RBAC contract: versioned role/permission catalog
 
-Role/permission **catalog** is fixed and versioned through migrations.  
-Public API does **not** create roles or permissions; API only assigns/revokes roles for users.
+Role/permission **catalog** is seeded and versioned through migrations.  
+Public API still does **not** create roles or permissions; API only assigns/revokes roles for users.
 
 Current system roles (`SystemRole`):
 
@@ -123,6 +124,8 @@ Current registry (`ROLE_PERMISSIONS`):
 - `user`: empty permission set
 - `admin`: full admin set above
 - `super_admin`: currently same as admin (prepared for extension later)
+
+Additional roles/permissions can be added via migration template (`20260209_0003`), then assigned through API.
 
 ### 4) Database schema and table relations
 
@@ -231,12 +234,22 @@ Important variables:
 - `JWT_ACCESS_TTL_S`
 - `JWT_REFRESH_TTL_S`
 - `DEFAULT_REGISTRATION_ROLE_CODE`
+- `AUTH_USER_CACHE_TTL_S`
+- refresh-lock settings:
+  - `REFRESH_LOCK_TTL_S`
+  - `REFRESH_LOCK_WAIT_TIMEOUT_S`
 - pool/timeout settings:
   - `DB_POOL_SIZE`
   - `DB_MAX_OVERFLOW`
   - `DB_POOL_TIMEOUT_S`
   - `DB_POOL_RECYCLE_S`
   - `DB_CONNECT_TIMEOUT_S`
+- Argon2 settings:
+  - `ARGON2_TIME_COST`
+  - `ARGON2_MEMORY_COST_KIB`
+  - `ARGON2_PARALLELISM`
+  - `ARGON2_HASH_LEN`
+  - `ARGON2_SALT_LEN`
 
 Production notes:
 
@@ -245,6 +258,12 @@ Production notes:
 - docs/openapi are disabled when `APP_ENV` is `prod` or `production`
 
 ### 7) Runtime
+
+Recommended local start (includes Linux host-network fallback logic):
+
+```bash
+./scripts/up.sh
+```
 
 Default runtime (cross-platform path):
 
@@ -258,6 +277,12 @@ If Docker build has DNS issues with PyPI:
 ```bash
 DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate app nginx
 ```
+
+Nginx auth rate limits are configurable via compose env vars:
+
+- `AUTH_LOGIN_RATE`
+- `AUTH_REGISTER_RATE`
+- `AUTH_REFRESH_RATE`
 
 Runtime entrypoints:
 
@@ -334,19 +359,20 @@ E2E_ADMIN_BEARER="<admin access token>"
 - На один HTTP-запрос:
   - одна request-scoped `AsyncSession`
   - один request-scoped `TransactionManager`
-- Write use-case выполняются в короткой транзакции (`run_in_tx` + `manager.transaction()`).
+- Write use-case выполняются в короткой транзакции (`run_result_in_tx` + `manager.transaction()`).
 - Поведение вложенности:
   - `nested=True` -> savepoint (`begin_nested`)
   - если scope уже открыт -> без доп. scope (`nullcontext`)
   - если внешняя транзакция уже есть, но scope нет -> контролируемый commit/rollback scope
 - Поведение старта:
-  - в фабрике приложения вызывается `register_domain_converters()`
-  - регистрация converter/mapping-объектов делается на старте
-  - транзакции БД применяются к write use-case, а не к регистрации конвертеров
+  - фабрика приложения собирает `Settings` из env и отключает docs/openapi в `prod|production`
+  - DI подключается через `setup_di(app, settings)` и интеграцию Dishka routes
+  - app-level `AppError` handler санитизирует payload/meta и маппит status codes
+  - `assert_closed_by_default(app)` проверяет auth dependency для непубличных роутов
 
-### 3) RBAC-контракт: фиксированный каталог ролей/прав
+### 3) RBAC-контракт: версионируемый каталог ролей/прав
 
-Каталог ролей/прав фиксирован и версионируется миграциями.  
+Каталог ролей/прав сидируется и версионируется миграциями.  
 Публичный API **не** создаёт роли и permission’ы; API только назначает/снимает роли у пользователей.
 
 Текущие системные роли (`SystemRole`):
@@ -370,6 +396,8 @@ E2E_ADMIN_BEARER="<admin access token>"
 - `user`: пустой набор прав
 - `admin`: полный admin-набор выше
 - `super_admin`: сейчас равен `admin` (подготовлена точка расширения)
+
+Дополнительные роли/права можно добавлять миграционным шаблоном (`20260209_0003`), а затем назначать через API.
 
 ### 4) Схема БД и связи таблиц
 
@@ -478,12 +506,22 @@ cp .env.example .env
 - `JWT_ACCESS_TTL_S`
 - `JWT_REFRESH_TTL_S`
 - `DEFAULT_REGISTRATION_ROLE_CODE`
+- `AUTH_USER_CACHE_TTL_S`
+- настройки refresh-lock:
+  - `REFRESH_LOCK_TTL_S`
+  - `REFRESH_LOCK_WAIT_TIMEOUT_S`
 - настройки пула/таймаутов:
   - `DB_POOL_SIZE`
   - `DB_MAX_OVERFLOW`
   - `DB_POOL_TIMEOUT_S`
   - `DB_POOL_RECYCLE_S`
   - `DB_CONNECT_TIMEOUT_S`
+- настройки Argon2:
+  - `ARGON2_TIME_COST`
+  - `ARGON2_MEMORY_COST_KIB`
+  - `ARGON2_PARALLELISM`
+  - `ARGON2_HASH_LEN`
+  - `ARGON2_SALT_LEN`
 
 Для прода:
 
@@ -492,6 +530,12 @@ cp .env.example .env
 - в `APP_ENV=prod|production` отключаются docs/openapi
 
 ### 7) Запуск runtime
+
+Рекомендуемый локальный запуск (включает Linux host-network fallback):
+
+```bash
+./scripts/up.sh
+```
 
 Базовый запуск (кроссплатформенный путь):
 
@@ -505,6 +549,12 @@ docker compose up -d --build postgres redis migrate app nginx
 ```bash
 DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate app nginx
 ```
+
+Лимиты auth в nginx настраиваются через compose env:
+
+- `AUTH_LOGIN_RATE`
+- `AUTH_REGISTER_RATE`
+- `AUTH_REFRESH_RATE`
 
 Entrypoint’ы runtime:
 

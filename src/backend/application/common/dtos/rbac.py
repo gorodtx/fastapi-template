@@ -8,12 +8,6 @@ from backend.domain.core.types.rbac import RoleCode
 
 
 @dto
-class RoleAssignmentResultDTO:
-    user_id: UUID
-    role: str
-
-
-@dto
 class AssignRoleToUserDTO:
     user_id: UUID
     role: str

@@ -97,7 +97,7 @@ async def update_user(
         email=str(payload.email) if payload.email is not None else None,
         raw_password=payload.raw_password,
     )
-    dto = (await handler(cmd)).unwrap()
+    dto = await unwrap_result(handler(cmd))
     await run_best_effort(
         cache_invalidator.invalidate_user(user_id),
         effect="auth-cache invalidation after user update",
@@ -119,7 +119,7 @@ async def delete_user(
         gateway=gateway,
     )
     cmd = DeleteUserCommand(user_id=user_id)
-    dto = (await handler(cmd)).unwrap()
+    dto = await unwrap_result(handler(cmd))
     await run_best_effort(
         cache_invalidator.invalidate_user(user_id),
         effect="auth-cache invalidation after user delete",

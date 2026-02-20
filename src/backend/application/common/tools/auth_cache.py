@@ -12,7 +12,4 @@ class AuthCacheInvalidator:
     cache: StrCache
 
     async def invalidate_user(self, user_id: UUID) -> None:
-        try:
-            await self.cache.delete(f"auth:user:{user_id}")
-        except Exception:
-            return
+        await self.cache.delete(f"auth:user:{user_id}")

@@ -23,6 +23,9 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
 from backend.application.common.interfaces.ports.persistence.manager import (
     TransactionManager,
 )
+from backend.application.common.interfaces.ports.system_health import (
+    SystemHealthPort,
+)
 from backend.application.common.tools.permission_guard import PermissionGuard
 from backend.infrastructure.persistence.manager import TransactionManagerImpl
 from backend.infrastructure.persistence.persistence_gateway import (
@@ -34,6 +37,9 @@ from backend.infrastructure.security.auth.authenticator import (
 from backend.infrastructure.security.auth.cache_codec import (
     decode_cached_user,
     encode_cached_user,
+)
+from backend.infrastructure.system_health import (
+    InfrastructureSystemHealthProbe,
 )
 
 
@@ -84,6 +90,14 @@ class RequestProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def permission_guard(self: Self) -> PermissionGuard:
         return PermissionGuard()
+
+    @provide(scope=Scope.REQUEST)
+    def system_health_probe(
+        self: Self,
+        manager: TransactionManager,
+        cache: StrCache,
+    ) -> SystemHealthPort:
+        return InfrastructureSystemHealthProbe(manager=manager, cache=cache)
 
     @provide(scope=Scope.REQUEST)
     async def current_user(

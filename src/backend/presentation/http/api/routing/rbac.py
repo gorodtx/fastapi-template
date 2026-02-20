@@ -72,7 +72,7 @@ async def assign_role_to_user(
         actor_id=current_user.id,
         actor_roles=current_user.role_codes,
     )
-    dto = (await handler(cmd)).unwrap()
+    dto = await unwrap_result(handler(cmd))
     await run_best_effort(
         cache_invalidator.invalidate_user(user_id),
         effect="auth-cache invalidation after role assign",
@@ -105,7 +105,7 @@ async def revoke_role_from_user(
         actor_id=current_user.id,
         actor_roles=current_user.role_codes,
     )
-    dto = (await handler(cmd)).unwrap()
+    dto = await unwrap_result(handler(cmd))
     await run_best_effort(
         cache_invalidator.invalidate_user(user_id),
         effect="auth-cache invalidation after role revoke",

@@ -14,10 +14,6 @@ from backend.domain.core.types.rbac import (
 
 
 class RbacAdapter(Protocol):
-    def get_user_roles(
-        self: RbacAdapter, user_id: UUID, /
-    ) -> Awaitable[Result[set[RoleCode], StorageError]]: ...
-
     def get_user_permission_codes(
         self: RbacAdapter, user_id: UUID, /
     ) -> Awaitable[Result[set[PermissionCode], StorageError]]: ...

@@ -27,7 +27,7 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_users_login_alnum",
         "users",
-        r"login ~ '^[A-Za-z0-9]+$'",
+        r"login ~ '^[[:alnum:]]+$'",
     )
     op.create_check_constraint(
         "ck_users_email_format",

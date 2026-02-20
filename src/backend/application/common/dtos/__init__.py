@@ -1,3 +1,3 @@
 from __future__ import annotations
 
-__all__: tuple[str, ...] = ("auth", "base", "rbac", "users")
+__all__: tuple[str, ...] = ("auth", "base", "rbac", "system", "users")

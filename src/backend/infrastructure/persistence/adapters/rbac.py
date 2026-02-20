@@ -14,17 +14,12 @@ from backend.domain.core.types.rbac import (
     RoleCode,
 )
 from backend.infrastructure.persistence.adapters.base import UnboundAdapter
-from backend.infrastructure.persistence.mappers.users import (
-    role_records_to_set,
-)
 from backend.infrastructure.persistence.rawadapter.rbac import (
     q_get_role_ids_by_codes,
     q_get_user_permission_codes,
-    q_get_user_role_codes,
     q_list_user_ids_by_role_id,
     q_replace_user_roles,
 )
-from backend.infrastructure.persistence.records import UserRoleCodeRecord
 from backend.infrastructure.tools.storage_result import storage_result
 
 
@@ -36,17 +31,6 @@ class _ReplaceUserRoles:
 
 class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
     __slots__: tuple[str, ...] = ()
-
-    async def get_user_roles(
-        self: SqlRbacAdapter, user_id: UUID
-    ) -> Result[set[RoleCode], StorageError]:
-        async def _call() -> set[RoleCode]:
-            rows: list[UserRoleCodeRecord] = await self.manager.send(
-                q_get_user_role_codes(user_id)
-            )
-            return role_records_to_set(rows)
-
-        return await storage_result(_call)
 
     async def get_user_permission_codes(
         self: SqlRbacAdapter, user_id: UUID

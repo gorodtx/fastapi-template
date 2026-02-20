@@ -27,6 +27,14 @@ def _require_positive_int(value: int, name: str) -> int:
     return value
 
 
+def _require_positive_float(value: float, name: str) -> float:
+    if value <= 0:
+        raise RuntimeError(
+            f"Environment variable must be positive number: {name}"
+        )
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     app_env: str
@@ -76,16 +84,25 @@ class Settings:
             jwt_audience=_require_str(env, "JWT_AUDIENCE"),
             jwt_alg=_require_str(env, "JWT_ALG"),
             jwt_secret=_require_str(env, "JWT_SECRET"),
-            jwt_access_ttl_s=_require_int(env, "JWT_ACCESS_TTL_S"),
-            jwt_refresh_ttl_s=_require_int(env, "JWT_REFRESH_TTL_S"),
+            jwt_access_ttl_s=_require_positive_int(
+                _require_int(env, "JWT_ACCESS_TTL_S"),
+                "JWT_ACCESS_TTL_S",
+            ),
+            jwt_refresh_ttl_s=_require_positive_int(
+                _require_int(env, "JWT_REFRESH_TTL_S"),
+                "JWT_REFRESH_TTL_S",
+            ),
             auth_user_cache_ttl_s=_require_positive_int(
                 env.int("AUTH_USER_CACHE_TTL_S", default=300),
                 "AUTH_USER_CACHE_TTL_S",
             ),
-            refresh_lock_ttl_s=env.float("REFRESH_LOCK_TTL_S", default=10.0),
-            refresh_lock_wait_timeout_s=env.float(
+            refresh_lock_ttl_s=_require_positive_float(
+                env.float("REFRESH_LOCK_TTL_S", default=10.0),
+                "REFRESH_LOCK_TTL_S",
+            ),
+            refresh_lock_wait_timeout_s=_require_positive_float(
+                env.float("REFRESH_LOCK_WAIT_TIMEOUT_S", default=1.0),
                 "REFRESH_LOCK_WAIT_TIMEOUT_S",
-                default=1.0,
             ),
             argon2_time_cost=env.int("ARGON2_TIME_COST", default=3),
             argon2_memory_cost_kib=env.int(
