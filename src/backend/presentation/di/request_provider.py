@@ -36,8 +36,6 @@ from backend.infrastructure.security.auth.cache_codec import (
     encode_cached_user,
 )
 
-_AUTH_USER_CACHE_TTL_S: int = 300
-
 
 def _extract_bearer_token(request: Request) -> str:
     raw = request.headers.get("Authorization")
@@ -54,14 +52,6 @@ def _extract_bearer_token(request: Request) -> str:
 
 def _user_cache_key(user_id: UUID) -> str:
     return f"auth:user:{user_id}"
-
-
-def _decode_cached_user(raw: str) -> AuthUser | None:
-    return decode_cached_user(raw)
-
-
-def _encode_cached_user(user: AuthUser) -> str:
-    return encode_cached_user(user)
 
 
 class RequestProvider(Provider):
@@ -102,6 +92,7 @@ class RequestProvider(Provider):
         jwt_verifier: JwtVerifier,
         authenticator: Authenticator,
         cache: StrCache,
+        auth_user_cache_ttl_s: int,
     ) -> AuthUser:
         token = _extract_bearer_token(request)
         user_id = jwt_verifier.verify_access(token).unwrap_or_raise(
@@ -110,7 +101,7 @@ class RequestProvider(Provider):
         cache_key = _user_cache_key(user_id)
         cached = await cache.get(cache_key)
         if cached is not None:
-            cached_user = _decode_cached_user(cached)
+            cached_user = decode_cached_user(cached)
             if cached_user is not None:
                 if not cached_user.is_active:
                     raise UnauthenticatedError("Authentication required")
@@ -120,7 +111,7 @@ class RequestProvider(Provider):
             raise UnauthenticatedError("Authentication required")
         await cache.set(
             cache_key,
-            _encode_cached_user(auth_user),
-            ttl_s=_AUTH_USER_CACHE_TTL_S,
+            encode_cached_user(auth_user),
+            ttl_s=auth_user_cache_ttl_s,
         )
         return auth_user

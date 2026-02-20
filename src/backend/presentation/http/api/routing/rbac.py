@@ -23,7 +23,10 @@ from backend.application.handlers.queries.rbac.get_user_roles import (
     GetUserRolesQuery,
 )
 from backend.domain.core.types.rbac import PermissionCode
-from backend.presentation.http.api.routing._helpers import run_best_effort
+from backend.presentation.http.api.routing.helpers import (
+    run_best_effort,
+    unwrap_result,
+)
 from backend.presentation.http.api.schemas.rbac import (
     RoleChangeRequest,
     UserRolesResponse,
@@ -44,9 +47,7 @@ async def get_user_roles(
         current_user, PermissionCode.RBAC_READ_ROLES
     )
     handler = GetUserRolesHandler(gateway=gateway)
-    result = await handler(GetUserRolesQuery(user_id=user_id))
-    dto = result.unwrap()
-
+    dto = await unwrap_result(handler(GetUserRolesQuery(user_id=user_id)))
     return UserRolesResponse.from_dto(dto)
 
 
@@ -71,8 +72,7 @@ async def assign_role_to_user(
         actor_id=current_user.id,
         actor_roles=current_user.role_codes,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = (await handler(cmd)).unwrap()
     await run_best_effort(
         cache_invalidator.invalidate_user(user_id),
         effect="auth-cache invalidation after role assign",
@@ -105,8 +105,7 @@ async def revoke_role_from_user(
         actor_id=current_user.id,
         actor_roles=current_user.role_codes,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = (await handler(cmd)).unwrap()
     await run_best_effort(
         cache_invalidator.invalidate_user(user_id),
         effect="auth-cache invalidation after role revoke",

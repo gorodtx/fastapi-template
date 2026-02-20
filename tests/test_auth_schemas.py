@@ -88,6 +88,25 @@ def test_login_request_rejects_invalid_fields(
     assert _has_field_error(exc_info.value, field_name)
 
 
+@pytest.mark.parametrize("refresh_token", ("", "   "))
+def test_refresh_and_logout_reject_empty_refresh_token(
+    refresh_token: str,
+) -> None:
+    with pytest.raises(ValidationError) as refresh_exc:
+        RefreshRequest(
+            refresh_token=refresh_token,
+            fingerprint="fp-12345678",
+        )
+    with pytest.raises(ValidationError) as logout_exc:
+        LogoutRequest(
+            refresh_token=refresh_token,
+            fingerprint="fp-12345678",
+        )
+
+    assert _has_field_error(refresh_exc.value, "refresh_token")
+    assert _has_field_error(logout_exc.value, "refresh_token")
+
+
 @pytest.mark.parametrize(
     ("factory", "fingerprint"),
     (

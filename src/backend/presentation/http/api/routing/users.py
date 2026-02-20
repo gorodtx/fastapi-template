@@ -28,7 +28,10 @@ from backend.application.handlers.queries.users.get_user import (
 )
 from backend.domain.core.types.rbac import PermissionCode, RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
-from backend.presentation.http.api.routing._helpers import run_best_effort
+from backend.presentation.http.api.routing.helpers import (
+    run_best_effort,
+    unwrap_result,
+)
 from backend.presentation.http.api.schemas.auth import SuccessResponse
 from backend.presentation.http.api.schemas.users import (
     UserCreateRequest,
@@ -60,9 +63,7 @@ async def create_user(
         username=payload.username,
         raw_password=payload.raw_password,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
-
+    dto = await unwrap_result(handler(cmd))
     return UserResponse.from_dto(dto)
 
 
@@ -72,9 +73,7 @@ async def get_me(
     current_user: FromDishka[AuthUser],
 ) -> UserResponse:
     handler = GetUserHandler(gateway=gateway)
-    result = await handler(GetUserQuery(user_id=current_user.id))
-    dto = result.unwrap()
-
+    dto = await unwrap_result(handler(GetUserQuery(user_id=current_user.id)))
     return UserResponse.from_dto(dto)
 
 
@@ -98,8 +97,7 @@ async def update_user(
         email=str(payload.email) if payload.email is not None else None,
         raw_password=payload.raw_password,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = (await handler(cmd)).unwrap()
     await run_best_effort(
         cache_invalidator.invalidate_user(user_id),
         effect="auth-cache invalidation after user update",
@@ -121,8 +119,7 @@ async def delete_user(
         gateway=gateway,
     )
     cmd = DeleteUserCommand(user_id=user_id)
-    result = await handler(cmd)
-    dto = result.unwrap()
+    dto = (await handler(cmd)).unwrap()
     await run_best_effort(
         cache_invalidator.invalidate_user(user_id),
         effect="auth-cache invalidation after user delete",

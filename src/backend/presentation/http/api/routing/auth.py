@@ -32,6 +32,7 @@ from backend.application.handlers.commands.auth.register import (
 )
 from backend.domain.core.types.rbac import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
+from backend.presentation.http.api.routing.helpers import unwrap_result
 from backend.presentation.http.api.schemas.auth import (
     LoginRequest,
     LogoutRequest,
@@ -67,9 +68,7 @@ async def register_user(
         raw_password=payload.raw_password,
         fingerprint=payload.fingerprint,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
-
+    dto = await unwrap_result(handler(cmd))
     return TokenPairResponse.from_dto(dto)
 
 
@@ -92,9 +91,7 @@ async def login_user(
         raw_password=payload.raw_password,
         fingerprint=payload.fingerprint,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
-
+    dto = await unwrap_result(handler(cmd))
     return TokenPairResponse.from_dto(dto)
 
 
@@ -114,9 +111,7 @@ async def logout_user(
         fingerprint=payload.fingerprint,
         actor_user_id=current_user.id,
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
-
+    dto = await unwrap_result(handler(cmd))
     return SuccessResponse.from_dto(dto)
 
 
@@ -135,7 +130,5 @@ async def refresh_user(
     cmd = RefreshUserCommand(
         refresh_token=payload.refresh_token, fingerprint=payload.fingerprint
     )
-    result = await handler(cmd)
-    dto = result.unwrap()
-
+    dto = await unwrap_result(handler(cmd))
     return TokenPairResponse.from_dto(dto)

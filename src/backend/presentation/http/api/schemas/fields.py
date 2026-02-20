@@ -65,6 +65,13 @@ type LoginPasswordStr = Annotated[
         max_length=MAX_LOGIN_PASSWORD_LENGTH,
     ),
 ]
+type RefreshTokenStr = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+    ),
+]
 type FingerprintStr = Annotated[
     str,
     StringConstraints(

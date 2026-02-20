@@ -5,6 +5,7 @@ from backend.presentation.http.api.schemas.fields import (
     EmailStr,
     FingerprintStr,
     LoginPasswordStr,
+    RefreshTokenStr,
 )
 from backend.presentation.http.api.schemas.users import UserCreateRequest
 
@@ -20,12 +21,12 @@ class RegisterRequest(UserCreateRequest):
 
 
 class RefreshRequest(BaseSchema):
-    refresh_token: str
+    refresh_token: RefreshTokenStr
     fingerprint: FingerprintStr
 
 
 class LogoutRequest(BaseSchema):
-    refresh_token: str
+    refresh_token: RefreshTokenStr
     fingerprint: FingerprintStr
 
 

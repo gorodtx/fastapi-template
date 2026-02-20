@@ -45,16 +45,16 @@ def create_app() -> FastAPI:
 def _app_error_handler(_request: Request, exc: Exception) -> Response:
     if not isinstance(exc, AppError):
         raise exc
-    _LOGGER.warning(
-        "Handled app error: code=%s detail=%r meta=%r",
-        exc.code,
-        exc.detail,
-        exc.meta,
-    )
     status_code = _status_for_code(exc.code)
-    response = JSONResponse(
-        status_code=status_code, content=_to_public_payload(exc)
+    payload = _to_public_payload(exc)
+    _LOGGER.warning(
+        "Handled app error: code=%s status=%s message=%r public_meta=%r",
+        exc.code,
+        status_code,
+        exc.message,
+        payload.get("meta"),
     )
+    response = JSONResponse(status_code=status_code, content=payload)
     retry_after = _read_retry_after(exc)
     if retry_after is not None:
         response.headers["Retry-After"] = str(retry_after)

@@ -72,14 +72,6 @@ class AppProvider(Provider):
         self._settings = settings
 
     @provide(scope=Scope.APP)
-    def settings(self: Self) -> Settings:
-        return self._settings
-
-    @provide(scope=Scope.APP)
-    def default_registration_role(self: Self) -> RoleCode:
-        return self._settings.default_registration_role_code
-
-    @provide(scope=Scope.APP)
     def engine(self: Self) -> AsyncEngine:
         return create_engine(
             self._settings.database_url,
@@ -96,39 +88,23 @@ class AppProvider(Provider):
     ) -> async_sessionmaker[AsyncSession]:
         return create_session_factory(engine)
 
-    @provide(scope=Scope.APP)
-    async def redis_client(self: Self) -> AsyncIterator[Redis]:
-        client = _build_redis_client(self._settings.redis_url)
-        try:
-            yield client
-        finally:
-            await client.aclose()
+
+class AuthProvider(Provider):
+    def __init__(self: Self, settings: Settings) -> None:
+        super().__init__()
+        self._settings = settings
 
     @provide(scope=Scope.APP)
-    def auth_cache(self: Self, client: Redis) -> StrCache:
-        return RedisCache(client)
+    def settings(self: Self) -> Settings:
+        return self._settings
 
     @provide(scope=Scope.APP)
-    def shared_lock(self: Self, client: Redis) -> RedisSharedLock:
-        return RedisSharedLock(
-            client=client,
-            ttl_s=self._settings.refresh_lock_ttl_s,
-            wait_timeout_s=self._settings.refresh_lock_wait_timeout_s,
-        )
+    def default_registration_role(self: Self) -> RoleCode:
+        return self._settings.default_registration_role_code
 
     @provide(scope=Scope.APP)
-    def refresh_store(self: Self, cache: StrCache) -> RefreshStore:
-        return RefreshStoreImpl(cache=cache)
-
-    @provide(scope=Scope.APP)
-    def refresh_tokens(
-        self: Self,
-        store: RefreshStore,
-        lock: RedisSharedLock,
-        cfg: JwtConfig,
-    ) -> RefreshTokenService:
-        ttl_s = int(cfg.refresh_ttl.total_seconds())
-        return RefreshTokenService(store=store, lock=lock, ttl_s=ttl_s)
+    def auth_user_cache_ttl_s(self: Self) -> int:
+        return self._settings.auth_user_cache_ttl_s
 
     @provide(scope=Scope.APP)
     def password_hasher(self: Self) -> PasswordHasherPort:
@@ -164,6 +140,46 @@ class AppProvider(Provider):
     @provide(scope=Scope.APP)
     def jwt_issuer(self: Self, impl: JwtImpl) -> JwtIssuer:
         return impl
+
+
+class CacheProvider(Provider):
+    def __init__(self: Self, settings: Settings) -> None:
+        super().__init__()
+        self._settings = settings
+
+    @provide(scope=Scope.APP)
+    async def redis_client(self: Self) -> AsyncIterator[Redis]:
+        client = _build_redis_client(self._settings.redis_url)
+        try:
+            yield client
+        finally:
+            await client.aclose()
+
+    @provide(scope=Scope.APP)
+    def auth_cache(self: Self, client: Redis) -> StrCache:
+        return RedisCache(client)
+
+    @provide(scope=Scope.APP)
+    def shared_lock(self: Self, client: Redis) -> RedisSharedLock:
+        return RedisSharedLock(
+            client=client,
+            ttl_s=self._settings.refresh_lock_ttl_s,
+            wait_timeout_s=self._settings.refresh_lock_wait_timeout_s,
+        )
+
+    @provide(scope=Scope.APP)
+    def refresh_store(self: Self, cache: StrCache) -> RefreshStore:
+        return RefreshStoreImpl(cache=cache)
+
+    @provide(scope=Scope.APP)
+    def refresh_tokens(
+        self: Self,
+        store: RefreshStore,
+        lock: RedisSharedLock,
+        cfg: JwtConfig,
+    ) -> RefreshTokenService:
+        ttl_s = int(cfg.refresh_ttl.total_seconds())
+        return RefreshTokenService(store=store, lock=lock, ttl_s=ttl_s)
 
     @provide(scope=Scope.APP)
     def auth_cache_invalidator(

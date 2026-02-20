@@ -29,4 +29,5 @@ type RoleCodePath = Annotated[
         max_length=MAX_ROLE_CODE_LENGTH,
         pattern=ROLE_CODE_PATTERN,
     ),
+    AfterValidator(validate_role_code),
 ]

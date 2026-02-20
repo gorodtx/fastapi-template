@@ -19,6 +19,14 @@ def _require_int(env: Env, name: str) -> int:
     return value
 
 
+def _require_positive_int(value: int, name: str) -> int:
+    if value <= 0:
+        raise RuntimeError(
+            f"Environment variable must be positive integer: {name}"
+        )
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     app_env: str
@@ -37,6 +45,7 @@ class Settings:
     jwt_secret: str
     jwt_access_ttl_s: int
     jwt_refresh_ttl_s: int
+    auth_user_cache_ttl_s: int
     refresh_lock_ttl_s: float
     refresh_lock_wait_timeout_s: float
     argon2_time_cost: int
@@ -69,6 +78,10 @@ class Settings:
             jwt_secret=_require_str(env, "JWT_SECRET"),
             jwt_access_ttl_s=_require_int(env, "JWT_ACCESS_TTL_S"),
             jwt_refresh_ttl_s=_require_int(env, "JWT_REFRESH_TTL_S"),
+            auth_user_cache_ttl_s=_require_positive_int(
+                env.int("AUTH_USER_CACHE_TTL_S", default=300),
+                "AUTH_USER_CACHE_TTL_S",
+            ),
             refresh_lock_ttl_s=env.float("REFRESH_LOCK_TTL_S", default=10.0),
             refresh_lock_wait_timeout_s=env.float(
                 "REFRESH_LOCK_WAIT_TIMEOUT_S",

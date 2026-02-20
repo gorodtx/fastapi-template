@@ -7,7 +7,11 @@ from dishka import AsyncContainer, make_async_container
 from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from fastapi import FastAPI
 
-from backend.presentation.di.app_provider import AppProvider
+from backend.presentation.di.app_provider import (
+    AppProvider,
+    AuthProvider,
+    CacheProvider,
+)
 from backend.presentation.di.request_provider import RequestProvider
 from backend.presentation.settings import Settings
 
@@ -22,7 +26,11 @@ class _EventRegistrar(Protocol):
 
 def build_container(settings: Settings) -> AsyncContainer:
     return make_async_container(
-        AppProvider(settings), RequestProvider(), FastapiProvider()
+        AppProvider(settings),
+        AuthProvider(settings),
+        CacheProvider(settings),
+        RequestProvider(),
+        FastapiProvider(),
     )
 
 
