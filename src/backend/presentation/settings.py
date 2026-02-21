@@ -61,6 +61,21 @@ class Settings:
     argon2_parallelism: int
     argon2_hash_len: int
     argon2_salt_len: int
+    obs_otel_enabled: bool
+    obs_otel_service_name: str
+    obs_otel_service_version: str
+    obs_otel_environment: str
+    obs_otel_exporter_otlp_endpoint: str | None
+    obs_otel_metrics_export_interval_ms: int
+    obs_otel_traces_sampler: str
+    obs_otel_traces_sampler_arg: float
+    obs_otel_http_instrumentation_enabled: bool
+    obs_otel_sqlalchemy_instrumentation_enabled: bool
+    obs_otel_redis_instrumentation_enabled: bool
+    obs_otel_capture_request_headers: bool
+    obs_otel_capture_response_headers: bool
+    obs_otel_sanitize_fields_csv: str
+    obs_otel_semconv_stability_opt_in: str | None
 
     @staticmethod
     def from_env(env: Env) -> Settings:
@@ -68,6 +83,10 @@ class Settings:
         redis_url: str | None = env.str("REDIS_URL", default="") or None
         default_registration_role_code = (
             env.str("DEFAULT_REGISTRATION_ROLE_CODE", default="user") or "user"
+        )
+        obs_otel_enabled = env.bool("OBS_OTEL_ENABLED", default=False)
+        obs_otel_exporter_otlp_endpoint = (
+            env.str("OBS_OTEL_EXPORTER_OTLP_ENDPOINT", default="") or None
         )
 
         return Settings(
@@ -111,6 +130,66 @@ class Settings:
             argon2_parallelism=env.int("ARGON2_PARALLELISM", default=4),
             argon2_hash_len=env.int("ARGON2_HASH_LEN", default=32),
             argon2_salt_len=env.int("ARGON2_SALT_LEN", default=16),
+            obs_otel_enabled=obs_otel_enabled,
+            obs_otel_service_name=(
+                env.str("OBS_OTEL_SERVICE_NAME", default="backend")
+                or "backend"
+            ),
+            obs_otel_service_version=(
+                env.str("OBS_OTEL_SERVICE_VERSION", default="0.1.0") or "0.1.0"
+            ),
+            obs_otel_environment=(
+                env.str("OBS_OTEL_ENVIRONMENT", default=app_env) or app_env
+            ),
+            obs_otel_exporter_otlp_endpoint=obs_otel_exporter_otlp_endpoint,
+            obs_otel_metrics_export_interval_ms=_require_positive_int(
+                env.int("OBS_OTEL_METRICS_EXPORT_INTERVAL_MS", default=15000),
+                "OBS_OTEL_METRICS_EXPORT_INTERVAL_MS",
+            ),
+            obs_otel_traces_sampler=(
+                env.str("OBS_OTEL_TRACES_SAMPLER", default="traceidratio")
+                or "traceidratio"
+            ),
+            obs_otel_traces_sampler_arg=env.float(
+                "OBS_OTEL_TRACES_SAMPLER_ARG", default=0.1
+            ),
+            obs_otel_http_instrumentation_enabled=env.bool(
+                "OBS_OTEL_HTTP_INSTRUMENTATION_ENABLED",
+                default=True,
+            ),
+            obs_otel_sqlalchemy_instrumentation_enabled=env.bool(
+                "OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED",
+                default=False,
+            ),
+            obs_otel_redis_instrumentation_enabled=env.bool(
+                "OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED",
+                default=False,
+            ),
+            obs_otel_capture_request_headers=env.bool(
+                "OBS_OTEL_CAPTURE_REQUEST_HEADERS",
+                default=False,
+            ),
+            obs_otel_capture_response_headers=env.bool(
+                "OBS_OTEL_CAPTURE_RESPONSE_HEADERS",
+                default=False,
+            ),
+            obs_otel_sanitize_fields_csv=(
+                env.str(
+                    "OBS_OTEL_SANITIZE_FIELDS_CSV",
+                    default=(
+                        ".*session.*,set-cookie,authorization,"
+                        "proxy-authorization"
+                    ),
+                )
+                or ".*session.*,set-cookie,authorization,proxy-authorization"
+            ),
+            obs_otel_semconv_stability_opt_in=(
+                env.str(
+                    "OBS_OTEL_SEMCONV_STABILITY_OPT_IN",
+                    default="",
+                )
+                or None
+            ),
         )
 
 

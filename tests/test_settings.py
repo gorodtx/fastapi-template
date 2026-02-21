@@ -37,6 +37,12 @@ def test_settings_accepts_positive_security_timeouts(
     assert settings.jwt_refresh_ttl_s == 2592000
     assert settings.refresh_lock_ttl_s == 10.0
     assert settings.refresh_lock_wait_timeout_s == 1.0
+    assert settings.obs_otel_enabled is False
+    assert settings.obs_otel_service_name == "backend"
+    assert settings.obs_otel_service_version == "0.1.0"
+    assert settings.obs_otel_environment == "dev"
+    assert settings.obs_otel_exporter_otlp_endpoint is None
+    assert settings.obs_otel_metrics_export_interval_ms == 15000
 
 
 @pytest.mark.parametrize(

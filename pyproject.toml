@@ -23,6 +23,9 @@ dependencies = [
     "pyjwt>=2.10.1",
     "dishka[fastapi]>=1.7.2",
     "environs>=14.5.0",
+    "opentelemetry-sdk>=1.39.1",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.39.1",
+    "opentelemetry-instrumentation-fastapi>=0.60b1",
 ]
 
 
