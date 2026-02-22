@@ -90,6 +90,11 @@ services:
     image: otel/opentelemetry-collector-contrib:0.146.1
     profiles: ["obs"]
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    depends_on:
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
     ports:
       - "${OBS_OTEL_GRPC_PORT:-4317}:4317"
     volumes:
@@ -102,16 +107,27 @@ services:
     depends_on:
       otel-collector:
         condition: service_started
+      alertmanager:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
     ports:
       - "${OBS_PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus/rules:/etc/prometheus/rules:ro
 
   grafana:
     image: grafana/grafana:latest
     profiles: ["obs"]
     depends_on:
       prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
         condition: service_started
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
@@ -120,8 +136,63 @@ services:
       - "${OBS_GRAFANA_PORT:-3000}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./ops/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    profiles: ["obs"]
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    ports:
+      - "${OBS_ALERTMANAGER_PORT:-9093}:9093"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  loki:
+    image: grafana/loki:latest
+    profiles: ["obs"]
+    command: ["-config.file=/etc/loki/loki.yml", "-config.expand-env=true"]
+    ports:
+      - "${OBS_LOKI_PORT:-3100}:3100"
+    environment:
+      LOKI_RETENTION_PERIOD: ${OBS_LOKI_RETENTION_PERIOD:-72h}
+    volumes:
+      - ./ops/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+
+  alloy:
+    image: grafana/alloy:latest
+    profiles: ["obs"]
+    command:
+      [
+        "run",
+        "--server.http.listen-addr=0.0.0.0:12345",
+        "/etc/alloy/config.alloy",
+      ]
+    depends_on:
+      loki:
+        condition: service_started
+    ports:
+      - "${OBS_ALLOY_PORT:-12345}:12345"
+    volumes:
+      - ./ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  tempo:
+    image: grafana/tempo:latest
+    profiles: ["obs"]
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - "${OBS_TEMPO_HTTP_PORT:-3200}:3200"
+    volumes:
+      - ./ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
 
 volumes:
   pg_data:
   redis_data:
   grafana_data:
+  loki_data:
+  tempo_data:

@@ -29,6 +29,9 @@ services:
   otel-collector:
     network_mode: host
     ports: []
+    command: ["--config=/etc/otelcol-contrib/config-hostnet.yaml"]
+    volumes:
+      - ./ops/otel-collector/config.hostnet.yaml:/etc/otelcol-contrib/config-hostnet.yaml:ro
 
   prometheus:
     network_mode: host
@@ -40,3 +43,22 @@ services:
   grafana:
     network_mode: host
     ports: []
+
+  alertmanager:
+    network_mode: host
+    ports: []
+
+  loki:
+    network_mode: host
+    ports: []
+
+  alloy:
+    network_mode: host
+    ports: []
+
+  tempo:
+    network_mode: host
+    ports: []
+    command: ["-config.file=/etc/tempo/tempo-hostnet.yml"]
+    volumes:
+      - ./ops/tempo/tempo.hostnet.yml:/etc/tempo/tempo-hostnet.yml:ro

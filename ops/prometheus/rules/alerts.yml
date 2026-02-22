@@ -1,0 +1,54 @@
+groups:
+  - name: service-alerts
+    interval: 30s
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "Target is down"
+          description: "{{ $labels.job }} / {{ $labels.instance }} is unreachable."
+
+      - alert: High5xxRate
+        expr: service:error_rate_5xx:5m > 5
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "High 5xx error rate"
+          description: "5xx error rate is above 5% for 10m."
+
+      - alert: HighP95Latency
+        expr: service:latency_p95_ms:5m > 800
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "High p95 latency"
+          description: "p95 latency is above 800ms for 10m."
+
+      - alert: SLOErrorBudgetBurnFast
+        expr: |
+          (service:error_ratio:5m > (14.4 * 0.01))
+          and
+          (service:error_ratio:1h > (14.4 * 0.01))
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "Fast SLO burn rate"
+          description: "Error budget burn rate is too high (fast window)."
+
+      - alert: SLOErrorBudgetBurnSlow
+        expr: |
+          (service:error_ratio:30m > (6 * 0.01))
+          and
+          (service:error_ratio:6h > (6 * 0.01))
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Slow SLO burn rate"
+          description: "Error budget burn rate is too high (slow window)."

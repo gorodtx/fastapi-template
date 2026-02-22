@@ -261,6 +261,15 @@ Important variables:
   - `OBS_OTEL_CAPTURE_REQUEST_HEADERS`
   - `OBS_OTEL_CAPTURE_RESPONSE_HEADERS`
   - `OBS_OTEL_SANITIZE_FIELDS_CSV`
+- observability runtime settings:
+  - `OBS_OTEL_GRPC_PORT`
+  - `OBS_PROMETHEUS_PORT`
+  - `OBS_GRAFANA_PORT`
+  - `OBS_ALERTMANAGER_PORT`
+  - `OBS_LOKI_PORT`
+  - `OBS_ALLOY_PORT`
+  - `OBS_TEMPO_HTTP_PORT`
+  - `OBS_LOKI_RETENTION_PERIOD`
 
 Production notes:
 
@@ -290,15 +299,21 @@ ENABLE_OBSERVABILITY=1 ./scripts/up.sh
 - OTel gRPC: `4317` (when observability is enabled)
 - Prometheus: `9090` (when observability is enabled)
 - Grafana: `3000` (when observability is enabled)
+- Alertmanager: `9093` (when observability is enabled)
+- Loki: `3100` (when observability is enabled)
+- Alloy: `12345` (when observability is enabled)
+- Tempo: `3200` (when observability is enabled)
 
 If any required port is occupied, the script automatically tries to free it:
 - first tears down containers from the current compose project (idempotent restart path)
+- then stops compose containers from the same repository workdir (covers host-network leftovers from another compose project name)
 - then stops Docker containers publishing this port
 - then terminates remaining local listener processes
 
 On Linux, if default bridge mode is healthy only from inside the compose network but not from host URLs, the script auto-switches to host-network fallback to restore host URL reachability.
 In this fallback mode, core services and observability services run on host networking, so default URLs stay reachable (`:8080`, `:9090`, `:3000`).
 For Prometheus in host-network fallback, scrape target switches to `127.0.0.1:9464` (instead of `otel-collector:9464`).
+`./scripts/up.sh` also retries failed `docker compose up` operations (default 3 attempts; override via `COMPOSE_UP_MAX_RETRIES`).
 
 Default runtime (cross-platform path):
 
@@ -316,7 +331,7 @@ DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate ap
 Core + observability (manual compose path):
 
 ```bash
-docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus grafana
+docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus grafana alertmanager loki alloy tempo
 ```
 
 Nginx auth rate limits are configurable via compose env vars:
@@ -334,11 +349,27 @@ Observability stack (enabled via `ENABLE_OBSERVABILITY=1 ./scripts/up.sh` or `--
 
 - OTel Collector config: `ops/otel-collector/config.yaml`
 - Prometheus scrape config: `ops/prometheus/prometheus.yml`
+- Prometheus rules: `ops/prometheus/rules/recording.yml`, `ops/prometheus/rules/alerts.yml`
+- Alertmanager config: `ops/alertmanager/alertmanager.yml`
+- Loki config: `ops/loki/loki.yml`
+- Alloy config: `ops/alloy/config.alloy`
+- Tempo config: `ops/tempo/tempo.yml`
+- Grafana datasource provisioning: `ops/grafana/provisioning/datasources/datasources.yml`
 - App OTEL is disabled by default in compose (`OBS_OTEL_ENABLED=false`) and auto-enabled by `./scripts/up.sh` when observability is requested
 - Collector gRPC is exposed via `${OBS_OTEL_GRPC_PORT}` (default `4317`) for Linux host-network fallback path
 - Prometheus UI: `http://127.0.0.1:${OBS_PROMETHEUS_PORT}` (default `9090`)
 - Grafana UI: `http://127.0.0.1:${OBS_GRAFANA_PORT}` (default `3000`, credentials `admin/admin`; override via `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`)
+- Alertmanager UI: `http://127.0.0.1:${OBS_ALERTMANAGER_PORT}` (default `9093`)
+- Loki API: `http://127.0.0.1:${OBS_LOKI_PORT}` (default `3100`)
+- Alloy UI: `http://127.0.0.1:${OBS_ALLOY_PORT}` (default `12345`)
+- Tempo UI/API: `http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}` (default `3200`)
 - `X-Trace-Id` response header is emitted only when a valid active trace exists
+
+Prometheus now has shortcut recording series for day-to-day use:
+
+- `service:rps:5m`
+- `service:error_rate_5xx:5m`
+- `service:latency_p95_ms:5m`
 
 ### 8) API surface (current)
 
@@ -584,6 +615,15 @@ cp .env.example .env
   - `OBS_OTEL_CAPTURE_REQUEST_HEADERS`
   - `OBS_OTEL_CAPTURE_RESPONSE_HEADERS`
   - `OBS_OTEL_SANITIZE_FIELDS_CSV`
+- runtime-настройки observability:
+  - `OBS_OTEL_GRPC_PORT`
+  - `OBS_PROMETHEUS_PORT`
+  - `OBS_GRAFANA_PORT`
+  - `OBS_ALERTMANAGER_PORT`
+  - `OBS_LOKI_PORT`
+  - `OBS_ALLOY_PORT`
+  - `OBS_TEMPO_HTTP_PORT`
+  - `OBS_LOKI_RETENTION_PERIOD`
 
 Для прода:
 
@@ -613,15 +653,21 @@ ENABLE_OBSERVABILITY=1 ./scripts/up.sh
 - OTel gRPC: `4317` (при включенном observability)
 - Prometheus: `9090` (при включенном observability)
 - Grafana: `3000` (при включенном observability)
+- Alertmanager: `9093` (при включенном observability)
+- Loki: `3100` (при включенном observability)
+- Alloy: `12345` (при включенном observability)
+- Tempo: `3200` (при включенном observability)
 
 Если любой обязательный порт занят, скрипт автоматически пытается его освободить:
 - сначала останавливает контейнеры текущего compose-проекта (идемпотентный restart path)
+- затем останавливает compose-контейнеры из того же рабочего каталога репозитория (закрывает host-network leftovers от другого имени compose-проекта)
 - затем останавливает Docker-контейнеры, публикующие этот порт
 - затем завершает оставшиеся локальные процессы, слушающие порт
 
 На Linux, если дефолтный bridge-режим работает только внутри docker-сети, но host URL недоступны, скрипт автоматически переключается на host-network fallback, чтобы URL с хоста открывались.
 В этом fallback-режиме и core, и observability сервисы запускаются в host networking, поэтому стандартные URL остаются доступны (`:8080`, `:9090`, `:3000`).
 Для Prometheus в host-network fallback scrape target переключается на `127.0.0.1:9464` (вместо `otel-collector:9464`).
+`./scripts/up.sh` также ретраит неуспешный `docker compose up` (по умолчанию 3 попытки, настраивается через `COMPOSE_UP_MAX_RETRIES`).
 
 Базовый запуск (кроссплатформенный путь):
 
@@ -639,7 +685,7 @@ DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate ap
 Core + observability (ручной compose-путь):
 
 ```bash
-docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus grafana
+docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus grafana alertmanager loki alloy tempo
 ```
 
 Лимиты auth в nginx настраиваются через compose env:
@@ -657,11 +703,27 @@ Observability-стек (включается через `ENABLE_OBSERVABILITY=1 
 
 - конфиг OTel Collector: `ops/otel-collector/config.yaml`
 - конфиг scrape для Prometheus: `ops/prometheus/prometheus.yml`
+- правила Prometheus: `ops/prometheus/rules/recording.yml`, `ops/prometheus/rules/alerts.yml`
+- конфиг Alertmanager: `ops/alertmanager/alertmanager.yml`
+- конфиг Loki: `ops/loki/loki.yml`
+- конфиг Alloy: `ops/alloy/config.alloy`
+- конфиг Tempo: `ops/tempo/tempo.yml`
+- provisioning datasource для Grafana: `ops/grafana/provisioning/datasources/datasources.yml`
 - в compose OTEL по умолчанию выключен (`OBS_OTEL_ENABLED=false`), а `./scripts/up.sh` включает его автоматически при включенном observability-профиле
 - gRPC Collector публикуется на `${OBS_OTEL_GRPC_PORT}` (по умолчанию `4317`) для Linux host-network fallback сценария
 - UI Prometheus: `http://127.0.0.1:${OBS_PROMETHEUS_PORT}` (по умолчанию `9090`)
 - UI Grafana: `http://127.0.0.1:${OBS_GRAFANA_PORT}` (по умолчанию `3000`, креды `admin/admin`; переопределяется через `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`)
+- UI Alertmanager: `http://127.0.0.1:${OBS_ALERTMANAGER_PORT}` (по умолчанию `9093`)
+- API Loki: `http://127.0.0.1:${OBS_LOKI_PORT}` (по умолчанию `3100`)
+- UI Alloy: `http://127.0.0.1:${OBS_ALLOY_PORT}` (по умолчанию `12345`)
+- UI/API Tempo: `http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}` (по умолчанию `3200`)
 - заголовок `X-Trace-Id` добавляется только при наличии валидного активного trace
+
+Для ежедневной работы в Prometheus добавлены shortcut recording series:
+
+- `service:rps:5m`
+- `service:error_rate_5xx:5m`
+- `service:latency_p95_ms:5m`
 
 ### 8) Актуальный API surface
 
