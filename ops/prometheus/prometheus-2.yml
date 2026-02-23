@@ -3,7 +3,7 @@ global:
   evaluation_interval: 15s
   external_labels:
     cluster: template
-    replica: prometheus-1
+    replica: prometheus-2
 
 alerting:
   alertmanagers:

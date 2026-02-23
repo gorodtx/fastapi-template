@@ -59,7 +59,24 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
       REDIS_URL: redis://redis:6379/0
       OBS_OTEL_ENABLED: ${OBS_OTEL_ENABLED:-false}
+      OBS_OTEL_SERVICE_NAME: ${OBS_OTEL_SERVICE_NAME:-backend}
+      OBS_OTEL_SERVICE_VERSION: ${OBS_OTEL_SERVICE_VERSION:-0.1.0}
+      OBS_OTEL_ENVIRONMENT: ${OBS_OTEL_ENVIRONMENT:-}
       OBS_OTEL_EXPORTER_OTLP_ENDPOINT: ${OBS_OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      OBS_OTEL_EXPORTER_OTLP_HEADERS: ${OBS_OTEL_EXPORTER_OTLP_HEADERS:-authorization=Bearer dev-otel-token}
+      OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE: ${OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE:-}
+      OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE: ${OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE:-}
+      OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE: ${OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE:-}
+      OBS_OTEL_METRICS_EXPORT_INTERVAL_MS: ${OBS_OTEL_METRICS_EXPORT_INTERVAL_MS:-15000}
+      OBS_OTEL_TRACES_SAMPLER: ${OBS_OTEL_TRACES_SAMPLER:-traceidratio}
+      OBS_OTEL_TRACES_SAMPLER_ARG: ${OBS_OTEL_TRACES_SAMPLER_ARG:-0.1}
+      OBS_OTEL_HTTP_INSTRUMENTATION_ENABLED: ${OBS_OTEL_HTTP_INSTRUMENTATION_ENABLED:-true}
+      OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED: ${OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED:-false}
+      OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED: ${OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED:-false}
+      OBS_OTEL_CAPTURE_REQUEST_HEADERS: ${OBS_OTEL_CAPTURE_REQUEST_HEADERS:-false}
+      OBS_OTEL_CAPTURE_RESPONSE_HEADERS: ${OBS_OTEL_CAPTURE_RESPONSE_HEADERS:-false}
+      OBS_OTEL_SANITIZE_FIELDS_CSV: ${OBS_OTEL_SANITIZE_FIELDS_CSV:-.*session.*,set-cookie,authorization,proxy-authorization}
+      OBS_OTEL_SEMCONV_STABILITY_OPT_IN: ${OBS_OTEL_SEMCONV_STABILITY_OPT_IN:-}
     command: ["/bin/sh", "/app/nginx/app-up.sh"]
     depends_on:
       migrate:
@@ -90,71 +107,162 @@ services:
     image: otel/opentelemetry-collector-contrib:0.146.1
     profiles: ["obs"]
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      OBS_OTEL_AUTH_TOKEN: ${OBS_OTEL_AUTH_TOKEN:-dev-otel-token}
     depends_on:
       tempo:
         condition: service_started
       loki:
         condition: service_started
     ports:
-      - "${OBS_OTEL_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${OBS_OTEL_GRPC_PORT:-4317}:4317"
     volumes:
       - ./ops/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
 
-  prometheus:
+  prometheus-1:
     image: prom/prometheus:latest
     profiles: ["obs"]
-    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    command:
+      [
+        "--config.file=/etc/prometheus/prometheus.yml",
+        "--storage.tsdb.path=/prometheus",
+        "--storage.tsdb.retention.time=${OBS_PROMETHEUS_RETENTION:-24h}",
+      ]
     depends_on:
       otel-collector:
         condition: service_started
-      alertmanager:
+      alertmanager-1:
+        condition: service_started
+      alertmanager-2:
         condition: service_started
       loki:
         condition: service_started
       tempo:
         condition: service_started
+      victoria-metrics:
+        condition: service_started
     ports:
-      - "${OBS_PROMETHEUS_PORT:-9090}:9090"
+      - "127.0.0.1:${OBS_PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./ops/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+
+  prometheus-2:
+    image: prom/prometheus:latest
+    profiles: ["obs"]
+    command:
+      [
+        "--config.file=/etc/prometheus/prometheus.yml",
+        "--storage.tsdb.path=/prometheus",
+        "--storage.tsdb.retention.time=${OBS_PROMETHEUS_RETENTION:-24h}",
+      ]
+    depends_on:
+      otel-collector:
+        condition: service_started
+      alertmanager-1:
+        condition: service_started
+      alertmanager-2:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+      victoria-metrics:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${OBS_PROMETHEUS_REPLICA_PORT:-9091}:9090"
+    volumes:
+      - ./ops/prometheus/prometheus-2.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_2_data:/prometheus
 
   grafana:
     image: grafana/grafana:latest
     profiles: ["obs"]
     depends_on:
-      prometheus:
+      prometheus-1:
+        condition: service_started
+      prometheus-2:
         condition: service_started
       loki:
         condition: service_started
       tempo:
         condition: service_started
+      victoria-metrics:
+        condition: service_started
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ALLOW_EMBEDDING: "false"
+      GF_SECURITY_COOKIE_SAMESITE: ${GRAFANA_COOKIE_SAMESITE:-strict}
+      GF_SECURITY_COOKIE_SECURE: ${GRAFANA_COOKIE_SECURE:-false}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/json/start-here.json
+      GRAFANA_PROMETHEUS_URL: ${GRAFANA_PROMETHEUS_URL:-http://prometheus-1:9090}
+      GRAFANA_PROMETHEUS_LTS_URL: ${GRAFANA_PROMETHEUS_LTS_URL:-http://victoria-metrics:8428}
+      GRAFANA_LOKI_URL: ${GRAFANA_LOKI_URL:-http://loki:3100}
+      GRAFANA_TEMPO_URL: ${GRAFANA_TEMPO_URL:-http://tempo:3200}
     ports:
-      - "${OBS_GRAFANA_PORT:-3000}:3000"
+      - "127.0.0.1:${OBS_GRAFANA_PORT:-3000}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./ops/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./ops/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
 
-  alertmanager:
+  alertmanager-1:
     image: prom/alertmanager:latest
     profiles: ["obs"]
-    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    entrypoint: ["/bin/sh", "/etc/alertmanager/render-config.sh"]
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      ALERTMANAGER_WEBHOOK_TICKET_URL: ${ALERTMANAGER_WEBHOOK_TICKET_URL:-http://host.docker.internal:5001/alerts}
+      ALERTMANAGER_WEBHOOK_PAGE_URL: ${ALERTMANAGER_WEBHOOK_PAGE_URL:-http://host.docker.internal:5002/alerts}
+      ALERTMANAGER_WEBHOOK_HEARTBEAT_URL: ${ALERTMANAGER_WEBHOOK_HEARTBEAT_URL:-}
+      ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL: ${ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL:-}
+      ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL: ${ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL:-}
+      ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY: ${ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY:-}
+      ALERTMANAGER_RETENTION: ${ALERTMANAGER_RETENTION:-120h}
+      ALERTMANAGER_CLUSTER_PEERS: ${ALERTMANAGER_1_CLUSTER_PEERS:-alertmanager-2:9094}
     ports:
-      - "${OBS_ALERTMANAGER_PORT:-9093}:9093"
+      - "127.0.0.1:${OBS_ALERTMANAGER_PORT:-9093}:9093"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./ops/alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
+      - alertmanager_data:/alertmanager
+
+  alertmanager-2:
+    image: prom/alertmanager:latest
+    profiles: ["obs"]
+    entrypoint: ["/bin/sh", "/etc/alertmanager/render-config.sh"]
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      ALERTMANAGER_WEBHOOK_TICKET_URL: ${ALERTMANAGER_WEBHOOK_TICKET_URL:-http://host.docker.internal:5001/alerts}
+      ALERTMANAGER_WEBHOOK_PAGE_URL: ${ALERTMANAGER_WEBHOOK_PAGE_URL:-http://host.docker.internal:5002/alerts}
+      ALERTMANAGER_WEBHOOK_HEARTBEAT_URL: ${ALERTMANAGER_WEBHOOK_HEARTBEAT_URL:-}
+      ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL: ${ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL:-}
+      ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL: ${ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL:-}
+      ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY: ${ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY:-}
+      ALERTMANAGER_RETENTION: ${ALERTMANAGER_RETENTION:-120h}
+      ALERTMANAGER_CLUSTER_PEERS: ${ALERTMANAGER_2_CLUSTER_PEERS:-alertmanager-1:9094}
+    ports:
+      - "127.0.0.1:${OBS_ALERTMANAGER_REPLICA_PORT:-9193}:9093"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./ops/alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
+      - alertmanager_2_data:/alertmanager
 
   loki:
     image: grafana/loki:latest
     profiles: ["obs"]
     command: ["-config.file=/etc/loki/loki.yml", "-config.expand-env=true"]
     ports:
-      - "${OBS_LOKI_PORT:-3100}:3100"
+      - "127.0.0.1:${OBS_LOKI_PORT:-3100}:3100"
     environment:
       LOKI_RETENTION_PERIOD: ${OBS_LOKI_RETENTION_PERIOD:-72h}
     volumes:
@@ -174,7 +282,7 @@ services:
       loki:
         condition: service_started
     ports:
-      - "${OBS_ALLOY_PORT:-12345}:12345"
+      - "127.0.0.1:${OBS_ALLOY_PORT:-12345}:12345"
     volumes:
       - ./ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -185,14 +293,32 @@ services:
     profiles: ["obs"]
     command: ["-config.file=/etc/tempo/tempo.yml"]
     ports:
-      - "${OBS_TEMPO_HTTP_PORT:-3200}:3200"
+      - "127.0.0.1:${OBS_TEMPO_HTTP_PORT:-3200}:3200"
     volumes:
       - ./ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
       - tempo_data:/var/tempo
+
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    profiles: ["obs"]
+    command:
+      [
+        "-storageDataPath=/victoria-metrics-data",
+        "-retentionPeriod=${OBS_VM_RETENTION_MONTHS:-3}",
+      ]
+    ports:
+      - "127.0.0.1:${OBS_VICTORIAMETRICS_PORT:-8428}:8428"
+    volumes:
+      - victoria_metrics_data:/victoria-metrics-data
 
 volumes:
   pg_data:
   redis_data:
   grafana_data:
+  prometheus_data:
+  prometheus_2_data:
+  alertmanager_data:
+  alertmanager_2_data:
   loki_data:
   tempo_data:
+  victoria_metrics_data:

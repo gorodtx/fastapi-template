@@ -1,10 +1,18 @@
+extensions:
+  bearertokenauth/server:
+    token: ${OBS_OTEL_AUTH_TOKEN}
+
 receivers:
   otlp:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: bearertokenauth/server
       http:
         endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth/server
 
 processors:
   memory_limiter:
@@ -42,7 +50,41 @@ exporters:
   otlp_http/loki:
     endpoint: http://127.0.0.1:3100/otlp
 
+connectors:
+  spanmetrics:
+    namespace: traces.spanmetrics
+    histogram:
+      unit: s
+      explicit:
+        buckets:
+          [
+            5ms,
+            10ms,
+            25ms,
+            50ms,
+            100ms,
+            250ms,
+            500ms,
+            1s,
+            2s,
+            5s,
+            10s,
+          ]
+    dimensions:
+      - name: http.method
+      - name: http.route
+      - name: db.system
+      - name: db.operation
+      - name: db.operation.name
+    resource_metrics_key_attributes:
+      - service.name
+      - telemetry.sdk.language
+      - telemetry.sdk.name
+    metrics_flush_interval: 15s
+    metrics_expiration: 5m
+
 service:
+  extensions: [bearertokenauth/server]
   telemetry:
     metrics:
       level: detailed
@@ -53,12 +95,16 @@ service:
                 host: 0.0.0.0
                 port: 8888
   pipelines:
+    traces/spanmetrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [spanmetrics]
     traces:
       receivers: [otlp]
       processors: [memory_limiter, tail_sampling, batch]
       exporters: [otlp_grpc/tempo]
     metrics:
-      receivers: [otlp]
+      receivers: [otlp, spanmetrics]
       processors: [memory_limiter, batch]
       exporters: [prometheus]
     logs:

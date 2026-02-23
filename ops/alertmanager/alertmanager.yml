@@ -2,14 +2,43 @@ global:
   resolve_timeout: 5m
 
 route:
-  group_by: ["alertname", "job", "service"]
+  group_by: ["alertname", "service", "job", "instance"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-  receiver: webhook-default
+  receiver: ticket-webhook
+  routes:
+    - matchers:
+        - severity="none"
+      receiver: heartbeat-webhook
+    - matchers:
+        - severity="page"
+      receiver: page-webhook
+    - matchers:
+        - severity="ticket"
+      receiver: ticket-webhook
+
+inhibit_rules:
+  - source_matchers:
+      - severity="page"
+    target_matchers:
+      - severity="ticket"
+    equal: ["alertname", "service", "job", "instance"]
 
 receivers:
-  - name: webhook-default
+  - name: blackhole
+  - name: heartbeat-webhook
     webhook_configs:
-      - url: "http://host.docker.internal:5001/alerts"
+      - url: "__HEARTBEAT_WEBHOOK_URL__"
         send_resolved: true
+  - name: ticket-webhook
+    webhook_configs:
+      - url: "__TICKET_WEBHOOK_URL__"
+        send_resolved: true
+__TICKET_SLACK_CONFIG__
+  - name: page-webhook
+    webhook_configs:
+      - url: "__PAGE_WEBHOOK_URL__"
+        send_resolved: true
+__PAGE_SLACK_CONFIG__
+__PAGE_PAGERDUTY_CONFIG__

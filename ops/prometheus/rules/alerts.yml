@@ -29,6 +29,24 @@ groups:
           summary: "High p95 latency"
           description: "p95 latency is above 800ms for 10m."
 
+      - alert: HighDependencyErrorRate
+        expr: max by (service_name, db_system) (dependency:db_redis_error_rate_pct:5m) > 5
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "High dependency error rate"
+          description: "DB/Redis error rate is above 5% for 10m."
+
+      - alert: HighDependencyP95Latency
+        expr: max by (service_name, db_system) (dependency:db_redis_latency_p95_seconds:5m) > 0.5
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "High dependency p95 latency"
+          description: "DB/Redis p95 latency is above 500ms for 10m."
+
       - alert: SLOErrorBudgetBurnFast
         expr: |
           (service:error_ratio:5m > (14.4 * 0.01))
@@ -52,3 +70,90 @@ groups:
         annotations:
           summary: "Slow SLO burn rate"
           description: "Error budget burn rate is too high (slow window)."
+
+      - alert: NoHTTPMetricsData
+        expr: absent_over_time(http_server_duration_milliseconds_count[10m]) == 1
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "No HTTP metrics data"
+          description: "No http_server_duration_milliseconds_count samples for 10m."
+
+      - alert: NoCollectorMetricsData
+        expr: absent_over_time(otelcol_process_uptime_seconds_total[10m]) == 1
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "No OTel Collector metrics data"
+          description: "Collector internal metrics are absent for 10m."
+
+      - alert: CollectorExporterQueueSaturation
+        expr: |
+          max by (exporter) (
+            otelcol_exporter_queue_size
+            /
+            clamp_min(otelcol_exporter_queue_capacity, 1)
+          ) > 0.8
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Collector exporter queue saturation"
+          description: "OTel Collector exporter queue is above 80% for 10m."
+
+      - alert: CollectorReceiverRefusedData
+        expr: |
+          (
+            (sum(rate(otelcol_receiver_refused_spans_total[5m])) or vector(0))
+            +
+            (sum(rate(otelcol_receiver_refused_metric_points_total[5m])) or vector(0))
+            +
+            (sum(rate(otelcol_receiver_refused_log_records_total[5m])) or vector(0))
+          ) > 0
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Collector receiver is refusing telemetry"
+          description: "Collector refused telemetry data during the last 5m."
+
+      - alert: CollectorExporterSendFailures
+        expr: |
+          (
+            (sum(rate(otelcol_exporter_send_failed_spans_total[5m])) or vector(0))
+            +
+            (sum(rate(otelcol_exporter_send_failed_metric_points_total[5m])) or vector(0))
+            +
+            (sum(rate(otelcol_exporter_send_failed_log_records_total[5m])) or vector(0))
+          ) > 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Collector exporter send failures"
+          description: "Collector exporter failed to send telemetry during the last 5m."
+
+      - alert: AlertmanagerNotificationFailures
+        expr: |
+          (
+            sum(rate(alertmanager_notifications_failed_total[5m]))
+            /
+            clamp_min(sum(rate(alertmanager_notifications_total[5m])), 1e-9)
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "Alertmanager notification failures"
+          description: "More than 10% of Alertmanager notifications failed for 10m."
+
+      - alert: Watchdog
+        expr: vector(1)
+        for: 0m
+        labels:
+          severity: none
+        annotations:
+          summary: "Watchdog"
+          description: "Always firing heartbeat alert for alerting pipeline checks."

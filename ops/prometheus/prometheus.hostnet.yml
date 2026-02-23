@@ -1,14 +1,26 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    cluster: template
+    replica: prometheus-1
 
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ["127.0.0.1:9093"]
+        - targets: ["127.0.0.1:9093", "127.0.0.1:9193"]
 
 rule_files:
   - /etc/prometheus/rules/*.yml
+
+remote_write:
+  - url: http://127.0.0.1:8428/api/v1/write
+    queue_config:
+      capacity: 10000
+      max_samples_per_send: 2000
+      min_shards: 1
+      max_shards: 10
+      batch_send_deadline: 5s
 
 scrape_configs:
   - job_name: otel-collector
@@ -29,4 +41,8 @@ scrape_configs:
 
   - job_name: alertmanager
     static_configs:
-      - targets: ["127.0.0.1:9093"]
+      - targets: ["127.0.0.1:9093", "127.0.0.1:9193"]
+
+  - job_name: victoria-metrics
+    static_configs:
+      - targets: ["127.0.0.1:8428"]

@@ -3,13 +3,13 @@ set -eu
 
 compose_file="${COMPOSE_FILE:-compose.yaml}"
 hostnet_override_file="${HOSTNET_OVERRIDE_FILE:-compose.linux-hostnet.yaml}"
-max_attempts="${MAX_ATTEMPTS:-45}"
+max_attempts="${MAX_ATTEMPTS:-90}"
 compose_up_max_retries="${COMPOSE_UP_MAX_RETRIES:-3}"
 auto_hostnet_fallback="${AUTO_HOSTNET_FALLBACK:-1}"
 enable_observability="${ENABLE_OBSERVABILITY:-0}"
 obs_profile_name="${OBS_PROFILE_NAME:-obs}"
 core_services_default="postgres redis migrate app nginx"
-obs_services_default="otel-collector prometheus grafana alertmanager loki alloy tempo"
+obs_services_default="otel-collector prometheus-1 prometheus-2 grafana alertmanager-1 alertmanager-2 loki alloy tempo victoria-metrics"
 
 if [ "$enable_observability" = "1" ]; then
   default_services="${core_services_default} ${obs_services_default}"
@@ -22,10 +22,75 @@ if [ "$enable_observability" = "1" ]; then
   observability_requested=1
 fi
 case " $services " in
-  *" otel-collector "* | *" prometheus "* | *" grafana "* | *" alertmanager "* | *" loki "* | *" alloy "* | *" tempo "*)
+  *" otel-collector "* | *" prometheus "* | *" prometheus-1 "* | *" prometheus-2 "* | *" grafana "* | *" alertmanager "* | *" alertmanager-1 "* | *" alertmanager-2 "* | *" loki "* | *" alloy "* | *" tempo "* | *" victoria-metrics "*)
     observability_requested=1
     ;;
 esac
+
+is_local_receiver_url() {
+  case "$1" in
+    *"host.docker.internal"* | *"://127.0.0.1"* | *"://localhost"*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+validate_prod_observability_env() {
+  case "${APP_ENV:-dev}" in
+    prod | PROD | production | PRODUCTION)
+      if [ "$auto_hostnet_fallback" = "1" ]; then
+        echo "Disabling host-network fallback in prod for security."
+        auto_hostnet_fallback=0
+      fi
+      if [ "$observability_requested" != "1" ]; then
+        return 0
+      fi
+
+      if [ "${GRAFANA_ADMIN_PASSWORD:-admin}" = "admin" ]; then
+        echo "Refusing to start in prod with default Grafana admin password."
+        echo "Set GRAFANA_ADMIN_PASSWORD to a non-default secret."
+        exit 1
+      fi
+
+      ticket_url="${ALERTMANAGER_WEBHOOK_TICKET_URL:-}"
+      page_url="${ALERTMANAGER_WEBHOOK_PAGE_URL:-$ticket_url}"
+      heartbeat_url="${ALERTMANAGER_WEBHOOK_HEARTBEAT_URL:-$ticket_url}"
+      ticket_slack_url="${ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL:-}"
+      page_slack_url="${ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL:-$ticket_slack_url}"
+
+      if [ -z "$ticket_url" ]; then
+        echo "ALERTMANAGER_WEBHOOK_TICKET_URL is required in prod."
+        exit 1
+      fi
+      if is_local_receiver_url "$ticket_url"; then
+        echo "ALERTMANAGER_WEBHOOK_TICKET_URL must not point to local address in prod."
+        exit 1
+      fi
+      if [ -n "$page_url" ] && is_local_receiver_url "$page_url"; then
+        echo "ALERTMANAGER_WEBHOOK_PAGE_URL must not point to local address in prod."
+        exit 1
+      fi
+      if [ -n "$heartbeat_url" ] && is_local_receiver_url "$heartbeat_url"; then
+        echo "ALERTMANAGER_WEBHOOK_HEARTBEAT_URL must not point to local address in prod."
+        exit 1
+      fi
+      if [ -n "$ticket_slack_url" ] && is_local_receiver_url "$ticket_slack_url"; then
+        echo "ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL must not point to local address in prod."
+        exit 1
+      fi
+      if [ -n "$page_slack_url" ] && is_local_receiver_url "$page_slack_url"; then
+        echo "ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL must not point to local address in prod."
+        exit 1
+      fi
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
 
 if [ -z "${OBS_OTEL_ENABLED:-}" ]; then
   if [ "$observability_requested" = "1" ]; then
@@ -34,6 +99,16 @@ if [ -z "${OBS_OTEL_ENABLED:-}" ]; then
     OBS_OTEL_ENABLED=false
   fi
   export OBS_OTEL_ENABLED
+fi
+
+if [ -z "${OBS_OTEL_AUTH_TOKEN:-}" ]; then
+  OBS_OTEL_AUTH_TOKEN=dev-otel-token
+  export OBS_OTEL_AUTH_TOKEN
+fi
+
+if [ "$observability_requested" = "1" ] && [ -z "${OBS_OTEL_EXPORTER_OTLP_HEADERS:-}" ]; then
+  OBS_OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer ${OBS_OTEL_AUTH_TOKEN}"
+  export OBS_OTEL_EXPORTER_OTLP_HEADERS
 fi
 
 enforce_standard_port_env() {
@@ -131,7 +206,7 @@ free_port_or_fail() {
 free_required_ports() {
   required_ports="5432 6379 ${APP_HOST_PORT}"
   if [ "$observability_requested" = "1" ]; then
-    required_ports="${required_ports} ${OBS_OTEL_GRPC_PORT} ${OBS_PROMETHEUS_PORT} ${OBS_GRAFANA_PORT} ${OBS_ALERTMANAGER_PORT} ${OBS_LOKI_PORT} ${OBS_ALLOY_PORT} ${OBS_TEMPO_HTTP_PORT}"
+    required_ports="${required_ports} ${OBS_OTEL_GRPC_PORT} ${OBS_PROMETHEUS_PORT} ${OBS_PROMETHEUS_REPLICA_PORT} ${OBS_GRAFANA_PORT} ${OBS_ALERTMANAGER_PORT} ${OBS_ALERTMANAGER_REPLICA_PORT} ${OBS_ALERTMANAGER_CLUSTER_PORT} ${OBS_ALERTMANAGER_REPLICA_CLUSTER_PORT} ${OBS_LOKI_PORT} ${OBS_ALLOY_PORT} ${OBS_TEMPO_HTTP_PORT} ${OBS_VICTORIAMETRICS_PORT}"
   fi
   for port in $required_ports; do
     free_port_or_fail "$port"
@@ -168,11 +243,17 @@ stop_repo_compose_containers() {
 enforce_standard_port_env APP_HOST_PORT 8080
 enforce_standard_port_env OBS_OTEL_GRPC_PORT 4317
 enforce_standard_port_env OBS_PROMETHEUS_PORT 9090
+enforce_standard_port_env OBS_PROMETHEUS_REPLICA_PORT 9091
 enforce_standard_port_env OBS_GRAFANA_PORT 3000
 enforce_standard_port_env OBS_ALERTMANAGER_PORT 9093
+enforce_standard_port_env OBS_ALERTMANAGER_REPLICA_PORT 9193
+enforce_standard_port_env OBS_ALERTMANAGER_CLUSTER_PORT 9094
+enforce_standard_port_env OBS_ALERTMANAGER_REPLICA_CLUSTER_PORT 9194
 enforce_standard_port_env OBS_LOKI_PORT 3100
 enforce_standard_port_env OBS_ALLOY_PORT 12345
 enforce_standard_port_env OBS_TEMPO_HTTP_PORT 3200
+enforce_standard_port_env OBS_VICTORIAMETRICS_PORT 8428
+validate_prod_observability_env
 down_current_project
 stop_repo_compose_containers
 free_required_ports
@@ -180,11 +261,26 @@ free_required_ports
 default_system_url="http://127.0.0.1:${APP_HOST_PORT}/system"
 hostnet_system_url="http://127.0.0.1:8080/system"
 default_prometheus_url="http://127.0.0.1:${OBS_PROMETHEUS_PORT}/-/ready"
+default_prometheus_replica_url="http://127.0.0.1:${OBS_PROMETHEUS_REPLICA_PORT}/-/ready"
 default_grafana_url="http://127.0.0.1:${OBS_GRAFANA_PORT}/api/health"
 default_alertmanager_url="http://127.0.0.1:${OBS_ALERTMANAGER_PORT}/-/ready"
+default_alertmanager_replica_url="http://127.0.0.1:${OBS_ALERTMANAGER_REPLICA_PORT}/-/ready"
 default_loki_url="http://127.0.0.1:${OBS_LOKI_PORT}/ready"
 default_alloy_url="http://127.0.0.1:${OBS_ALLOY_PORT}/"
 default_tempo_url="http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}/ready"
+default_victoria_metrics_url="http://127.0.0.1:${OBS_VICTORIAMETRICS_PORT}/health"
+
+print_observability_endpoints() {
+  echo "Prometheus-1: http://127.0.0.1:${OBS_PROMETHEUS_PORT}"
+  echo "Prometheus-2: http://127.0.0.1:${OBS_PROMETHEUS_REPLICA_PORT}"
+  echo "Grafana: http://127.0.0.1:${OBS_GRAFANA_PORT}"
+  echo "Alertmanager-1: http://127.0.0.1:${OBS_ALERTMANAGER_PORT}"
+  echo "Alertmanager-2: http://127.0.0.1:${OBS_ALERTMANAGER_REPLICA_PORT}"
+  echo "Loki: http://127.0.0.1:${OBS_LOKI_PORT}"
+  echo "Alloy: http://127.0.0.1:${OBS_ALLOY_PORT}"
+  echo "Tempo: http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}"
+  echo "VictoriaMetrics: http://127.0.0.1:${OBS_VICTORIAMETRICS_PORT}"
+}
 
 http_ready() {
   target_url="$1"
@@ -242,11 +338,14 @@ obs_host_ready_once() {
     return 0
   fi
   http_ready "$default_prometheus_url" \
+    && http_ready "$default_prometheus_replica_url" \
     && http_ready "$default_grafana_url" \
     && http_ready "$default_alertmanager_url" \
+    && http_ready "$default_alertmanager_replica_url" \
     && http_ready "$default_loki_url" \
     && http_ready "$default_alloy_url" \
-    && http_ready "$default_tempo_url"
+    && http_ready "$default_tempo_url" \
+    && http_ready "$default_victoria_metrics_url"
 }
 
 wait_observability_ready() {
@@ -269,7 +368,7 @@ up_default() {
   attempt=0
   if [ "$observability_requested" = "1" ]; then
     echo "Observability profile: enabled (${obs_profile_name})"
-    echo "Using host ports: app=${APP_HOST_PORT}, otel-grpc=${OBS_OTEL_GRPC_PORT}, prometheus=${OBS_PROMETHEUS_PORT}, grafana=${OBS_GRAFANA_PORT}, alertmanager=${OBS_ALERTMANAGER_PORT}, loki=${OBS_LOKI_PORT}, alloy=${OBS_ALLOY_PORT}, tempo=${OBS_TEMPO_HTTP_PORT}"
+    echo "Using host ports: app=${APP_HOST_PORT}, otel-grpc=${OBS_OTEL_GRPC_PORT}, prometheus-1=${OBS_PROMETHEUS_PORT}, prometheus-2=${OBS_PROMETHEUS_REPLICA_PORT}, grafana=${OBS_GRAFANA_PORT}, alertmanager-1=${OBS_ALERTMANAGER_PORT}, alertmanager-2=${OBS_ALERTMANAGER_REPLICA_PORT}, loki=${OBS_LOKI_PORT}, alloy=${OBS_ALLOY_PORT}, tempo=${OBS_TEMPO_HTTP_PORT}, victoria-metrics=${OBS_VICTORIAMETRICS_PORT}"
     while [ "$attempt" -lt "$compose_up_max_retries" ]; do
       if DOCKER_BUILD_NETWORK="${DOCKER_BUILD_NETWORK:-default}" docker compose -f "$compose_file" --profile "$obs_profile_name" up -d --build $services; then
         return 0
@@ -303,7 +402,7 @@ up_hostnet() {
   attempt=0
   if [ "$observability_requested" = "1" ]; then
     while [ "$attempt" -lt "$compose_up_max_retries" ]; do
-      if DOCKER_BUILD_NETWORK="${FALLBACK_DOCKER_BUILD_NETWORK:-host}" docker compose -f "$compose_file" -f "$hostnet_override_file" --profile "$obs_profile_name" up -d --build $services; then
+      if DOCKER_BUILD_NETWORK="${FALLBACK_DOCKER_BUILD_NETWORK:-host}" docker compose -f "$compose_file" -f "$hostnet_override_file" --profile "$obs_profile_name" up -d $services; then
         return 0
       fi
       attempt=$((attempt + 1))
@@ -315,7 +414,7 @@ up_hostnet() {
     return 1
   else
     while [ "$attempt" -lt "$compose_up_max_retries" ]; do
-      if DOCKER_BUILD_NETWORK="${FALLBACK_DOCKER_BUILD_NETWORK:-host}" docker compose -f "$compose_file" -f "$hostnet_override_file" up -d --build $services; then
+      if DOCKER_BUILD_NETWORK="${FALLBACK_DOCKER_BUILD_NETWORK:-host}" docker compose -f "$compose_file" -f "$hostnet_override_file" up -d $services; then
         return 0
       fi
       attempt=$((attempt + 1))
@@ -347,12 +446,7 @@ if up_default; then
   if [ "$default_obs_unreachable" = "0" ] && [ "$default_system_ready" -eq 1 ]; then
     echo "Stack is ready: $default_system_url"
     if [ "$observability_requested" = "1" ]; then
-      echo "Prometheus: http://127.0.0.1:${OBS_PROMETHEUS_PORT}"
-      echo "Grafana: http://127.0.0.1:${OBS_GRAFANA_PORT}"
-      echo "Alertmanager: http://127.0.0.1:${OBS_ALERTMANAGER_PORT}"
-      echo "Loki: http://127.0.0.1:${OBS_LOKI_PORT}"
-      echo "Alloy: http://127.0.0.1:${OBS_ALLOY_PORT}"
-      echo "Tempo: http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}"
+      print_observability_endpoints
     fi
     exit 0
   fi
@@ -361,12 +455,7 @@ if up_default; then
     if [ "$(uname -s)" != "Linux" ] || [ "$auto_hostnet_fallback" != "1" ] || [ ! -f "$hostnet_override_file" ]; then
       echo "Stack is running internally, but host probe failed for $default_system_url."
       if [ "$observability_requested" = "1" ]; then
-        echo "Prometheus: http://127.0.0.1:${OBS_PROMETHEUS_PORT}"
-        echo "Grafana: http://127.0.0.1:${OBS_GRAFANA_PORT}"
-        echo "Alertmanager: http://127.0.0.1:${OBS_ALERTMANAGER_PORT}"
-        echo "Loki: http://127.0.0.1:${OBS_LOKI_PORT}"
-        echo "Alloy: http://127.0.0.1:${OBS_ALLOY_PORT}"
-        echo "Tempo: http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}"
+        print_observability_endpoints
       fi
       exit 0
     fi
@@ -394,24 +483,14 @@ if [ "$(uname -s)" = "Linux" ] && [ "$auto_hostnet_fallback" = "1" ] && [ -f "$h
       fi
       echo "Stack is ready with host-network fallback: $hostnet_system_url"
       if [ "$observability_requested" = "1" ]; then
-        echo "Prometheus: http://127.0.0.1:${OBS_PROMETHEUS_PORT}"
-        echo "Grafana: http://127.0.0.1:${OBS_GRAFANA_PORT}"
-        echo "Alertmanager: http://127.0.0.1:${OBS_ALERTMANAGER_PORT}"
-        echo "Loki: http://127.0.0.1:${OBS_LOKI_PORT}"
-        echo "Alloy: http://127.0.0.1:${OBS_ALLOY_PORT}"
-        echo "Tempo: http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}"
+        print_observability_endpoints
       fi
       exit 0
     fi
     if wait_system_ready_in_stack; then
       echo "Stack is running with host-network fallback, but host probe failed for $hostnet_system_url."
       if [ "$observability_requested" = "1" ]; then
-        echo "Prometheus: http://127.0.0.1:${OBS_PROMETHEUS_PORT}"
-        echo "Grafana: http://127.0.0.1:${OBS_GRAFANA_PORT}"
-        echo "Alertmanager: http://127.0.0.1:${OBS_ALERTMANAGER_PORT}"
-        echo "Loki: http://127.0.0.1:${OBS_LOKI_PORT}"
-        echo "Alloy: http://127.0.0.1:${OBS_ALLOY_PORT}"
-        echo "Tempo: http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}"
+        print_observability_endpoints
       fi
       exit 0
     fi

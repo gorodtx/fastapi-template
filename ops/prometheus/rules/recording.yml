@@ -38,3 +38,47 @@ groups:
             0.95,
             sum by (le) (rate(http_server_duration_milliseconds_bucket[5m]))
           )
+
+  - name: dependency-recording
+    interval: 30s
+    rules:
+      - record: dependency:db_redis_error_ratio:5m
+        expr: |
+          sum by (service_name, db_system) (
+            rate(
+              traces_spanmetrics_calls_total{
+                span_kind="SPAN_KIND_CLIENT",
+                status_code="STATUS_CODE_ERROR",
+                db_system=~"redis|postgresql|mysql|sqlite|mssql|oracle|mongodb|cockroachdb"
+              }[5m]
+            )
+          )
+          /
+          clamp_min(
+            sum by (service_name, db_system) (
+              rate(
+                traces_spanmetrics_calls_total{
+                  span_kind="SPAN_KIND_CLIENT",
+                  db_system=~"redis|postgresql|mysql|sqlite|mssql|oracle|mongodb|cockroachdb"
+                }[5m]
+              )
+            ),
+            1e-9
+          )
+
+      - record: dependency:db_redis_error_rate_pct:5m
+        expr: 100 * dependency:db_redis_error_ratio:5m
+
+      - record: dependency:db_redis_latency_p95_seconds:5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, service_name, db_system) (
+              rate(
+                traces_spanmetrics_duration_seconds_bucket{
+                  span_kind="SPAN_KIND_CLIENT",
+                  db_system=~"redis|postgresql|mysql|sqlite|mssql|oracle|mongodb|cockroachdb"
+                }[5m]
+              )
+            )
+          )
