@@ -66,6 +66,10 @@ class Settings:
     obs_otel_service_version: str
     obs_otel_environment: str
     obs_otel_exporter_otlp_endpoint: str | None
+    obs_otel_exporter_otlp_headers: str | None
+    obs_otel_exporter_otlp_ca_cert_file: str | None
+    obs_otel_exporter_otlp_client_cert_file: str | None
+    obs_otel_exporter_otlp_client_key_file: str | None
     obs_otel_metrics_export_interval_ms: int
     obs_otel_traces_sampler: str
     obs_otel_traces_sampler_arg: float
@@ -87,6 +91,20 @@ class Settings:
         obs_otel_enabled = env.bool("OBS_OTEL_ENABLED", default=False)
         obs_otel_exporter_otlp_endpoint = (
             env.str("OBS_OTEL_EXPORTER_OTLP_ENDPOINT", default="") or None
+        )
+        obs_otel_exporter_otlp_headers = (
+            env.str("OBS_OTEL_EXPORTER_OTLP_HEADERS", default="") or None
+        )
+        obs_otel_exporter_otlp_ca_cert_file = (
+            env.str("OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE", default="") or None
+        )
+        obs_otel_exporter_otlp_client_cert_file = (
+            env.str("OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE", default="")
+            or None
+        )
+        obs_otel_exporter_otlp_client_key_file = (
+            env.str("OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE", default="")
+            or None
         )
 
         return Settings(
@@ -142,6 +160,16 @@ class Settings:
                 env.str("OBS_OTEL_ENVIRONMENT", default=app_env) or app_env
             ),
             obs_otel_exporter_otlp_endpoint=obs_otel_exporter_otlp_endpoint,
+            obs_otel_exporter_otlp_headers=obs_otel_exporter_otlp_headers,
+            obs_otel_exporter_otlp_ca_cert_file=(
+                obs_otel_exporter_otlp_ca_cert_file
+            ),
+            obs_otel_exporter_otlp_client_cert_file=(
+                obs_otel_exporter_otlp_client_cert_file
+            ),
+            obs_otel_exporter_otlp_client_key_file=(
+                obs_otel_exporter_otlp_client_key_file
+            ),
             obs_otel_metrics_export_interval_ms=_require_positive_int(
                 env.int("OBS_OTEL_METRICS_EXPORT_INTERVAL_MS", default=15000),
                 "OBS_OTEL_METRICS_EXPORT_INTERVAL_MS",

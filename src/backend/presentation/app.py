@@ -58,6 +58,12 @@ def _build_observability_config(settings: Settings) -> ObservabilityConfig:
         service_version=settings.obs_otel_service_version,
         environment=settings.obs_otel_environment,
         otlp_endpoint=settings.obs_otel_exporter_otlp_endpoint,
+        otlp_headers=settings.obs_otel_exporter_otlp_headers,
+        otlp_ca_cert_file=settings.obs_otel_exporter_otlp_ca_cert_file,
+        otlp_client_cert_file=(
+            settings.obs_otel_exporter_otlp_client_cert_file
+        ),
+        otlp_client_key_file=(settings.obs_otel_exporter_otlp_client_key_file),
         metrics_export_interval_ms=settings.obs_otel_metrics_export_interval_ms,
         traces_sampler=settings.obs_otel_traces_sampler,
         traces_sampler_arg=settings.obs_otel_traces_sampler_arg,

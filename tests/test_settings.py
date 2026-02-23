@@ -42,6 +42,10 @@ def test_settings_accepts_positive_security_timeouts(
     assert settings.obs_otel_service_version == "0.1.0"
     assert settings.obs_otel_environment == "dev"
     assert settings.obs_otel_exporter_otlp_endpoint is None
+    assert settings.obs_otel_exporter_otlp_headers is None
+    assert settings.obs_otel_exporter_otlp_ca_cert_file is None
+    assert settings.obs_otel_exporter_otlp_client_cert_file is None
+    assert settings.obs_otel_exporter_otlp_client_key_file is None
     assert settings.obs_otel_metrics_export_interval_ms == 15000
 
 

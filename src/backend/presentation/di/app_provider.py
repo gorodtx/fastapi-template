@@ -26,6 +26,9 @@ from backend.application.common.tools.refresh_tokens import (
 from backend.domain.core.types.rbac import RoleCode
 from backend.domain.ports.security.password_hasher import PasswordHasherPort
 from backend.infrastructure.lock.redis_lock import RedisSharedLock
+from backend.infrastructure.observability.setup import (
+    instrument_sqlalchemy_engine,
+)
 from backend.infrastructure.persistence.cache.redis import RedisCache
 from backend.infrastructure.persistence.sqlalchemy.session_db import (
     create_engine,
@@ -73,7 +76,7 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     def engine(self: Self) -> AsyncEngine:
-        return create_engine(
+        engine = create_engine(
             self._settings.database_url,
             pool_size=self._settings.db_pool_size,
             max_overflow=self._settings.db_max_overflow,
@@ -81,6 +84,12 @@ class AppProvider(Provider):
             pool_recycle_s=self._settings.db_pool_recycle_s,
             connect_timeout_s=self._settings.db_connect_timeout_s,
         )
+        if (
+            self._settings.obs_otel_enabled
+            and self._settings.obs_otel_sqlalchemy_instrumentation_enabled
+        ):
+            instrument_sqlalchemy_engine(engine)
+        return engine
 
     @provide(scope=Scope.APP)
     def session_factory(

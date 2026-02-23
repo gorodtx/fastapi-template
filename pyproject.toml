@@ -26,6 +26,8 @@ dependencies = [
     "opentelemetry-sdk>=1.39.1",
     "opentelemetry-exporter-otlp-proto-grpc>=1.39.1",
     "opentelemetry-instrumentation-fastapi>=0.60b1",
+    "opentelemetry-instrumentation-sqlalchemy>=0.60b1",
+    "opentelemetry-instrumentation-redis>=0.60b1",
 ]
 
 

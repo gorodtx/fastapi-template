@@ -1,1 +1,1 @@
-"""Observability adapters (OpenTelemetry setup and custom metrics)."""
+"""Observability adapters (OpenTelemetry setup)."""

@@ -10,6 +10,10 @@ class ObservabilityConfig:
     service_version: str
     environment: str
     otlp_endpoint: str | None
+    otlp_headers: str | None
+    otlp_ca_cert_file: str | None
+    otlp_client_cert_file: str | None
+    otlp_client_key_file: str | None
     metrics_export_interval_ms: int
     traces_sampler: str
     traces_sampler_arg: float
