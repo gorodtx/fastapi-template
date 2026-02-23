@@ -1,0 +1,27 @@
+services:
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      network: ${DOCKER_BUILD_NETWORK:-default}
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
+      REDIS_URL: redis://redis:6379/0
+      RBAC_BOOTSTRAP_USERS: ${RBAC_BOOTSTRAP_USERS:-}
+    command:
+      [
+        "uv",
+        "run",
+        "--no-dev",
+        "--no-sync",
+        "--frozen",
+        "alembic",
+        "upgrade",
+        "head",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"

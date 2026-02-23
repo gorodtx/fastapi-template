@@ -1,0 +1,8 @@
+services:
+  postgres:
+    network_mode: host
+    ports: []
+
+  redis:
+    network_mode: host
+    ports: []

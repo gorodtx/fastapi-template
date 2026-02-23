@@ -1,0 +1,69 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      network: ${DOCKER_BUILD_NETWORK:-default}
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
+      REDIS_URL: redis://redis:6379/0
+      OBS_OTEL_ENABLED: ${OBS_OTEL_ENABLED:-false}
+      OBS_OTEL_SERVICE_NAME: ${OBS_OTEL_SERVICE_NAME:-backend}
+      OBS_OTEL_SERVICE_VERSION: ${OBS_OTEL_SERVICE_VERSION:-0.1.0}
+      OBS_OTEL_ENVIRONMENT: ${OBS_OTEL_ENVIRONMENT:-}
+      OBS_OTEL_EXPORTER_OTLP_ENDPOINT: ${OBS_OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      OBS_OTEL_EXPORTER_OTLP_HEADERS: ${OBS_OTEL_EXPORTER_OTLP_HEADERS:-authorization=Bearer dev-otel-token}
+      OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE: ${OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE:-}
+      OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE: ${OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE:-}
+      OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE: ${OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE:-}
+      OBS_OTEL_METRICS_EXPORT_INTERVAL_MS: ${OBS_OTEL_METRICS_EXPORT_INTERVAL_MS:-15000}
+      OBS_OTEL_TRACES_SAMPLER: ${OBS_OTEL_TRACES_SAMPLER:-traceidratio}
+      OBS_OTEL_TRACES_SAMPLER_ARG: ${OBS_OTEL_TRACES_SAMPLER_ARG:-0.1}
+      OBS_OTEL_HTTP_INSTRUMENTATION_ENABLED: ${OBS_OTEL_HTTP_INSTRUMENTATION_ENABLED:-true}
+      OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED: ${OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED:-false}
+      OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED: ${OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED:-false}
+      OBS_OTEL_CAPTURE_REQUEST_HEADERS: ${OBS_OTEL_CAPTURE_REQUEST_HEADERS:-false}
+      OBS_OTEL_CAPTURE_RESPONSE_HEADERS: ${OBS_OTEL_CAPTURE_RESPONSE_HEADERS:-false}
+      OBS_OTEL_SANITIZE_FIELDS_CSV: ${OBS_OTEL_SANITIZE_FIELDS_CSV:-.*session.*,set-cookie,authorization,proxy-authorization}
+      OBS_OTEL_SEMCONV_STABILITY_OPT_IN: ${OBS_OTEL_SEMCONV_STABILITY_OPT_IN:-}
+    command:
+      [
+        "uv",
+        "run",
+        "--no-dev",
+        "--no-sync",
+        "--frozen",
+        "uvicorn",
+        "--app-dir",
+        "src",
+        "backend.main:create_app",
+        "--factory",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    environment:
+      APP_UPSTREAM: ${APP_UPSTREAM:-app:8000}
+      AUTH_LOGIN_RATE: ${AUTH_LOGIN_RATE:-10r/m}
+      AUTH_REGISTER_RATE: ${AUTH_REGISTER_RATE:-6r/m}
+      AUTH_REFRESH_RATE: ${AUTH_REFRESH_RATE:-60r/m}
+      NGINX_ENVSUBST_FILTER: APP_UPSTREAM|AUTH_LOGIN_RATE|AUTH_REGISTER_RATE|AUTH_REFRESH_RATE
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "${APP_HOST_PORT:-8080}:8080"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/templates:/etc/nginx/templates:ro

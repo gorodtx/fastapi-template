@@ -1,111 +1,6 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      network: ${DOCKER_BUILD_NETWORK:-default}
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
-      REDIS_URL: redis://redis:6379/0
-      RBAC_BOOTSTRAP_USERS: ${RBAC_BOOTSTRAP_USERS:-}
-    command: ["/bin/sh", "/app/nginx/migrate-up.sh"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      network: ${DOCKER_BUILD_NETWORK:-default}
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
-      REDIS_URL: redis://redis:6379/0
-      OBS_OTEL_ENABLED: ${OBS_OTEL_ENABLED:-false}
-      OBS_OTEL_SERVICE_NAME: ${OBS_OTEL_SERVICE_NAME:-backend}
-      OBS_OTEL_SERVICE_VERSION: ${OBS_OTEL_SERVICE_VERSION:-0.1.0}
-      OBS_OTEL_ENVIRONMENT: ${OBS_OTEL_ENVIRONMENT:-}
-      OBS_OTEL_EXPORTER_OTLP_ENDPOINT: ${OBS_OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
-      OBS_OTEL_EXPORTER_OTLP_HEADERS: ${OBS_OTEL_EXPORTER_OTLP_HEADERS:-authorization=Bearer dev-otel-token}
-      OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE: ${OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE:-}
-      OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE: ${OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE:-}
-      OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE: ${OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE:-}
-      OBS_OTEL_METRICS_EXPORT_INTERVAL_MS: ${OBS_OTEL_METRICS_EXPORT_INTERVAL_MS:-15000}
-      OBS_OTEL_TRACES_SAMPLER: ${OBS_OTEL_TRACES_SAMPLER:-traceidratio}
-      OBS_OTEL_TRACES_SAMPLER_ARG: ${OBS_OTEL_TRACES_SAMPLER_ARG:-0.1}
-      OBS_OTEL_HTTP_INSTRUMENTATION_ENABLED: ${OBS_OTEL_HTTP_INSTRUMENTATION_ENABLED:-true}
-      OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED: ${OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED:-false}
-      OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED: ${OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED:-false}
-      OBS_OTEL_CAPTURE_REQUEST_HEADERS: ${OBS_OTEL_CAPTURE_REQUEST_HEADERS:-false}
-      OBS_OTEL_CAPTURE_RESPONSE_HEADERS: ${OBS_OTEL_CAPTURE_RESPONSE_HEADERS:-false}
-      OBS_OTEL_SANITIZE_FIELDS_CSV: ${OBS_OTEL_SANITIZE_FIELDS_CSV:-.*session.*,set-cookie,authorization,proxy-authorization}
-      OBS_OTEL_SEMCONV_STABILITY_OPT_IN: ${OBS_OTEL_SEMCONV_STABILITY_OPT_IN:-}
-    command: ["/bin/sh", "/app/nginx/app-up.sh"]
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  nginx:
-    image: nginx:1.27-alpine
-    environment:
-      APP_UPSTREAM: ${APP_UPSTREAM:-app:8000}
-      AUTH_LOGIN_RATE: ${AUTH_LOGIN_RATE:-10r/m}
-      AUTH_REGISTER_RATE: ${AUTH_REGISTER_RATE:-6r/m}
-      AUTH_REFRESH_RATE: ${AUTH_REFRESH_RATE:-60r/m}
-      NGINX_ENVSUBST_FILTER: APP_UPSTREAM|AUTH_LOGIN_RATE|AUTH_REGISTER_RATE|AUTH_REFRESH_RATE
-    depends_on:
-      app:
-        condition: service_started
-    ports:
-      - "${APP_HOST_PORT:-8080}:8080"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/templates:/etc/nginx/templates:ro
-
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.146.1
-    profiles: ["obs"]
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     environment:
       OBS_OTEL_AUTH_TOKEN: ${OBS_OTEL_AUTH_TOKEN:-dev-otel-token}
@@ -117,11 +12,10 @@ services:
     ports:
       - "127.0.0.1:${OBS_OTEL_GRPC_PORT:-4317}:4317"
     volumes:
-      - ./ops/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ../ops/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
 
   prometheus-1:
     image: prom/prometheus:latest
-    profiles: ["obs"]
     command:
       [
         "--config.file=/etc/prometheus/prometheus.yml",
@@ -144,13 +38,12 @@ services:
     ports:
       - "127.0.0.1:${OBS_PROMETHEUS_PORT:-9090}:9090"
     volumes:
-      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./ops/prometheus/rules:/etc/prometheus/rules:ro
+      - ../ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../ops/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
 
   prometheus-2:
     image: prom/prometheus:latest
-    profiles: ["obs"]
     command:
       [
         "--config.file=/etc/prometheus/prometheus.yml",
@@ -173,13 +66,12 @@ services:
     ports:
       - "127.0.0.1:${OBS_PROMETHEUS_REPLICA_PORT:-9091}:9090"
     volumes:
-      - ./ops/prometheus/prometheus-2.yml:/etc/prometheus/prometheus.yml:ro
-      - ./ops/prometheus/rules:/etc/prometheus/rules:ro
+      - ../ops/prometheus/prometheus-2.yml:/etc/prometheus/prometheus.yml:ro
+      - ../ops/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_2_data:/prometheus
 
   grafana:
     image: grafana/grafana:latest
-    profiles: ["obs"]
     depends_on:
       prometheus-1:
         condition: service_started
@@ -208,12 +100,11 @@ services:
       - "127.0.0.1:${OBS_GRAFANA_PORT:-3000}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./ops/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./ops/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../ops/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../ops/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
 
   alertmanager-1:
     image: prom/alertmanager:latest
-    profiles: ["obs"]
     entrypoint: ["/bin/sh", "/etc/alertmanager/render-config.sh"]
     environment:
       APP_ENV: ${APP_ENV:-dev}
@@ -230,13 +121,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - ./ops/alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
+      - ../ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../ops/alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
       - alertmanager_data:/alertmanager
 
   alertmanager-2:
     image: prom/alertmanager:latest
-    profiles: ["obs"]
     entrypoint: ["/bin/sh", "/etc/alertmanager/render-config.sh"]
     environment:
       APP_ENV: ${APP_ENV:-dev}
@@ -253,25 +143,23 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - ./ops/alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
+      - ../ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../ops/alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
       - alertmanager_2_data:/alertmanager
 
   loki:
     image: grafana/loki:latest
-    profiles: ["obs"]
     command: ["-config.file=/etc/loki/loki.yml", "-config.expand-env=true"]
     ports:
       - "127.0.0.1:${OBS_LOKI_PORT:-3100}:3100"
     environment:
       LOKI_RETENTION_PERIOD: ${OBS_LOKI_RETENTION_PERIOD:-72h}
     volumes:
-      - ./ops/loki/loki.yml:/etc/loki/loki.yml:ro
+      - ../ops/loki/loki.yml:/etc/loki/loki.yml:ro
       - loki_data:/loki
 
   alloy:
     image: grafana/alloy:latest
-    profiles: ["obs"]
     command:
       [
         "run",
@@ -284,23 +172,21 @@ services:
     ports:
       - "127.0.0.1:${OBS_ALLOY_PORT:-12345}:12345"
     volumes:
-      - ./ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ../ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   tempo:
     image: grafana/tempo:latest
-    profiles: ["obs"]
     command: ["-config.file=/etc/tempo/tempo.yml"]
     ports:
       - "127.0.0.1:${OBS_TEMPO_HTTP_PORT:-3200}:3200"
     volumes:
-      - ./ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - ../ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
       - tempo_data:/var/tempo
 
   victoria-metrics:
     image: victoriametrics/victoria-metrics:latest
-    profiles: ["obs"]
     command:
       [
         "-storageDataPath=/victoria-metrics-data",
@@ -312,8 +198,6 @@ services:
       - victoria_metrics_data:/victoria-metrics-data
 
 volumes:
-  pg_data:
-  redis_data:
   grafana_data:
   prometheus_data:
   prometheus_2_data:
