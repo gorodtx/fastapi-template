@@ -5,7 +5,7 @@ datasources:
     name: Prometheus
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    url: ${GRAFANA_PROMETHEUS_URL}
     isDefault: true
     jsonData:
       exemplarTraceIdDestinations:
@@ -16,13 +16,19 @@ datasources:
     name: Loki
     type: loki
     access: proxy
-    url: http://loki:3100
+    url: ${GRAFANA_LOKI_URL}
+
+  - uid: prometheus_lts
+    name: Prometheus (LTS)
+    type: prometheus
+    access: proxy
+    url: ${GRAFANA_PROMETHEUS_LTS_URL}
 
   - uid: tempo
     name: Tempo
     type: tempo
     access: proxy
-    url: http://tempo:3200
+    url: ${GRAFANA_TEMPO_URL}
     jsonData:
       tracesToLogsV2:
         datasourceUid: loki

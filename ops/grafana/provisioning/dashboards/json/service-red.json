@@ -1,0 +1,487 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "targetBlank": true,
+      "title": "Dependency Alerts",
+      "url": "/alerting/list?search=HighDependency"
+    },
+    {
+      "targetBlank": true,
+      "title": "Tempo Explore (dependency filters)",
+      "url": "/explore?left=%5B%22now-1h%22,%22now%22,%22tempo%22,%7B%22query%22:%22%7Bservice.name%3D~%5C%22${service}%5C%22,db.system%3D~%5C%22${dependency}%5C%22%7D%22%7D%5D"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "service:rps:5m",
+          "legendFormat": "RPS",
+          "refId": "A"
+        }
+      ],
+      "title": "Requests Per Second (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "service:latency_p95_ms:5m",
+          "legendFormat": "p95 latency",
+          "refId": "A"
+        }
+      ],
+      "title": "Latency P95 (ms, 5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-RdYlGr"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Open dependency alerts",
+              "url": "/alerting/list?search=HighDependency"
+            },
+            {
+              "targetBlank": true,
+              "title": "Open Tempo traces for series",
+              "url": "/explore?left=%5B%22now-1h%22,%22now%22,%22tempo%22,%7B%22query%22:%22%7Bservice.name%3D%5C%22${__field.labels.service_name}%5C%22,db.system%3D%5C%22${__field.labels.db_system}%5C%22%7D%22%7D%5D"
+            }
+          ],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "service:error_rate_5xx:5m",
+          "legendFormat": "5xx rate",
+          "refId": "A"
+        }
+      ],
+      "title": "5xx Error Rate (%)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(up{job=~\"otel-collector|otel-collector-internal|loki|tempo|alertmanager\"})",
+          "legendFormat": "infra up targets",
+          "refId": "A"
+        }
+      ],
+      "title": "Infrastructure Targets Up",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-RdYlGr"
+          },
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "dependency:db_redis_error_rate_pct:5m{service_name=~\"$service\",db_system=~\"$dependency\"}",
+          "legendFormat": "{{service_name}} {{db_system}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Dependency Error Rate (%)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Open dependency alerts",
+              "url": "/alerting/list?search=HighDependency"
+            },
+            {
+              "targetBlank": true,
+              "title": "Open Tempo traces for series",
+              "url": "/explore?left=%5B%22now-1h%22,%22now%22,%22tempo%22,%7B%22query%22:%22%7Bservice.name%3D%5C%22${__field.labels.service_name}%5C%22,db.system%3D%5C%22${__field.labels.db_system}%5C%22%7D%22%7D%5D"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.2
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "dependency:db_redis_latency_p95_seconds:5m{service_name=~\"$service\",db_system=~\"$dependency\"}",
+          "legendFormat": "{{service_name}} {{db_system}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Dependency Latency P95 (s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Open dependency alerts",
+              "url": "/alerting/list?search=HighDependency"
+            },
+            {
+              "targetBlank": true,
+              "title": "Open Tempo traces (dashboard filters)",
+              "url": "/explore?left=%5B%22now-1h%22,%22now%22,%22tempo%22,%7B%22query%22:%22%7Bservice.name%3D~%5C%22${service}%5C%22,db.system%3D~%5C%22${dependency}%5C%22%7D%22%7D%5D"
+            }
+          ],
+          "max": 1,
+          "min": 0,
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "ALERTS{alertname=~\"HighDependencyErrorRate|HighDependencyP95Latency\",alertstate=\"firing\",service_name=~\"$service\",db_system=~\"$dependency\"}",
+          "legendFormat": "{{alertname}} {{service_name}} {{db_system}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Dependency Alerts (firing=1)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 41,
+  "tags": [
+    "observability",
+    "red"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(dependency:db_redis_latency_p95_seconds:5m, service_name)",
+        "includeAll": true,
+        "label": "Service",
+        "multi": true,
+        "name": "service",
+        "options": [],
+        "query": {
+          "query": "label_values(dependency:db_redis_latency_p95_seconds:5m, service_name)",
+          "refId": "PrometheusVariableQueryEditor-service"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(dependency:db_redis_latency_p95_seconds:5m, db_system)",
+        "includeAll": true,
+        "label": "Dependency",
+        "multi": true,
+        "name": "dependency",
+        "options": [],
+        "query": {
+          "query": "label_values(dependency:db_redis_latency_p95_seconds:5m, db_system)",
+          "refId": "PrometheusVariableQueryEditor-dependency"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Service RED",
+  "uid": "service-red",
+  "version": 3,
+  "weekStart": ""
+}

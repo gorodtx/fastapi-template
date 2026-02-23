@@ -297,12 +297,15 @@ ENABLE_OBSERVABILITY=1 ./scripts/up.sh
 - postgres: `5432`
 - redis: `6379`
 - OTel gRPC: `4317` (when observability is enabled)
-- Prometheus: `9090` (when observability is enabled)
+- Prometheus-1: `9090` (when observability is enabled)
+- Prometheus-2: `9091` (when observability is enabled)
 - Grafana: `3000` (when observability is enabled)
-- Alertmanager: `9093` (when observability is enabled)
+- Alertmanager-1: `9093` (when observability is enabled)
+- Alertmanager-2: `9193` (when observability is enabled)
 - Loki: `3100` (when observability is enabled)
 - Alloy: `12345` (when observability is enabled)
 - Tempo: `3200` (when observability is enabled)
+- VictoriaMetrics: `8428` (when observability is enabled)
 
 If any required port is occupied, the script automatically tries to free it:
 - first tears down containers from the current compose project (idempotent restart path)
@@ -311,7 +314,7 @@ If any required port is occupied, the script automatically tries to free it:
 - then terminates remaining local listener processes
 
 On Linux, if default bridge mode is healthy only from inside the compose network but not from host URLs, the script auto-switches to host-network fallback to restore host URL reachability.
-In this fallback mode, core services and observability services run on host networking, so default URLs stay reachable (`:8080`, `:9090`, `:3000`).
+In this fallback mode, core services and observability services run on host networking, so default URLs stay reachable (`:8080`, `:9090`, `:9091`, `:3000`).
 For Prometheus in host-network fallback, scrape target switches to `127.0.0.1:9464` (instead of `otel-collector:9464`).
 `./scripts/up.sh` also retries failed `docker compose up` operations (default 3 attempts; override via `COMPOSE_UP_MAX_RETRIES`).
 
@@ -331,7 +334,7 @@ DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate ap
 Core + observability (manual compose path):
 
 ```bash
-docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus grafana alertmanager loki alloy tempo
+docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus-1 prometheus-2 grafana alertmanager-1 alertmanager-2 loki alloy tempo victoria-metrics
 ```
 
 Nginx auth rate limits are configurable via compose env vars:
@@ -348,28 +351,84 @@ Runtime entrypoints:
 Observability stack (enabled via `ENABLE_OBSERVABILITY=1 ./scripts/up.sh` or `--profile obs`):
 
 - OTel Collector config: `ops/otel-collector/config.yaml`
-- Prometheus scrape config: `ops/prometheus/prometheus.yml`
+- Prometheus scrape config: `ops/prometheus/prometheus.yml`, `ops/prometheus/prometheus-2.yml`
 - Prometheus rules: `ops/prometheus/rules/recording.yml`, `ops/prometheus/rules/alerts.yml`
-- Alertmanager config: `ops/alertmanager/alertmanager.yml`
+- Alertmanager config template: `ops/alertmanager/alertmanager.yml`
+- Alertmanager runtime render script: `ops/alertmanager/render-config.sh`
 - Loki config: `ops/loki/loki.yml`
 - Alloy config: `ops/alloy/config.alloy`
 - Tempo config: `ops/tempo/tempo.yml`
 - Grafana datasource provisioning: `ops/grafana/provisioning/datasources/datasources.yml`
+- Grafana dashboards provisioning: `ops/grafana/provisioning/dashboards/dashboards.yml`
 - App OTEL is disabled by default in compose (`OBS_OTEL_ENABLED=false`) and auto-enabled by `./scripts/up.sh` when observability is requested
-- Collector gRPC is exposed via `${OBS_OTEL_GRPC_PORT}` (default `4317`) for Linux host-network fallback path
-- Prometheus UI: `http://127.0.0.1:${OBS_PROMETHEUS_PORT}` (default `9090`)
+- Observability ports are bound to localhost (`127.0.0.1`) in default compose mode
+- Collector gRPC is exposed on `${OBS_OTEL_GRPC_PORT}` (default `4317`) for local debugging and Linux host-network fallback path
+- Prometheus-1 UI: `http://127.0.0.1:${OBS_PROMETHEUS_PORT}` (default `9090`)
+- Prometheus-2 UI: `http://127.0.0.1:${OBS_PROMETHEUS_REPLICA_PORT}` (default `9091`)
 - Grafana UI: `http://127.0.0.1:${OBS_GRAFANA_PORT}` (default `3000`, credentials `admin/admin`; override via `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`)
-- Alertmanager UI: `http://127.0.0.1:${OBS_ALERTMANAGER_PORT}` (default `9093`)
+- Alertmanager-1 UI: `http://127.0.0.1:${OBS_ALERTMANAGER_PORT}` (default `9093`)
+- Alertmanager-2 UI: `http://127.0.0.1:${OBS_ALERTMANAGER_REPLICA_PORT}` (default `9193`)
 - Loki API: `http://127.0.0.1:${OBS_LOKI_PORT}` (default `3100`)
 - Alloy UI: `http://127.0.0.1:${OBS_ALLOY_PORT}` (default `12345`)
 - Tempo UI/API: `http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}` (default `3200`)
+- VictoriaMetrics UI/API: `http://127.0.0.1:${OBS_VICTORIAMETRICS_PORT}` (default `8428`)
+- Prometheus retention is configurable via `OBS_PROMETHEUS_RETENTION` (default `24h`) and persisted in a Docker volume
+- Alertmanager retention is configurable via `ALERTMANAGER_RETENTION` (default `120h`) and persisted in a Docker volume
 - `X-Trace-Id` response header is emitted only when a valid active trace exists
+- Collector OTLP receiver uses bearer auth (`OBS_OTEL_AUTH_TOKEN` in collector, `OBS_OTEL_EXPORTER_OTLP_HEADERS` in app)
+- App OTLP exporter supports optional TLS/mTLS files:
+  - `OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE`
+  - `OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE`
+  - `OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE`
+- Optional runtime instrumentation flags:
+  - `OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED=true` instruments SQLAlchemy engine on creation
+  - `OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED=true` enables Redis client instrumentation
+- Collector derives span-to-metrics for dependency visibility (DB/Redis) via `spanmetrics` connector:
+  - Spanmetrics are generated in a dedicated traces pipeline without tail sampling; tail sampling is applied only on the Tempo export path.
+  - `traces_spanmetrics_calls_total`
+  - `traces_spanmetrics_duration_seconds_bucket`
+- Grafana datasources are configured via env and work in both default and host-network modes:
+  - `GRAFANA_PROMETHEUS_URL`
+  - `GRAFANA_PROMETHEUS_LTS_URL`
+  - `GRAFANA_LOKI_URL`
+  - `GRAFANA_TEMPO_URL`
+- Prometheus replicas remote-write to VictoriaMetrics for long-term retention (`/api/v1/write`)
+- Alertmanager webhook endpoints are configured via env:
+  - `ALERTMANAGER_WEBHOOK_TICKET_URL`
+  - `ALERTMANAGER_WEBHOOK_PAGE_URL`
+  - `ALERTMANAGER_WEBHOOK_HEARTBEAT_URL`
+- Optional direct channels (in addition to webhooks):
+  - `ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL`
+  - `ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL`
+  - `ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY`
+- In `APP_ENV=prod`, `./scripts/up.sh` disables host-network fallback and fails fast if:
+  - `GRAFANA_ADMIN_PASSWORD` is still default (`admin`)
+  - Alertmanager webhook/Slack URLs point to local addresses (`127.0.0.1`, `localhost`, `host.docker.internal`)
 
 Prometheus now has shortcut recording series for day-to-day use:
 
 - `service:rps:5m`
 - `service:error_rate_5xx:5m`
 - `service:latency_p95_ms:5m`
+- `dependency:db_redis_error_rate_pct:5m`
+- `dependency:db_redis_latency_p95_seconds:5m`
+- Plus monitoring-of-monitoring rules:
+  - `NoHTTPMetricsData`, `NoCollectorMetricsData`, `Watchdog`
+  - `CollectorExporterQueueSaturation`
+  - `CollectorReceiverRefusedData`
+  - `CollectorExporterSendFailures`
+  - `AlertmanagerNotificationFailures`
+- Dependency alerts:
+  - `HighDependencyErrorRate`
+  - `HighDependencyP95Latency`
+- Alert notifications are sent only after a rule stays firing for its `for` duration.
+
+Pre-provisioned Grafana dashboards:
+
+- `Service RED`
+- `Platform Observability`
+- `Service RED` includes `Service`/`Dependency` filters, dependency alert drill-down links, and Tempo Explore links.
+- `Start Here (Overview)` is provisioned as the Grafana home dashboard with only core health signals.
 
 ### 8) API surface (current)
 
@@ -651,12 +710,15 @@ ENABLE_OBSERVABILITY=1 ./scripts/up.sh
 - postgres: `5432`
 - redis: `6379`
 - OTel gRPC: `4317` (при включенном observability)
-- Prometheus: `9090` (при включенном observability)
+- Prometheus-1: `9090` (при включенном observability)
+- Prometheus-2: `9091` (при включенном observability)
 - Grafana: `3000` (при включенном observability)
-- Alertmanager: `9093` (при включенном observability)
+- Alertmanager-1: `9093` (при включенном observability)
+- Alertmanager-2: `9193` (при включенном observability)
 - Loki: `3100` (при включенном observability)
 - Alloy: `12345` (при включенном observability)
 - Tempo: `3200` (при включенном observability)
+- VictoriaMetrics: `8428` (при включенном observability)
 
 Если любой обязательный порт занят, скрипт автоматически пытается его освободить:
 - сначала останавливает контейнеры текущего compose-проекта (идемпотентный restart path)
@@ -665,7 +727,7 @@ ENABLE_OBSERVABILITY=1 ./scripts/up.sh
 - затем завершает оставшиеся локальные процессы, слушающие порт
 
 На Linux, если дефолтный bridge-режим работает только внутри docker-сети, но host URL недоступны, скрипт автоматически переключается на host-network fallback, чтобы URL с хоста открывались.
-В этом fallback-режиме и core, и observability сервисы запускаются в host networking, поэтому стандартные URL остаются доступны (`:8080`, `:9090`, `:3000`).
+В этом fallback-режиме и core, и observability сервисы запускаются в host networking, поэтому стандартные URL остаются доступны (`:8080`, `:9090`, `:9091`, `:3000`).
 Для Prometheus в host-network fallback scrape target переключается на `127.0.0.1:9464` (вместо `otel-collector:9464`).
 `./scripts/up.sh` также ретраит неуспешный `docker compose up` (по умолчанию 3 попытки, настраивается через `COMPOSE_UP_MAX_RETRIES`).
 
@@ -685,7 +747,7 @@ DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate ap
 Core + observability (ручной compose-путь):
 
 ```bash
-docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus grafana alertmanager loki alloy tempo
+docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus-1 prometheus-2 grafana alertmanager-1 alertmanager-2 loki alloy tempo victoria-metrics
 ```
 
 Лимиты auth в nginx настраиваются через compose env:
@@ -702,28 +764,84 @@ Entrypoint’ы runtime:
 Observability-стек (включается через `ENABLE_OBSERVABILITY=1 ./scripts/up.sh` или `--profile obs`):
 
 - конфиг OTel Collector: `ops/otel-collector/config.yaml`
-- конфиг scrape для Prometheus: `ops/prometheus/prometheus.yml`
+- конфиг scrape для Prometheus: `ops/prometheus/prometheus.yml`, `ops/prometheus/prometheus-2.yml`
 - правила Prometheus: `ops/prometheus/rules/recording.yml`, `ops/prometheus/rules/alerts.yml`
-- конфиг Alertmanager: `ops/alertmanager/alertmanager.yml`
+- шаблон конфига Alertmanager: `ops/alertmanager/alertmanager.yml`
+- скрипт рендера runtime-конфига Alertmanager: `ops/alertmanager/render-config.sh`
 - конфиг Loki: `ops/loki/loki.yml`
 - конфиг Alloy: `ops/alloy/config.alloy`
 - конфиг Tempo: `ops/tempo/tempo.yml`
 - provisioning datasource для Grafana: `ops/grafana/provisioning/datasources/datasources.yml`
+- provisioning dashboard для Grafana: `ops/grafana/provisioning/dashboards/dashboards.yml`
 - в compose OTEL по умолчанию выключен (`OBS_OTEL_ENABLED=false`), а `./scripts/up.sh` включает его автоматически при включенном observability-профиле
-- gRPC Collector публикуется на `${OBS_OTEL_GRPC_PORT}` (по умолчанию `4317`) для Linux host-network fallback сценария
-- UI Prometheus: `http://127.0.0.1:${OBS_PROMETHEUS_PORT}` (по умолчанию `9090`)
+- observability-порты в default compose-режиме биндуются только на localhost (`127.0.0.1`)
+- gRPC Collector публикуется на `${OBS_OTEL_GRPC_PORT}` (по умолчанию `4317`) для локальной отладки и Linux host-network fallback сценария
+- UI Prometheus-1: `http://127.0.0.1:${OBS_PROMETHEUS_PORT}` (по умолчанию `9090`)
+- UI Prometheus-2: `http://127.0.0.1:${OBS_PROMETHEUS_REPLICA_PORT}` (по умолчанию `9091`)
 - UI Grafana: `http://127.0.0.1:${OBS_GRAFANA_PORT}` (по умолчанию `3000`, креды `admin/admin`; переопределяется через `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`)
-- UI Alertmanager: `http://127.0.0.1:${OBS_ALERTMANAGER_PORT}` (по умолчанию `9093`)
+- UI Alertmanager-1: `http://127.0.0.1:${OBS_ALERTMANAGER_PORT}` (по умолчанию `9093`)
+- UI Alertmanager-2: `http://127.0.0.1:${OBS_ALERTMANAGER_REPLICA_PORT}` (по умолчанию `9193`)
 - API Loki: `http://127.0.0.1:${OBS_LOKI_PORT}` (по умолчанию `3100`)
 - UI Alloy: `http://127.0.0.1:${OBS_ALLOY_PORT}` (по умолчанию `12345`)
 - UI/API Tempo: `http://127.0.0.1:${OBS_TEMPO_HTTP_PORT}` (по умолчанию `3200`)
+- UI/API VictoriaMetrics: `http://127.0.0.1:${OBS_VICTORIAMETRICS_PORT}` (по умолчанию `8428`)
+- retention Prometheus задается через `OBS_PROMETHEUS_RETENTION` (по умолчанию `24h`) и хранится в Docker volume
+- retention Alertmanager задается через `ALERTMANAGER_RETENTION` (по умолчанию `120h`) и хранится в Docker volume
 - заголовок `X-Trace-Id` добавляется только при наличии валидного активного trace
+- OTLP receiver в Collector защищен bearer auth (`OBS_OTEL_AUTH_TOKEN` в collector, `OBS_OTEL_EXPORTER_OTLP_HEADERS` в app)
+- OTLP exporter в app поддерживает опциональные TLS/mTLS-файлы:
+  - `OBS_OTEL_EXPORTER_OTLP_CA_CERT_FILE`
+  - `OBS_OTEL_EXPORTER_OTLP_CLIENT_CERT_FILE`
+  - `OBS_OTEL_EXPORTER_OTLP_CLIENT_KEY_FILE`
+- Опциональные флаги runtime-инструментации:
+  - `OBS_OTEL_SQLALCHEMY_INSTRUMENTATION_ENABLED=true` включает инструментирование SQLAlchemy engine при создании
+  - `OBS_OTEL_REDIS_INSTRUMENTATION_ENABLED=true` включает инструментирование Redis-клиента
+- Collector строит span-to-metrics для зависимостей (DB/Redis) через `spanmetrics` connector:
+  - Spanmetrics считаются в отдельном traces-pipeline без tail sampling; tail sampling применяется только в pipeline экспорта в Tempo.
+  - `traces_spanmetrics_calls_total`
+  - `traces_spanmetrics_duration_seconds_bucket`
+- datasource Grafana конфигурируются через env и корректно работают в default/host-network режимах:
+  - `GRAFANA_PROMETHEUS_URL`
+  - `GRAFANA_PROMETHEUS_LTS_URL`
+  - `GRAFANA_LOKI_URL`
+  - `GRAFANA_TEMPO_URL`
+- Реплики Prometheus пишут remote_write в VictoriaMetrics для long-term retention (`/api/v1/write`)
+- webhook endpoints Alertmanager конфигурируются через env:
+  - `ALERTMANAGER_WEBHOOK_TICKET_URL`
+  - `ALERTMANAGER_WEBHOOK_PAGE_URL`
+  - `ALERTMANAGER_WEBHOOK_HEARTBEAT_URL`
+- Опциональные прямые каналы (дополнительно к webhook):
+  - `ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL`
+  - `ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL`
+  - `ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY`
+- при `APP_ENV=prod` скрипт `./scripts/up.sh` отключает host-network fallback и завершится с ошибкой, если:
+  - `GRAFANA_ADMIN_PASSWORD` оставлен дефолтным (`admin`)
+  - webhook/Slack URL Alertmanager указывает на локальный адрес (`127.0.0.1`, `localhost`, `host.docker.internal`)
 
 Для ежедневной работы в Prometheus добавлены shortcut recording series:
 
 - `service:rps:5m`
 - `service:error_rate_5xx:5m`
 - `service:latency_p95_ms:5m`
+- `dependency:db_redis_error_rate_pct:5m`
+- `dependency:db_redis_latency_p95_seconds:5m`
+- Также добавлены monitoring-of-monitoring alert-правила:
+  - `NoHTTPMetricsData`, `NoCollectorMetricsData`, `Watchdog`
+  - `CollectorExporterQueueSaturation`
+  - `CollectorReceiverRefusedData`
+  - `CollectorExporterSendFailures`
+  - `AlertmanagerNotificationFailures`
+- Alert-правила зависимостей:
+  - `HighDependencyErrorRate`
+  - `HighDependencyP95Latency`
+- Уведомление по алерту отправляется только когда правило находится в firing не меньше времени `for`.
+
+Преднастроенные Grafana dashboard:
+
+- `Service RED`
+- `Platform Observability`
+- `Service RED` включает фильтры `Service`/`Dependency`, drill-down ссылки на dependency-alerts и ссылки в Tempo Explore.
+- `Start Here (Overview)` преднастроен как домашний dashboard Grafana и показывает только базовые сигналы здоровья.
 
 ### 8) Актуальный API surface
 
