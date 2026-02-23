@@ -11,14 +11,14 @@ Release / Релиз: <https://github.com/gorodtx/fastapi-template/releases/late
 Use release tag (например `v1.0.0`) and run one command:
 
 ```bash
-TAG=v1.0.0 && git clone --depth 1 --branch "$TAG" https://github.com/gorodtx/fastapi-template.git && cd fastapi-template && cp .env.example .env && docker compose up -d --build postgres redis migrate app nginx
+TAG=v1.0.0 && git clone --depth 1 --branch "$TAG" https://github.com/gorodtx/fastapi-template.git && cd fastapi-template && cp .env.example .env && docker compose -f compose/data.yaml up -d && DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml run --rm migrate && DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/app.yaml up -d --build
 ```
 
 What to use from release / Что использовать из релиза:
 
 - clone by semantic tag (`git clone --branch vX.Y.Z`) as the single install path / клон по тегу — единый путь установки
 - `.env.example` -> `.env` with real credentials before first start / реальные значения перед стартом
-- runtime files from tag: `compose.yaml`, `nginx/`, `migrations/`, `alembic.ini`, `src/`
+- runtime files from tag: `compose/`, `nginx/`, `migrations/`, `alembic.ini`, `src/`
 
 Smoke checks / Проверка:
 
@@ -279,63 +279,59 @@ Production notes:
 
 ### 7) Runtime
 
-Recommended local start (includes Linux host-network fallback logic, core profile by default):
+Compose scopes (modular runtime):
+
+- `compose/data.yaml` — Postgres + Redis
+- `compose/migrate.yaml` — one-shot schema/bootstrap step
+- `compose/app.yaml` — app + nginx
+- `compose/obs.yaml` — OTel/Prometheus/Grafana/Loki/Tempo/Alertmanager/VictoriaMetrics
+- `compose/core.hostnet.yaml` — Linux host-network override for Postgres/Redis
+- `compose/migrate.hostnet.yaml` — Linux host-network override for migrate
+- `compose/app.hostnet.yaml` — Linux host-network override for app/nginx
+- `compose/obs.hostnet.yaml` — Linux host-network override for observability
+
+Core runtime (data + migrate + app):
 
 ```bash
-./scripts/up.sh
+docker compose -f compose/data.yaml down -v --remove-orphans
+docker compose -f compose/data.yaml up -d
+DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml run --rm migrate
+docker compose -f compose/data.yaml -f compose/app.yaml up -d --build
 ```
 
-Enable observability profile on demand:
+Core + observability:
 
 ```bash
-ENABLE_OBSERVABILITY=1 ./scripts/up.sh
+OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f compose/obs.yaml up -d --build
 ```
 
-`./scripts/up.sh` always enforces standard service ports:
+Linux host-network fallback (use when host cannot read Docker-published ports):
+
+```bash
+docker compose -f compose/data.yaml -f compose/core.hostnet.yaml down -v --remove-orphans
+docker compose -f compose/data.yaml up -d
+DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml -f compose/core.hostnet.yaml -f compose/migrate.hostnet.yaml run --rm migrate
+DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml up -d --build
+OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f compose/obs.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml -f compose/obs.hostnet.yaml up -d
+```
+
+Standard service ports:
 
 - app: `8080`
 - postgres: `5432`
 - redis: `6379`
-- OTel gRPC: `4317` (when observability is enabled)
-- Prometheus-1: `9090` (when observability is enabled)
-- Prometheus-2: `9091` (when observability is enabled)
-- Grafana: `3000` (when observability is enabled)
-- Alertmanager-1: `9093` (when observability is enabled)
-- Alertmanager-2: `9193` (when observability is enabled)
-- Loki: `3100` (when observability is enabled)
-- Alloy: `12345` (when observability is enabled)
-- Tempo: `3200` (when observability is enabled)
-- VictoriaMetrics: `8428` (when observability is enabled)
+- OTel gRPC: `4317` (with `compose/obs.yaml`)
+- Prometheus-1: `9090` (with `compose/obs.yaml`)
+- Prometheus-2: `9091` (with `compose/obs.yaml`)
+- Grafana: `3000` (with `compose/obs.yaml`)
+- Alertmanager-1: `9093` (with `compose/obs.yaml`)
+- Alertmanager-2: `9193` (with `compose/obs.yaml`)
+- Loki: `3100` (with `compose/obs.yaml`)
+- Alloy: `12345` (with `compose/obs.yaml`)
+- Tempo: `3200` (with `compose/obs.yaml`)
+- VictoriaMetrics: `8428` (with `compose/obs.yaml`)
 
-If any required port is occupied, the script automatically tries to free it:
-- first tears down containers from the current compose project (idempotent restart path)
-- then stops compose containers from the same repository workdir (covers host-network leftovers from another compose project name)
-- then stops Docker containers publishing this port
-- then terminates remaining local listener processes
-
-On Linux, if default bridge mode is healthy only from inside the compose network but not from host URLs, the script auto-switches to host-network fallback to restore host URL reachability.
-In this fallback mode, core services and observability services run on host networking, so default URLs stay reachable (`:8080`, `:9090`, `:9091`, `:3000`).
-For Prometheus in host-network fallback, scrape target switches to `127.0.0.1:9464` (instead of `otel-collector:9464`).
-`./scripts/up.sh` also retries failed `docker compose up` operations (default 3 attempts; override via `COMPOSE_UP_MAX_RETRIES`).
-
-Default runtime (cross-platform path):
-
-```bash
-docker compose down -v --remove-orphans
-docker compose up -d --build postgres redis migrate app nginx
-```
-
-If Docker build has DNS issues with PyPI:
-
-```bash
-DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate app nginx
-```
-
-Core + observability (manual compose path):
-
-```bash
-docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus-1 prometheus-2 grafana alertmanager-1 alertmanager-2 loki alloy tempo victoria-metrics
-```
+If a standard port is occupied, free it manually before start (or stop conflicting containers/processes).
 
 Nginx auth rate limits are configurable via compose env vars:
 
@@ -345,10 +341,16 @@ Nginx auth rate limits are configurable via compose env vars:
 
 Runtime entrypoints:
 
-- `nginx/migrate-up.sh` -> `uv run --no-dev --no-sync --frozen alembic upgrade head`
-- `nginx/app-up.sh` -> `uv run --no-dev --no-sync --frozen uvicorn ...`
+- `compose/migrate.yaml` (`migrate.command`) -> `uv run --no-dev --no-sync --frozen alembic upgrade head`
+- `compose/app.yaml` (`app.command`) -> `uv run --no-dev --no-sync --frozen uvicorn ...`
 
-Observability stack (enabled via `ENABLE_OBSERVABILITY=1 ./scripts/up.sh` or `--profile obs`):
+App-only horizontal scaling (data/obs scopes are untouched):
+
+```bash
+docker compose -f compose/data.yaml -f compose/app.yaml up -d --scale app=3
+```
+
+Observability stack (enabled by adding `-f compose/obs.yaml` and setting `OBS_OTEL_ENABLED=true` for app):
 
 - OTel Collector config: `ops/otel-collector/config.yaml`
 - Prometheus scrape config: `ops/prometheus/prometheus.yml`, `ops/prometheus/prometheus-2.yml`
@@ -360,9 +362,9 @@ Observability stack (enabled via `ENABLE_OBSERVABILITY=1 ./scripts/up.sh` or `--
 - Tempo config: `ops/tempo/tempo.yml`
 - Grafana datasource provisioning: `ops/grafana/provisioning/datasources/datasources.yml`
 - Grafana dashboards provisioning: `ops/grafana/provisioning/dashboards/dashboards.yml`
-- App OTEL is disabled by default in compose (`OBS_OTEL_ENABLED=false`) and auto-enabled by `./scripts/up.sh` when observability is requested
+- App OTEL is disabled by default in compose (`OBS_OTEL_ENABLED=false`)
 - Observability ports are bound to localhost (`127.0.0.1`) in default compose mode
-- Collector gRPC is exposed on `${OBS_OTEL_GRPC_PORT}` (default `4317`) for local debugging and Linux host-network fallback path
+- Collector gRPC is exposed on `${OBS_OTEL_GRPC_PORT}` (default `4317`) for local debugging
 - Prometheus-1 UI: `http://127.0.0.1:${OBS_PROMETHEUS_PORT}` (default `9090`)
 - Prometheus-2 UI: `http://127.0.0.1:${OBS_PROMETHEUS_REPLICA_PORT}` (default `9091`)
 - Grafana UI: `http://127.0.0.1:${OBS_GRAFANA_PORT}` (default `3000`, credentials `admin/admin`; override via `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`)
@@ -387,7 +389,7 @@ Observability stack (enabled via `ENABLE_OBSERVABILITY=1 ./scripts/up.sh` or `--
   - Spanmetrics are generated in a dedicated traces pipeline without tail sampling; tail sampling is applied only on the Tempo export path.
   - `traces_spanmetrics_calls_total`
   - `traces_spanmetrics_duration_seconds_bucket`
-- Grafana datasources are configured via env and work in both default and host-network modes:
+- Grafana datasources are configured via env:
   - `GRAFANA_PROMETHEUS_URL`
   - `GRAFANA_PROMETHEUS_LTS_URL`
   - `GRAFANA_LOKI_URL`
@@ -401,9 +403,7 @@ Observability stack (enabled via `ENABLE_OBSERVABILITY=1 ./scripts/up.sh` or `--
   - `ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL`
   - `ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL`
   - `ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY`
-- In `APP_ENV=prod`, `./scripts/up.sh` disables host-network fallback and fails fast if:
-  - `GRAFANA_ADMIN_PASSWORD` is still default (`admin`)
-  - Alertmanager webhook/Slack URLs point to local addresses (`127.0.0.1`, `localhost`, `host.docker.internal`)
+- In `APP_ENV=prod`, set non-default `GRAFANA_ADMIN_PASSWORD` and non-local Alertmanager receiver URLs before startup.
 
 Prometheus now has shortcut recording series for day-to-day use:
 
@@ -692,63 +692,59 @@ cp .env.example .env
 
 ### 7) Запуск runtime
 
-Рекомендуемый локальный запуск (включает Linux host-network fallback, по умолчанию профиль core):
+Compose scope-файлы (модульный runtime):
+
+- `compose/data.yaml` — Postgres + Redis
+- `compose/migrate.yaml` — one-shot шаг миграций/инициализации
+- `compose/app.yaml` — app + nginx
+- `compose/obs.yaml` — OTel/Prometheus/Grafana/Loki/Tempo/Alertmanager/VictoriaMetrics
+- `compose/core.hostnet.yaml` — Linux host-network override для Postgres/Redis
+- `compose/migrate.hostnet.yaml` — Linux host-network override для migrate
+- `compose/app.hostnet.yaml` — Linux host-network override для app/nginx
+- `compose/obs.hostnet.yaml` — Linux host-network override для observability
+
+Базовый runtime (data + migrate + app):
 
 ```bash
-./scripts/up.sh
+docker compose -f compose/data.yaml down -v --remove-orphans
+docker compose -f compose/data.yaml up -d
+DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml run --rm migrate
+docker compose -f compose/data.yaml -f compose/app.yaml up -d --build
 ```
 
-Включение observability-профиля:
+Runtime с observability:
 
 ```bash
-ENABLE_OBSERVABILITY=1 ./scripts/up.sh
+OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f compose/obs.yaml up -d --build
 ```
 
-`./scripts/up.sh` всегда использует стандартные порты сервисов:
+Linux host-network fallback (используй, если с хоста недоступны Docker-публикации портов):
+
+```bash
+docker compose -f compose/data.yaml -f compose/core.hostnet.yaml down -v --remove-orphans
+docker compose -f compose/data.yaml up -d
+DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml -f compose/core.hostnet.yaml -f compose/migrate.hostnet.yaml run --rm migrate
+DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml up -d --build
+OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f compose/obs.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml -f compose/obs.hostnet.yaml up -d
+```
+
+Стандартные порты сервисов:
 
 - app: `8080`
 - postgres: `5432`
 - redis: `6379`
-- OTel gRPC: `4317` (при включенном observability)
-- Prometheus-1: `9090` (при включенном observability)
-- Prometheus-2: `9091` (при включенном observability)
-- Grafana: `3000` (при включенном observability)
-- Alertmanager-1: `9093` (при включенном observability)
-- Alertmanager-2: `9193` (при включенном observability)
-- Loki: `3100` (при включенном observability)
-- Alloy: `12345` (при включенном observability)
-- Tempo: `3200` (при включенном observability)
-- VictoriaMetrics: `8428` (при включенном observability)
+- OTel gRPC: `4317` (с `compose/obs.yaml`)
+- Prometheus-1: `9090` (с `compose/obs.yaml`)
+- Prometheus-2: `9091` (с `compose/obs.yaml`)
+- Grafana: `3000` (с `compose/obs.yaml`)
+- Alertmanager-1: `9093` (с `compose/obs.yaml`)
+- Alertmanager-2: `9193` (с `compose/obs.yaml`)
+- Loki: `3100` (с `compose/obs.yaml`)
+- Alloy: `12345` (с `compose/obs.yaml`)
+- Tempo: `3200` (с `compose/obs.yaml`)
+- VictoriaMetrics: `8428` (с `compose/obs.yaml`)
 
-Если любой обязательный порт занят, скрипт автоматически пытается его освободить:
-- сначала останавливает контейнеры текущего compose-проекта (идемпотентный restart path)
-- затем останавливает compose-контейнеры из того же рабочего каталога репозитория (закрывает host-network leftovers от другого имени compose-проекта)
-- затем останавливает Docker-контейнеры, публикующие этот порт
-- затем завершает оставшиеся локальные процессы, слушающие порт
-
-На Linux, если дефолтный bridge-режим работает только внутри docker-сети, но host URL недоступны, скрипт автоматически переключается на host-network fallback, чтобы URL с хоста открывались.
-В этом fallback-режиме и core, и observability сервисы запускаются в host networking, поэтому стандартные URL остаются доступны (`:8080`, `:9090`, `:9091`, `:3000`).
-Для Prometheus в host-network fallback scrape target переключается на `127.0.0.1:9464` (вместо `otel-collector:9464`).
-`./scripts/up.sh` также ретраит неуспешный `docker compose up` (по умолчанию 3 попытки, настраивается через `COMPOSE_UP_MAX_RETRIES`).
-
-Базовый запуск (кроссплатформенный путь):
-
-```bash
-docker compose down -v --remove-orphans
-docker compose up -d --build postgres redis migrate app nginx
-```
-
-Если в Docker build проблемы DNS с PyPI:
-
-```bash
-DOCKER_BUILD_NETWORK=host docker compose up -d --build postgres redis migrate app nginx
-```
-
-Core + observability (ручной compose-путь):
-
-```bash
-docker compose --profile obs up -d --build postgres redis otel-collector migrate app nginx prometheus-1 prometheus-2 grafana alertmanager-1 alertmanager-2 loki alloy tempo victoria-metrics
-```
+Если любой стандартный порт занят, освободи его вручную до запуска (или останови конфликтующий процесс/контейнер).
 
 Лимиты auth в nginx настраиваются через compose env:
 
@@ -758,10 +754,16 @@ docker compose --profile obs up -d --build postgres redis otel-collector migrate
 
 Entrypoint’ы runtime:
 
-- `nginx/migrate-up.sh` -> `uv run --no-dev --no-sync --frozen alembic upgrade head`
-- `nginx/app-up.sh` -> `uv run --no-dev --no-sync --frozen uvicorn ...`
+- `compose/migrate.yaml` (`migrate.command`) -> `uv run --no-dev --no-sync --frozen alembic upgrade head`
+- `compose/app.yaml` (`app.command`) -> `uv run --no-dev --no-sync --frozen uvicorn ...`
 
-Observability-стек (включается через `ENABLE_OBSERVABILITY=1 ./scripts/up.sh` или `--profile obs`):
+Горизонтальное масштабирование только app-сервиса (без затрагивания data/obs scope):
+
+```bash
+docker compose -f compose/data.yaml -f compose/app.yaml up -d --scale app=3
+```
+
+Observability-стек (включается добавлением `-f compose/obs.yaml` и `OBS_OTEL_ENABLED=true` для app):
 
 - конфиг OTel Collector: `ops/otel-collector/config.yaml`
 - конфиг scrape для Prometheus: `ops/prometheus/prometheus.yml`, `ops/prometheus/prometheus-2.yml`
@@ -773,9 +775,9 @@ Observability-стек (включается через `ENABLE_OBSERVABILITY=1 
 - конфиг Tempo: `ops/tempo/tempo.yml`
 - provisioning datasource для Grafana: `ops/grafana/provisioning/datasources/datasources.yml`
 - provisioning dashboard для Grafana: `ops/grafana/provisioning/dashboards/dashboards.yml`
-- в compose OTEL по умолчанию выключен (`OBS_OTEL_ENABLED=false`), а `./scripts/up.sh` включает его автоматически при включенном observability-профиле
+- в compose OTEL по умолчанию выключен (`OBS_OTEL_ENABLED=false`)
 - observability-порты в default compose-режиме биндуются только на localhost (`127.0.0.1`)
-- gRPC Collector публикуется на `${OBS_OTEL_GRPC_PORT}` (по умолчанию `4317`) для локальной отладки и Linux host-network fallback сценария
+- gRPC Collector публикуется на `${OBS_OTEL_GRPC_PORT}` (по умолчанию `4317`) для локальной отладки
 - UI Prometheus-1: `http://127.0.0.1:${OBS_PROMETHEUS_PORT}` (по умолчанию `9090`)
 - UI Prometheus-2: `http://127.0.0.1:${OBS_PROMETHEUS_REPLICA_PORT}` (по умолчанию `9091`)
 - UI Grafana: `http://127.0.0.1:${OBS_GRAFANA_PORT}` (по умолчанию `3000`, креды `admin/admin`; переопределяется через `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`)
@@ -800,7 +802,7 @@ Observability-стек (включается через `ENABLE_OBSERVABILITY=1 
   - Spanmetrics считаются в отдельном traces-pipeline без tail sampling; tail sampling применяется только в pipeline экспорта в Tempo.
   - `traces_spanmetrics_calls_total`
   - `traces_spanmetrics_duration_seconds_bucket`
-- datasource Grafana конфигурируются через env и корректно работают в default/host-network режимах:
+- datasource Grafana конфигурируются через env:
   - `GRAFANA_PROMETHEUS_URL`
   - `GRAFANA_PROMETHEUS_LTS_URL`
   - `GRAFANA_LOKI_URL`
@@ -814,9 +816,7 @@ Observability-стек (включается через `ENABLE_OBSERVABILITY=1 
   - `ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL`
   - `ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL`
   - `ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY`
-- при `APP_ENV=prod` скрипт `./scripts/up.sh` отключает host-network fallback и завершится с ошибкой, если:
-  - `GRAFANA_ADMIN_PASSWORD` оставлен дефолтным (`admin`)
-  - webhook/Slack URL Alertmanager указывает на локальный адрес (`127.0.0.1`, `localhost`, `host.docker.internal`)
+- при `APP_ENV=prod` до запуска задай не-дефолтный `GRAFANA_ADMIN_PASSWORD` и не используй локальные URL для Alertmanager receiver-ов.
 
 Для ежедневной работы в Prometheus добавлены shortcut recording series:
 
