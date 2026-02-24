@@ -286,6 +286,7 @@ Compose scopes (modular runtime):
 - `compose/data.yaml` — Postgres + Redis
 - `compose/migrate.yaml` — one-shot schema/bootstrap step
 - `compose/app.yaml` — app + nginx
+- `compose/release.yaml` — release overlay (pull-only images, no build)
 - `compose/obs.yaml` — OTel/Prometheus/Grafana/Loki/Tempo/Alertmanager/VictoriaMetrics
 - `compose/core.hostnet.yaml` — Linux host-network override for Postgres/Redis
 - `compose/migrate.hostnet.yaml` — Linux host-network override for migrate
@@ -299,6 +300,20 @@ docker compose -f compose/data.yaml down -v --remove-orphans
 docker compose -f compose/data.yaml up -d
 DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml run --rm migrate
 docker compose -f compose/data.yaml -f compose/app.yaml up -d --build
+```
+
+Release runtime (prebuilt images, no server build):
+
+```bash
+export APP_IMAGE=ghcr.io/<owner>/fastapi-template-app:vX.Y.Z
+export MIGRATE_IMAGE=ghcr.io/<owner>/fastapi-template-migrate:vX.Y.Z
+export NGINX_IMAGE=ghcr.io/<owner>/fastapi-template-nginx:vX.Y.Z
+# Optional for local smoke with prebuilt local tags:
+# export RELEASE_PULL_POLICY=missing
+
+docker compose -f compose/data.yaml up -d
+docker compose -f compose/data.yaml -f compose/migrate.yaml -f compose/release.yaml run --rm migrate
+docker compose -f compose/data.yaml -f compose/release.yaml up -d
 ```
 
 Core + observability:
@@ -315,6 +330,22 @@ docker compose -f compose/data.yaml up -d
 DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml -f compose/core.hostnet.yaml -f compose/migrate.hostnet.yaml run --rm migrate
 DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml up -d --build
 OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f compose/obs.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml -f compose/obs.hostnet.yaml up -d
+```
+
+If `curl` returns `000` on host (`Empty reply from server`):
+
+1. This is usually a host Docker networking/runtime issue, not an app failure.
+2. Verify service from inside Docker network first:
+
+```bash
+docker run --rm --network <project>_default curlimages/curl:8.12.1 -s -o /dev/null -w '%{http_code}\n' http://nginx:8080/system
+```
+
+3. Use host-network fallback for this machine:
+
+```bash
+docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml up -d --build
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/system
 ```
 
 Standard service ports:
@@ -345,6 +376,7 @@ Runtime entrypoints:
 
 - `compose/migrate.yaml` (`migrate.command`) -> `uv run --no-dev --no-sync --frozen alembic upgrade head`
 - `compose/app.yaml` (`app.command`) -> `uv run --no-dev --no-sync --frozen uvicorn ...`
+- `compose/release.yaml` -> image-only app/migrate/nginx services with `pull_policy: ${RELEASE_PULL_POLICY:-always}` (release deploy without local build)
 
 App-only horizontal scaling (data/obs scopes are untouched):
 
@@ -701,6 +733,7 @@ Compose scope-файлы (модульный runtime):
 - `compose/data.yaml` — Postgres + Redis
 - `compose/migrate.yaml` — one-shot шаг миграций/инициализации
 - `compose/app.yaml` — app + nginx
+- `compose/release.yaml` — release overlay (только pull image, без build)
 - `compose/obs.yaml` — OTel/Prometheus/Grafana/Loki/Tempo/Alertmanager/VictoriaMetrics
 - `compose/core.hostnet.yaml` — Linux host-network override для Postgres/Redis
 - `compose/migrate.hostnet.yaml` — Linux host-network override для migrate
@@ -714,6 +747,20 @@ docker compose -f compose/data.yaml down -v --remove-orphans
 docker compose -f compose/data.yaml up -d
 DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml run --rm migrate
 docker compose -f compose/data.yaml -f compose/app.yaml up -d --build
+```
+
+Release runtime (prebuilt image, без сборки на сервере):
+
+```bash
+export APP_IMAGE=ghcr.io/<owner>/fastapi-template-app:vX.Y.Z
+export MIGRATE_IMAGE=ghcr.io/<owner>/fastapi-template-migrate:vX.Y.Z
+export NGINX_IMAGE=ghcr.io/<owner>/fastapi-template-nginx:vX.Y.Z
+# Опционально для локального smoke с локальными тегами:
+# export RELEASE_PULL_POLICY=missing
+
+docker compose -f compose/data.yaml up -d
+docker compose -f compose/data.yaml -f compose/migrate.yaml -f compose/release.yaml run --rm migrate
+docker compose -f compose/data.yaml -f compose/release.yaml up -d
 ```
 
 Runtime с observability:
@@ -730,6 +777,22 @@ docker compose -f compose/data.yaml up -d
 DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/migrate.yaml -f compose/core.hostnet.yaml -f compose/migrate.hostnet.yaml run --rm migrate
 DOCKER_BUILD_NETWORK=host docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml up -d --build
 OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f compose/obs.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml -f compose/obs.hostnet.yaml up -d
+```
+
+Если `curl` на хосте возвращает `000` (`Empty reply from server`):
+
+1. Обычно это сетевой/runtime нюанс Docker на конкретной машине, а не падение приложения.
+2. Сначала проверь сервис из Docker-сети:
+
+```bash
+docker run --rm --network <project>_default curlimages/curl:8.12.1 -s -o /dev/null -w '%{http_code}\n' http://nginx:8080/system
+```
+
+3. Для этой машины используй host-network fallback:
+
+```bash
+docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml up -d --build
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/system
 ```
 
 Стандартные порты сервисов:
@@ -760,6 +823,7 @@ Entrypoint’ы runtime:
 
 - `compose/migrate.yaml` (`migrate.command`) -> `uv run --no-dev --no-sync --frozen alembic upgrade head`
 - `compose/app.yaml` (`app.command`) -> `uv run --no-dev --no-sync --frozen uvicorn ...`
+- `compose/release.yaml` -> image-only сервисы app/migrate/nginx с `pull_policy: ${RELEASE_PULL_POLICY:-always}` (release-деплой без локальной сборки)
 
 Горизонтальное масштабирование только app-сервиса (без затрагивания data/obs scope):
 

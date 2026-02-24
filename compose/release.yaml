@@ -1,10 +1,7 @@
 services:
   app:
-    image: ${APP_IMAGE:-template-app:local}
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      network: ${DOCKER_BUILD_NETWORK:-default}
+    image: ${APP_IMAGE:?APP_IMAGE is required for release compose}
+    pull_policy: ${RELEASE_PULL_POLICY:-always}
     env_file:
       - ../.env
     environment:
@@ -51,23 +48,35 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/system', timeout=2)\"",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+
+  migrate:
+    image: ${MIGRATE_IMAGE:?MIGRATE_IMAGE is required for release compose}
+    pull_policy: ${RELEASE_PULL_POLICY:-always}
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/postgres
+      REDIS_URL: redis://redis:6379/0
+      RBAC_BOOTSTRAP_USERS: ${RBAC_BOOTSTRAP_USERS:-}
+    command:
+      [
+        "uv",
+        "run",
+        "--no-dev",
+        "--no-sync",
+        "--frozen",
+        "alembic",
+        "upgrade",
+        "head",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   nginx:
-    image: ${NGINX_IMAGE:-template-nginx:local}
-    build:
-      context: ..
-      dockerfile: Dockerfile.nginx
-      network: ${DOCKER_BUILD_NETWORK:-default}
+    image: ${NGINX_IMAGE:?NGINX_IMAGE is required for release compose}
+    pull_policy: ${RELEASE_PULL_POLICY:-always}
     environment:
       APP_UPSTREAM: ${APP_UPSTREAM:-app:8000}
       AUTH_LOGIN_RATE: ${AUTH_LOGIN_RATE:-10r/m}
@@ -76,6 +85,6 @@ services:
       NGINX_ENVSUBST_FILTER: APP_UPSTREAM|AUTH_LOGIN_RATE|AUTH_REGISTER_RATE|AUTH_REFRESH_RATE
     depends_on:
       app:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "${APP_HOST_PORT:-8080}:8080"

@@ -1,5 +1,6 @@
 services:
   migrate:
+    image: ${MIGRATE_IMAGE:-template-migrate:local}
     build:
       context: ..
       dockerfile: Dockerfile
