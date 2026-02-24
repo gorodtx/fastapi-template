@@ -316,6 +316,11 @@ docker compose -f compose/data.yaml -f compose/migrate.yaml -f compose/release.y
 docker compose -f compose/data.yaml -f compose/release.yaml up -d
 ```
 
+Tag-driven CI release flow:
+
+- `.github/workflows/release-images.yml` builds and publishes `app/migrate/nginx` images to GHCR on `v*` tags.
+- `.github/workflows/release.yml` creates GitHub Release object automatically for the same tag.
+
 Core + observability:
 
 ```bash
@@ -762,6 +767,11 @@ docker compose -f compose/data.yaml up -d
 docker compose -f compose/data.yaml -f compose/migrate.yaml -f compose/release.yaml run --rm migrate
 docker compose -f compose/data.yaml -f compose/release.yaml up -d
 ```
+
+CI release flow по тегу:
+
+- `.github/workflows/release-images.yml` собирает и публикует образы `app/migrate/nginx` в GHCR на тегах `v*`.
+- `.github/workflows/release.yml` автоматически создаёт GitHub Release object для того же тега.
 
 Runtime с observability:
 
