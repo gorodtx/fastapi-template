@@ -60,6 +60,19 @@ def _user_cache_key(user_id: UUID) -> str:
     return f"auth:user:{user_id}"
 
 
+async def _authenticate_with_fresh_session(
+    session_factory: async_sessionmaker[AsyncSession],
+    user_id: UUID,
+) -> AuthUser | None:
+    async with session_factory() as session:
+        manager = TransactionManagerImpl(session)
+        gateway = PersistenceGatewayImpl(manager)
+        authenticator = AuthenticatorImpl(
+            users=gateway.users, rbac=gateway.rbac
+        )
+        return await authenticator.authenticate(user_id)
+
+
 class RequestProvider(Provider):
     @provide(scope=Scope.REQUEST)
     async def session(
@@ -104,7 +117,7 @@ class RequestProvider(Provider):
         self: Self,
         request: Request,
         jwt_verifier: JwtVerifier,
-        authenticator: Authenticator,
+        session_factory: async_sessionmaker[AsyncSession],
         cache: StrCache,
         auth_user_cache_ttl_s: int,
     ) -> AuthUser:
@@ -120,7 +133,9 @@ class RequestProvider(Provider):
                 if not cached_user.is_active:
                     raise UnauthenticatedError("Authentication required")
                 return cached_user
-        auth_user = await authenticator.authenticate(user_id)
+        auth_user = await _authenticate_with_fresh_session(
+            session_factory, user_id
+        )
         if auth_user is None or not auth_user.is_active:
             raise UnauthenticatedError("Authentication required")
         await cache.set(
