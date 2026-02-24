@@ -29,7 +29,7 @@ class DeleteUserHandler(CommandHandler[DeleteUserCommand, SuccessDTO]):
     ) -> Result[SuccessDTO, AppError]:
         return await run_result_in_tx(
             manager=self.gateway.manager,
-            action=self._execute(cmd),
+            action_factory=lambda: self._execute(cmd),
         )
 
     async def _execute(

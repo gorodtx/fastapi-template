@@ -7,6 +7,14 @@ from backend.application.common.exceptions.storage import StorageError
 _SQLSTATE_UNIQUE: str = "23505"
 _SQLSTATE_FK: str = "23503"
 _SQLSTATE_NOT_NULL: str = "23502"
+_SQLSTATE_SERIALIZATION_FAILURE: str = "40001"
+_SQLSTATE_DEADLOCK_DETECTED: str = "40P01"
+_SQLSTATE_LOCK_NOT_AVAILABLE: str = "55P03"
+_TRANSIENT_CODE_BY_SQLSTATE: dict[str, str] = {
+    _SQLSTATE_SERIALIZATION_FAILURE: "db.transient.serialization_failure",
+    _SQLSTATE_DEADLOCK_DETECTED: "db.transient.deadlock_detected",
+    _SQLSTATE_LOCK_NOT_AVAILABLE: "db.transient.lock_not_available",
+}
 
 
 def _read_attr(obj: object, name: str) -> object | None:
@@ -84,6 +92,14 @@ def map_dbapi_error(err: DBAPIError) -> StorageError:
     meta: dict[str, object] | None = None
     if sqlstate is not None:
         meta = {"sqlstate": sqlstate}
+        transient_code = _TRANSIENT_CODE_BY_SQLSTATE.get(sqlstate)
+        if transient_code is not None:
+            return StorageError(
+                code=transient_code,
+                message="Temporary database error",
+                detail=str(err),
+                meta=meta,
+            )
     return StorageError(
         code="db.error",
         message="Database error",

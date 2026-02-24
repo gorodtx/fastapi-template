@@ -14,4 +14,5 @@ def test_conflict_not_found_and_fallback_statuses() -> None:
     assert _status_for_code("conflict") == 409
     assert _status_for_code("auth.too_many_requests") == 429
     assert _status_for_code("user.not_found") == 404
+    assert _status_for_code("db.transient.deadlock_detected") == 503
     assert _status_for_code("unexpected.error") == 400

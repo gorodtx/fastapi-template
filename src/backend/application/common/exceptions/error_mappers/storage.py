@@ -25,8 +25,10 @@ _DETAIL_CONSTRAINT_PATTERN = re.compile(
 )
 _DETAIL_FIELD_PATTERN = re.compile(r"Key \((?P<field>[a-z_]+)\)=")
 _DB_ERROR_PREFIX: Final[str] = "db."
+_DB_TRANSIENT_PREFIX: Final[str] = "db.transient."
 _INTERNAL_ERROR_CODE: Final[str] = "internal.error"
 _INTERNAL_ERROR_MESSAGE: Final[str] = "Internal server error"
+_TRANSIENT_DB_ERROR_MESSAGE: Final[str] = "Temporary database error"
 
 
 def map_storage_error_to_app() -> Callable[[StorageError], AppError]:
@@ -41,6 +43,11 @@ def map_storage_error_to_app() -> Callable[[StorageError], AppError]:
             )
         if error.code in {"rbac.role_unknown", "rbac.seed_mismatch"}:
             return UnknownRoleError()
+        if error.code.startswith(_DB_TRANSIENT_PREFIX):
+            return AppError(
+                code=error.code,
+                message=_TRANSIENT_DB_ERROR_MESSAGE,
+            )
         if error.code.startswith(_DB_ERROR_PREFIX):
             return AppError(
                 code=_INTERNAL_ERROR_CODE,

@@ -60,6 +60,23 @@ def test_non_unique_storage_error_keeps_original_payload() -> None:
     assert mapped.meta is None
 
 
+def test_transient_storage_error_keeps_public_retryable_code() -> None:
+    error = StorageError(
+        code="db.transient.deadlock_detected",
+        message="Database error",
+        detail="deadlock detected",
+        meta={"sqlstate": "40P01"},
+    )
+
+    mapped = map_storage_error_to_app()(error)
+
+    assert isinstance(mapped, AppError)
+    assert mapped.code == "db.transient.deadlock_detected"
+    assert mapped.message == "Temporary database error"
+    assert mapped.detail is None
+    assert mapped.meta is None
+
+
 def test_not_found_storage_error_masks_detail_and_meta() -> None:
     error = StorageError(
         code="user.not_found",

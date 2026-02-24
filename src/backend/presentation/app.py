@@ -142,6 +142,8 @@ def _status_for_code(code: str) -> int:
         return 409
     if code.endswith(".not_found"):
         return 404
+    if code.startswith("db.transient."):
+        return 503
     if code == "internal.error":
         return 500
     return 400
