@@ -88,10 +88,12 @@ Smoke checks / Проверка:
   - one request-scoped `AsyncSession`
   - one request-scoped `TransactionManager`
 - Write use-cases run in short transactions (`run_result_in_tx` + `manager.transaction()`).
+- Write transaction wrapper retries the whole use-case on transient DB failures (`db.transient.*`) with bounded exponential backoff.
 - Nested behavior is explicit:
   - `nested=True` -> savepoint (`begin_nested`)
   - already-inside scope -> no extra scope (`nullcontext`)
   - existing DB transaction without scope -> controlled commit/rollback scope
+- `current_user` auth lookup uses a short-lived dedicated DB session on cache miss, so auth-read does not alter the write transaction boundary of the request.
 - Startup behavior:
   - app factory builds `Settings` from env and disables docs/openapi in `prod|production`
   - DI is wired via `setup_di(app, settings)` with Dishka route integration
@@ -501,10 +503,12 @@ E2E_ADMIN_BEARER="<admin access token>"
   - одна request-scoped `AsyncSession`
   - один request-scoped `TransactionManager`
 - Write use-case выполняются в короткой транзакции (`run_result_in_tx` + `manager.transaction()`).
+- Обертка write-транзакции повторяет весь use-case на transient DB-ошибках (`db.transient.*`) с ограниченным exponential backoff.
 - Поведение вложенности:
   - `nested=True` -> savepoint (`begin_nested`)
   - если scope уже открыт -> без доп. scope (`nullcontext`)
   - если внешняя транзакция уже есть, но scope нет -> контролируемый commit/rollback scope
+- `current_user` при cache miss использует отдельную короткоживущую DB-session, чтобы auth-read не менял границу write-транзакции текущего запроса.
 - Поведение старта:
   - фабрика приложения собирает `Settings` из env и отключает docs/openapi в `prod|production`
   - DI подключается через `setup_di(app, settings)` и интеграцию Dishka routes
