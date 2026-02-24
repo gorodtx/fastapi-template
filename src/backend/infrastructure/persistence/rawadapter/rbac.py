@@ -11,8 +11,8 @@ from backend.application.common.interfaces.ports.persistence.manager import (
 )
 from backend.domain.core.types.rbac import RoleCode
 from backend.infrastructure.persistence.mappers.rbac import value_to_uuid
+from backend.infrastructure.persistence.mappers.rows import map_many
 from backend.infrastructure.persistence.rawadapter.sql_helpers import (
-    map_many_user_role_rows,
     select_user_roles,
     user_permissions_join,
 )
@@ -37,7 +37,7 @@ def q_get_user_role_codes(
         stmt = select_user_roles(user_roles_table.c.user_id == user_id)
         res = await async_session.execute(stmt)
         rows: Sequence[RowMapping] = res.mappings().all()
-        return map_many_user_role_rows(rows)
+        return map_many(rows, UserRoleCodeRecord)
 
     return _q
 
@@ -53,7 +53,7 @@ def q_get_user_role_codes_by_user_ids(
         stmt = select_user_roles(user_roles_table.c.user_id.in_(id_values))
         res = await async_session.execute(stmt)
         rows: Sequence[RowMapping] = res.mappings().all()
-        return map_many_user_role_rows(rows)
+        return map_many(rows, UserRoleCodeRecord)
 
     return _q
 

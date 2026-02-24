@@ -1,14 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 import sqlalchemy as sa
-from sqlalchemy import ColumnElement, FromClause, RowMapping
+from sqlalchemy import ColumnElement, FromClause
 
-from backend.infrastructure.persistence.records import (
-    UserRoleCodeRecord,
-    UserRowRecord,
-)
 from backend.infrastructure.persistence.sqlalchemy.tables.role import (
     roles_table,
 )
@@ -19,7 +13,6 @@ from backend.infrastructure.persistence.sqlalchemy.tables.role_permission import
 from backend.infrastructure.persistence.sqlalchemy.tables.users import (
     users_table,
 )
-from backend.infrastructure.tools.msgspec_convert import convert_record
 
 USER_ROW_COLUMNS = (
     users_table.c.id.label("id"),
@@ -67,19 +60,3 @@ def select_user_roles(
         .select_from(user_roles_join())
         .where(where_clause)
     )
-
-
-def map_one_user_row(row: RowMapping | None) -> UserRowRecord | None:
-    if row is None:
-        return None
-    return convert_record(dict(row), UserRowRecord)
-
-
-def map_many_user_rows(rows: Sequence[RowMapping]) -> list[UserRowRecord]:
-    return [convert_record(dict(row), UserRowRecord) for row in rows]
-
-
-def map_many_user_role_rows(
-    rows: Sequence[RowMapping],
-) -> list[UserRoleCodeRecord]:
-    return [convert_record(dict(row), UserRoleCodeRecord) for row in rows]

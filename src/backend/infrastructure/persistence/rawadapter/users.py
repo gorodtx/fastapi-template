@@ -10,10 +10,12 @@ from uuid_utils.compat import UUID
 from backend.application.common.interfaces.ports.persistence.manager import (
     SessionProtocol,
 )
+from backend.infrastructure.persistence.mappers.rows import (
+    map_many,
+    map_one,
+)
 from backend.infrastructure.persistence.rawadapter.sql_helpers import (
     USER_ROW_COLUMNS,
-    map_many_user_rows,
-    map_one_user_row,
     select_user_rows,
 )
 from backend.infrastructure.persistence.records import UserRowRecord
@@ -33,7 +35,7 @@ def q_get_user_row_by_id(
         stmt = select_user_rows(users_table.c.id == user_id)
         res = await async_session.execute(stmt)
         row: RowMapping | None = res.mappings().first()
-        return map_one_user_row(row)
+        return map_one(row, UserRowRecord)
 
     return _q
 
@@ -46,7 +48,7 @@ def q_get_user_row_by_email(
         stmt = select_user_rows(users_table.c.email == email)
         res = await async_session.execute(stmt)
         row: RowMapping | None = res.mappings().first()
-        return map_one_user_row(row)
+        return map_one(row, UserRowRecord)
 
     return _q
 
@@ -62,7 +64,7 @@ def q_get_user_rows_by_ids(
         stmt = select_user_rows(users_table.c.id.in_(id_values))
         res = await async_session.execute(stmt)
         rows: Sequence[RowMapping] = res.mappings().all()
-        return map_many_user_rows(rows)
+        return map_many(rows, UserRowRecord)
 
     return _q
 
@@ -91,7 +93,7 @@ def q_upsert_user_row(
         )
         res = await async_session.execute(stmt)
         row_mapping: RowMapping | None = res.mappings().first()
-        converted = map_one_user_row(row_mapping)
+        converted = map_one(row_mapping, UserRowRecord)
         if converted is None:
             raise RuntimeError("Failed to upsert user row")
         return converted
