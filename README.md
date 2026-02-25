@@ -18,9 +18,7 @@ Production-oriented backend template: FastAPI + Clean/DDD + SQLAlchemy + Postgre
 - [Detailed Guides](#detailed-guides--подробные-руководства)
 - [Smoke Checks](#smoke-checks--быстрые-проверки)
 - [Quality Gates](#quality-gates--контроль-качества)
-- [Troubleshooting](#troubleshooting--типовые-проблемы)
-- [English](#english)
-- [Русский](#русский)
+- [Q&A](#qa)
 
 ## Quick Start / Быстрый старт
 
@@ -155,7 +153,7 @@ Optional live matrix / Опциональная живая матрица:
 RUN_LIVE_E2E=1 E2E_BASE_URL=http://127.0.0.1:8080 uv run pytest tests/test_e2e_endpoint_matrix_live.py -q
 ```
 
-## Troubleshooting / Типовые проблемы
+## Q&A
 
 ### `curl` returns `000` from host / `curl` возвращает `000` с хоста
 
@@ -172,12 +170,7 @@ docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/system
 ```
 
-## English
+## thks :)
 
-Use this page as a compact navigation hub.  
-For complete technical details, open [`docs/guide.en.md`](docs/guide.en.md).
-
-## Русский
-
-Этот файл теперь компактный и навигационный.  
-Все подробности вынесены в [`docs/guide.ru.md`](docs/guide.ru.md).
+For complete technical details [`docs/guide.en.md`](docs/guide.en.md).
+Все подробности - [`docs/guide.ru.md`](docs/guide.ru.md).
