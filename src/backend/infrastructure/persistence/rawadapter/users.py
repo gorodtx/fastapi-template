@@ -27,12 +27,31 @@ from backend.infrastructure.persistence.sqlalchemy.tables.users import (
 )
 
 
+def _lock_user_row_by_id_stmt(user_id: UUID) -> sa.Select[tuple]:
+    return select_user_rows(users_table.c.id == user_id).with_for_update(
+        nowait=True
+    )
+
+
 def q_get_user_row_by_id(
     user_id: UUID,
 ) -> Callable[[SessionProtocol], Awaitable[UserRowRecord | None]]:
     async def _q(session: SessionProtocol) -> UserRowRecord | None:
         async_session = require_async_session(session)
         stmt = select_user_rows(users_table.c.id == user_id)
+        res = await async_session.execute(stmt)
+        row: RowMapping | None = res.mappings().first()
+        return map_one(row, UserRowRecord)
+
+    return _q
+
+
+def q_lock_user_row_by_id_nowait(
+    user_id: UUID,
+) -> Callable[[SessionProtocol], Awaitable[UserRowRecord | None]]:
+    async def _q(session: SessionProtocol) -> UserRowRecord | None:
+        async_session = require_async_session(session)
+        stmt = _lock_user_row_by_id_stmt(user_id)
         res = await async_session.execute(stmt)
         row: RowMapping | None = res.mappings().first()
         return map_one(row, UserRowRecord)

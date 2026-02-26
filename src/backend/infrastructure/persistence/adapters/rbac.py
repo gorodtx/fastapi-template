@@ -20,6 +20,9 @@ from backend.infrastructure.persistence.rawadapter.rbac import (
     q_list_user_ids_by_role_id,
     q_replace_user_roles,
 )
+from backend.infrastructure.persistence.rawadapter.users import (
+    q_lock_user_row_by_id_nowait,
+)
 from backend.infrastructure.tools.storage_result import storage_result
 
 
@@ -48,6 +51,15 @@ class SqlRbacAdapter(UnboundAdapter, RbacAdapter):
     ) -> Result[None, StorageError]:
         async def _call() -> None:
             payload = _ReplaceUserRoles(user_id=user_id, roles=roles)
+            locked_user = await self.manager.send(
+                q_lock_user_row_by_id_nowait(payload.user_id)
+            )
+            self.require_found(
+                locked_user,
+                code="user.not_found",
+                message="User not found",
+                detail="not found",
+            )
             pairs = await self.manager.send(
                 q_get_role_ids_by_codes(list(payload.roles))
             )

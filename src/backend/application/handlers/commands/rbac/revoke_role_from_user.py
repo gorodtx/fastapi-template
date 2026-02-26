@@ -64,7 +64,7 @@ class RevokeRoleFromUserHandler(
         role: RoleCode = cmd.role
 
         user_result = (
-            await self.gateway.users.get_by_id(cmd.user_id)
+            await self.gateway.users.lock_by_id(cmd.user_id)
         ).map_err(map_storage_error_to_app())
         if isinstance(user_result, Err):
             return ResultImpl.err_from(user_result)

@@ -51,7 +51,7 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
         self: UpdateUserHandler, cmd: UpdateUserCommand
     ) -> Result[UserResponseDTO, AppError]:
         user_result = (
-            await self.gateway.users.get_by_id(
+            await self.gateway.users.lock_by_id(
                 cmd.user_id,
                 include_roles=False,
             )

@@ -26,6 +26,7 @@ from backend.infrastructure.persistence.rawadapter.users import (
     q_get_user_row_by_email,
     q_get_user_row_by_id,
     q_get_user_rows_by_ids,
+    q_lock_user_row_by_id_nowait,
     q_upsert_user_row,
 )
 from backend.infrastructure.persistence.records import UserRowRecord
@@ -64,6 +65,26 @@ class SqlUsersAdapter(UnboundAdapter, UsersAdapter):
         async def _call() -> User:
             async def fetch_row() -> UserRowRecord | None:
                 return await self.manager.send(q_get_user_row_by_id(user_id))
+
+            return await self._fetch_user(
+                fetch_row,
+                include_roles=include_roles,
+            )
+
+        return await storage_result(_call)
+
+    async def lock_by_id(
+        self: SqlUsersAdapter,
+        user_id: UUID,
+        /,
+        *,
+        include_roles: bool = True,
+    ) -> Result[User, StorageError]:
+        async def _call() -> User:
+            async def fetch_row() -> UserRowRecord | None:
+                return await self.manager.send(
+                    q_lock_user_row_by_id_nowait(user_id)
+                )
 
             return await self._fetch_user(
                 fetch_row,

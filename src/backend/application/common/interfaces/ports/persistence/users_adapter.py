@@ -11,6 +11,14 @@ from backend.domain.core.entities.user import User
 
 
 class UsersAdapter(Protocol):
+    def lock_by_id(
+        self: UsersAdapter,
+        user_id: UUID,
+        /,
+        *,
+        include_roles: bool = True,
+    ) -> Awaitable[Result[User, StorageError]]: ...
+
     def get_by_id(
         self: UsersAdapter,
         user_id: UUID,
