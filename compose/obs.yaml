@@ -1,4 +1,8 @@
 services:
+  alert-webhook-sink:
+    image: hashicorp/http-echo:1.0.0
+    command: ["-listen=:5678", "-text=ok"]
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.146.1
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
@@ -108,9 +112,9 @@ services:
     entrypoint: ["/bin/sh", "/etc/alertmanager/render-config.sh"]
     environment:
       APP_ENV: ${APP_ENV:-dev}
-      ALERTMANAGER_WEBHOOK_TICKET_URL: ${ALERTMANAGER_WEBHOOK_TICKET_URL:-http://host.docker.internal:5001/alerts}
-      ALERTMANAGER_WEBHOOK_PAGE_URL: ${ALERTMANAGER_WEBHOOK_PAGE_URL:-http://host.docker.internal:5002/alerts}
-      ALERTMANAGER_WEBHOOK_HEARTBEAT_URL: ${ALERTMANAGER_WEBHOOK_HEARTBEAT_URL:-}
+      ALERTMANAGER_WEBHOOK_TICKET_URL: ${ALERTMANAGER_WEBHOOK_TICKET_URL:-http://alert-webhook-sink:5678/alerts}
+      ALERTMANAGER_WEBHOOK_PAGE_URL: ${ALERTMANAGER_WEBHOOK_PAGE_URL:-http://alert-webhook-sink:5678/alerts}
+      ALERTMANAGER_WEBHOOK_HEARTBEAT_URL: ${ALERTMANAGER_WEBHOOK_HEARTBEAT_URL:-http://alert-webhook-sink:5678/alerts}
       ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL: ${ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL:-}
       ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL: ${ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL:-}
       ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY: ${ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY:-}
@@ -130,9 +134,9 @@ services:
     entrypoint: ["/bin/sh", "/etc/alertmanager/render-config.sh"]
     environment:
       APP_ENV: ${APP_ENV:-dev}
-      ALERTMANAGER_WEBHOOK_TICKET_URL: ${ALERTMANAGER_WEBHOOK_TICKET_URL:-http://host.docker.internal:5001/alerts}
-      ALERTMANAGER_WEBHOOK_PAGE_URL: ${ALERTMANAGER_WEBHOOK_PAGE_URL:-http://host.docker.internal:5002/alerts}
-      ALERTMANAGER_WEBHOOK_HEARTBEAT_URL: ${ALERTMANAGER_WEBHOOK_HEARTBEAT_URL:-}
+      ALERTMANAGER_WEBHOOK_TICKET_URL: ${ALERTMANAGER_WEBHOOK_TICKET_URL:-http://alert-webhook-sink:5678/alerts}
+      ALERTMANAGER_WEBHOOK_PAGE_URL: ${ALERTMANAGER_WEBHOOK_PAGE_URL:-http://alert-webhook-sink:5678/alerts}
+      ALERTMANAGER_WEBHOOK_HEARTBEAT_URL: ${ALERTMANAGER_WEBHOOK_HEARTBEAT_URL:-http://alert-webhook-sink:5678/alerts}
       ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL: ${ALERTMANAGER_TICKET_SLACK_WEBHOOK_URL:-}
       ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL: ${ALERTMANAGER_PAGE_SLACK_WEBHOOK_URL:-}
       ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY: ${ALERTMANAGER_PAGE_PAGERDUTY_ROUTING_KEY:-}
@@ -154,6 +158,7 @@ services:
       - "127.0.0.1:${OBS_LOKI_PORT:-3100}:3100"
     environment:
       LOKI_RETENTION_PERIOD: ${OBS_LOKI_RETENTION_PERIOD:-72h}
+      LOKI_RULER_ALERTMANAGER_URL: ${LOKI_RULER_ALERTMANAGER_URL:-http://alertmanager-1:9093}
     volumes:
       - ../ops/loki/loki.yml:/etc/loki/loki.yml:ro
       - loki_data:/loki
@@ -173,7 +178,6 @@ services:
       - "127.0.0.1:${OBS_ALLOY_PORT:-12345}:12345"
     volumes:
       - ../ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   tempo:

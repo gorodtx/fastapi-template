@@ -14,17 +14,6 @@ distributor:
 ingester:
   max_block_duration: 5m
 
-metrics_generator:
-  registry:
-    external_labels:
-      source: tempo
-      cluster: template
-  storage:
-    path: /var/tempo/generator/wal
-    remote_write:
-      - url: http://prometheus:9090/api/v1/write
-        send_exemplars: true
-
 storage:
   trace:
     backend: local
@@ -32,8 +21,3 @@ storage:
       path: /var/tempo/blocks
     wal:
       path: /var/tempo/wal
-
-overrides:
-  defaults:
-    metrics_generator:
-      processors: ["service-graphs", "span-metrics"]

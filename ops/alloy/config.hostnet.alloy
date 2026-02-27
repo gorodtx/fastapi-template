@@ -22,6 +22,6 @@ loki.process "docker" {
 
 loki.write "default" {
   endpoint {
-    url = "http://loki:3100/loki/api/v1/push"
+    url = "http://127.0.0.1:3100/loki/api/v1/push"
   }
 }
