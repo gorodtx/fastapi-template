@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from fastapi import FastAPI
 from pytest import MonkeyPatch
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -61,7 +62,15 @@ def test_setup_observability_enables_redis_instrumentation(
     monkeypatch.setattr(
         observability_setup_module,
         "_INSTRUMENTATION_STATE",
-        {"redis_instrumented": False},
+        {
+            "redis_instrumented": False,
+            "logging_instrumented": True,
+        },
+    )
+    monkeypatch.setattr(
+        observability_setup_module,
+        "_build_logger_provider",
+        lambda *_args, **_kwargs: _FakeLoggerProvider(),
     )
     cfg = ObservabilityConfig(
         enabled=True,
@@ -86,6 +95,39 @@ def test_setup_observability_enables_redis_instrumentation(
     )
     setup_observability(app, cfg)
     assert calls["count"] == 1
+
+
+class _FakeLoggerProvider:
+    def shutdown(self) -> None:
+        return None
+
+
+def test_instrument_logging_requires_logging_package(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        observability_setup_module,
+        "_INSTRUMENTATION_STATE",
+        {
+            "redis_instrumented": False,
+            "logging_instrumented": False,
+        },
+    )
+
+    def _missing_import(_name: str) -> object:
+        raise ModuleNotFoundError("missing module")
+
+    monkeypatch.setattr(
+        observability_setup_module,
+        "import_module",
+        _missing_import,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="opentelemetry-instrumentation-logging",
+    ):
+        observability_setup_module._instrument_logging()
 
 
 def test_instrument_sqlalchemy_engine_idempotent(

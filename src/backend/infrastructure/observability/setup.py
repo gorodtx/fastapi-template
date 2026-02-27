@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Sequence
+from importlib import import_module
 from pathlib import Path
 from threading import Lock
 
 from fastapi import FastAPI
 from grpc import ChannelCredentials, ssl_channel_credentials
 from opentelemetry import metrics, trace
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.grpc._log_exporter import (
+    OTLPLogExporter,
+)
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
     OTLPMetricExporter,
 )
@@ -19,6 +25,8 @@ from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import (
     SQLAlchemyInstrumentor,
 )
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.metrics.view import (
@@ -55,7 +63,13 @@ _HTTP_DURATION_BUCKETS: Sequence[float] = (
 )
 _INSTRUMENTATION_LOCK = Lock()
 _SQLALCHEMY_INSTRUMENTED_ENGINES: set[int] = set()
-_INSTRUMENTATION_STATE: dict[str, bool] = {"redis_instrumented": False}
+_INSTRUMENTATION_STATE: dict[str, bool] = {
+    "redis_instrumented": False,
+    "logging_instrumented": False,
+}
+_INSTRUMENTATION_OBJECTS: dict[str, LoggingHandler | None] = {
+    "logging_handler": None,
+}
 
 
 def setup_observability(
@@ -109,6 +123,13 @@ def setup_observability(
         )
     )
     trace.set_tracer_provider(tracer_provider)
+    _instrument_logging()
+    logger_provider = _build_logger_provider(
+        cfg,
+        resource,
+        insecure,
+        credentials,
+    )
 
     metric_reader = PeriodicExportingMetricReader(
         OTLPMetricExporter(
@@ -138,7 +159,12 @@ def setup_observability(
     if cfg.redis_instrumentation_enabled:
         _instrument_redis()
 
-    _register_shutdown(app, tracer_provider, meter_provider)
+    _register_shutdown(
+        app,
+        tracer_provider,
+        meter_provider,
+        logger_provider,
+    )
 
 
 def instrument_sqlalchemy_engine(engine: AsyncEngine) -> None:
@@ -154,8 +180,11 @@ def _register_shutdown(
     app: FastAPI,
     tracer_provider: TracerProvider,
     meter_provider: MeterProvider,
+    logger_provider: LoggerProvider,
 ) -> None:
     async def _shutdown() -> None:
+        _detach_logging_handler()
+        logger_provider.shutdown()
         meter_provider.shutdown()
         tracer_provider.shutdown()
 
@@ -222,3 +251,65 @@ def _instrument_redis() -> None:
             return
         RedisInstrumentor().instrument()
         _INSTRUMENTATION_STATE["redis_instrumented"] = True
+
+
+def _instrument_logging() -> None:
+    with _INSTRUMENTATION_LOCK:
+        if _INSTRUMENTATION_STATE["logging_instrumented"]:
+            return
+        try:
+            logging_module = import_module(
+                "opentelemetry.instrumentation.logging"
+            )
+            logging_instrumentor_type = logging_module.LoggingInstrumentor
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "Observability logging requires package opentelemetry-instrumentation-logging"
+            ) from exc
+        logging_instrumentor_type().instrument(set_logging_format=False)
+        _INSTRUMENTATION_STATE["logging_instrumented"] = True
+
+
+def _build_logger_provider(
+    cfg: ObservabilityConfig,
+    resource: Resource,
+    insecure: bool,
+    credentials: ChannelCredentials | None,
+) -> LoggerProvider:
+    logger_provider = LoggerProvider(resource=resource)
+    logger_provider.add_log_record_processor(
+        BatchLogRecordProcessor(
+            OTLPLogExporter(
+                endpoint=cfg.otlp_endpoint,
+                headers=cfg.otlp_headers,
+                insecure=insecure,
+                credentials=credentials,
+            )
+        )
+    )
+    set_logger_provider(logger_provider)
+    _attach_logging_handler(logger_provider)
+    return logger_provider
+
+
+def _attach_logging_handler(
+    logger_provider: LoggerProvider,
+) -> None:
+    with _INSTRUMENTATION_LOCK:
+        if _INSTRUMENTATION_OBJECTS["logging_handler"] is not None:
+            return
+        handler = LoggingHandler(
+            level=logging.NOTSET,
+            logger_provider=logger_provider,
+        )
+        logging.getLogger("backend").addHandler(handler)
+        _INSTRUMENTATION_OBJECTS["logging_handler"] = handler
+
+
+def _detach_logging_handler() -> None:
+    with _INSTRUMENTATION_LOCK:
+        handler = _INSTRUMENTATION_OBJECTS["logging_handler"]
+        if handler is None:
+            return
+        logging.getLogger("backend").removeHandler(handler)
+        _INSTRUMENTATION_OBJECTS["logging_handler"] = None
