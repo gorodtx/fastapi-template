@@ -55,7 +55,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "## Start Here\n1. **HTTP 5xx Rate** and **HTTP P95 Latency** are primary health indicators.\n2. **Dependency Error Rate** and **Dependency P95 Latency** reflect DB/Redis health.\n3. **Active Alerts** must stay at `0` in normal conditions.\n4. Click top links for deep dive dashboards.",
+        "content": "## Start Here\n1. **HTTP 5xx Rate** + **API P95 Latency** are primary health indicators.\n2. **Auth P95 Latency** is expected to be higher because password hashing is CPU-expensive.\n3. **Dependency Error Rate** and **Dependency P95 Latency** reflect DB/Redis health.\n4. **Active Alerts (without Watchdog)** must stay at `0` in normal conditions.\n5. Click top links for deep dive dashboards.",
         "mode": "markdown"
       },
       "title": "How To Read",
@@ -226,11 +226,74 @@
       },
       "targets": [
         {
-          "expr": "service:latency_p95_ms:5m",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{http_target!~\"/auth/.*\"}[5m]))) or vector(0)",
           "refId": "A"
         }
       ],
-      "title": "HTTP P95 Latency (ms)",
+      "title": "API P95 Latency (ms, no /auth/*)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 250
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 25
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{http_target=~\"/auth/.*\"}[5m]))) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Auth P95 Latency (ms)",
       "type": "stat"
     },
     {
@@ -416,11 +479,11 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertstate=\"firing\"})",
+          "expr": "count(ALERTS{alertstate=\"firing\",alertname!=\"Watchdog\"})",
           "refId": "A"
         }
       ],
-      "title": "Active Alerts",
+      "title": "Active Alerts (no Watchdog)",
       "type": "stat"
     },
     {

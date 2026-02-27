@@ -110,6 +110,10 @@ OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f
 - `compose/obs.yaml` -> OTel/Prometheus/Grafana/Loki/Tempo/Alertmanager/VictoriaMetrics
 - `compose/core.hostnet.yaml`, `compose/app.hostnet.yaml`, `compose/migrate.hostnet.yaml`, `compose/obs.hostnet.yaml` -> Linux host-network fallback
 
+Observability log flow:
+- app logs -> OTLP gRPC -> OTel Collector -> Loki
+- container logs -> Alloy `loki.source.docker` (Docker API) -> Loki
+
 ## Release and CI / Релиз и CI
 
 - `.github/workflows/ci.yml` -> lint/format/type/tests
@@ -169,6 +173,10 @@ docker run --rm --network <project>_default curlimages/curl:8.12.1 -s -o /dev/nu
 docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.yaml -f compose/app.hostnet.yaml up -d --build
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/system
 ```
+
+### `OBS_OTEL_ENABLED=true` and app fails on startup
+
+If startup error contains `opentelemetry-instrumentation-logging`, install this runtime package in your app image/environment. Logging correlation is configured as a hard requirement for observability mode.
 
 ## thks :)
 
