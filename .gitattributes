@@ -1,0 +1,6 @@
+README.md export-ignore
+AGENTS.md export-ignore
+test.md export-ignore
+docs/** export-ignore
+tests/** export-ignore
+dev/** export-ignore

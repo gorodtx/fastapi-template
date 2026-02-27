@@ -4,7 +4,7 @@ WORKDIR /app
 
 ENV UV_LINK_MODE=copy
 
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock ./
 RUN attempts=0; max_attempts=20; \
   until uv sync --frozen --no-dev --no-install-project; do \
     attempts=$((attempts + 1)); \

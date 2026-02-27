@@ -19,3 +19,7 @@ typings
 .vscode
 .idea
 .env
+README.md
+AGENTS.md
+test.md
+docs
