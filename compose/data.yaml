@@ -1,6 +1,16 @@
 services:
   postgres:
     image: postgres:16-alpine
+    command:
+      [
+        "postgres",
+        "-c",
+        "shared_preload_libraries=pg_stat_statements",
+        "-c",
+        "pg_stat_statements.track=all",
+        "-c",
+        "pg_stat_statements.max=10000",
+      ]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -19,8 +29,60 @@ services:
       timeout: 5s
       retries: 10
 
+  pgbouncer:
+    image: ${PGBOUNCER_IMAGE:-edoburu/pgbouncer@sha256:85d1e38593617af1b5f7f285e97d407e56c29939683cc7cfe4c8f6dc19f1268b}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres
+      AUTH_TYPE: ${PGBOUNCER_AUTH_TYPE:-scram-sha-256}
+      POOL_MODE: ${PGBOUNCER_POOL_MODE:-transaction}
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-500}
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-50}
+      RESERVE_POOL_SIZE: ${PGBOUNCER_RESERVE_POOL_SIZE:-10}
+      RESERVE_POOL_TIMEOUT: ${PGBOUNCER_RESERVE_POOL_TIMEOUT:-5}
+      MAX_DB_CONNECTIONS: ${PGBOUNCER_MAX_DB_CONNECTIONS:-100}
+      MAX_DB_CLIENT_CONNECTIONS: ${PGBOUNCER_MAX_DB_CLIENT_CONNECTIONS:-1000}
+      ADMIN_USERS: ${PGBOUNCER_ADMIN_USERS:-postgres}
+      LOG_CONNECTIONS: ${PGBOUNCER_LOG_CONNECTIONS:-1}
+      LOG_DISCONNECTIONS: ${PGBOUNCER_LOG_DISCONNECTIONS:-1}
+      LOG_POOLER_ERRORS: ${PGBOUNCER_LOG_POOLER_ERRORS:-1}
+      STATS_PERIOD: ${PGBOUNCER_STATS_PERIOD:-60}
+      CLIENT_TLS_SSLMODE: ${PGBOUNCER_CLIENT_TLS_SSLMODE:-disable}
+      CLIENT_TLS_KEY_FILE: ${PGBOUNCER_CLIENT_TLS_KEY_FILE:-}
+      CLIENT_TLS_CERT_FILE: ${PGBOUNCER_CLIENT_TLS_CERT_FILE:-}
+      CLIENT_TLS_CA_FILE: ${PGBOUNCER_CLIENT_TLS_CA_FILE:-}
+      SERVER_TLS_SSLMODE: ${PGBOUNCER_SERVER_TLS_SSLMODE:-disable}
+      SERVER_TLS_KEY_FILE: ${PGBOUNCER_SERVER_TLS_KEY_FILE:-}
+      SERVER_TLS_CERT_FILE: ${PGBOUNCER_SERVER_TLS_CERT_FILE:-}
+      SERVER_TLS_CA_FILE: ${PGBOUNCER_SERVER_TLS_CA_FILE:-}
+    ports:
+      - "127.0.0.1:6432:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p 5432 -U postgres -d postgres",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "${REDIS_MAXMEMORY:-256mb}",
+        "--maxmemory-policy",
+        "${REDIS_MAXMEMORY_POLICY:-allkeys-lru}",
+      ]
     ports:
       - "6379:6379"
     volumes:

@@ -2,7 +2,7 @@ services:
   app:
     network_mode: host
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/postgres
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@127.0.0.1:6432/postgres?prepared_statement_cache_size=0}
       REDIS_URL: redis://127.0.0.1:6379/0
       OBS_OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:${OBS_OTEL_GRPC_PORT:-4317}
 

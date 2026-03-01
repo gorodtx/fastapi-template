@@ -43,9 +43,11 @@ from backend.infrastructure.security.password_hasher import (
 from backend.presentation.settings import Settings
 
 
-def _build_redis_client(redis_url: str | None) -> Redis:
+def _build_redis_client(
+    redis_url: str | None, redis_max_connections: int
+) -> Redis:
     if redis_url is None:
-        return Redis()
+        return Redis(max_connections=redis_max_connections)
     parsed = urlparse(redis_url)
     if parsed.scheme not in {"redis", "rediss"}:
         raise RuntimeError(f"Unsupported Redis URL scheme: {parsed.scheme}")
@@ -66,6 +68,7 @@ def _build_redis_client(redis_url: str | None) -> Redis:
         password=parsed.password,
         db=db,
         ssl=parsed.scheme == "rediss",
+        max_connections=redis_max_connections,
     )
 
 
@@ -158,7 +161,10 @@ class CacheProvider(Provider):
 
     @provide(scope=Scope.APP)
     async def redis_client(self: Self) -> AsyncIterator[Redis]:
-        client = _build_redis_client(self._settings.redis_url)
+        client = _build_redis_client(
+            self._settings.redis_url,
+            self._settings.redis_max_connections,
+        )
         try:
             yield client
         finally:

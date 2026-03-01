@@ -3,6 +3,23 @@ services:
     network_mode: host
     ports: []
 
+  pgbouncer:
+    network_mode: host
+    ports: []
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+      LISTEN_ADDR: "127.0.0.1"
+      LISTEN_PORT: "6432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p 6432 -U postgres -d postgres",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     network_mode: host
     ports: []
