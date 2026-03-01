@@ -17,11 +17,11 @@ receivers:
 processors:
   memory_limiter:
     check_interval: 1s
-    limit_mib: 512
+    limit_mib: ${OBS_OTEL_COLLECTOR_MEMORY_LIMIT_MIB}
   tail_sampling:
-    decision_wait: 5s
-    num_traces: 50000
-    expected_new_traces_per_sec: 500
+    decision_wait: ${OBS_OTEL_TAIL_DECISION_WAIT}
+    num_traces: ${OBS_OTEL_TAIL_NUM_TRACES}
+    expected_new_traces_per_sec: ${OBS_OTEL_TAIL_EXPECTED_NEW_TRACES_PER_SEC}
     policies:
       - name: errors
         type: status_code
@@ -30,14 +30,14 @@ processors:
       - name: slow-traces
         type: latency
         latency:
-          threshold_ms: 1000
+          threshold_ms: ${OBS_OTEL_TAIL_SLOW_THRESHOLD_MS}
       - name: baseline-sample
         type: probabilistic
         probabilistic:
-          sampling_percentage: 10
+          sampling_percentage: ${OBS_OTEL_TAIL_BASELINE_SAMPLING_PERCENTAGE}
   batch:
-    timeout: 5s
-    send_batch_size: 1024
+    timeout: ${OBS_OTEL_BATCH_TIMEOUT}
+    send_batch_size: ${OBS_OTEL_BATCH_SEND_SIZE}
 
 exporters:
   prometheus:

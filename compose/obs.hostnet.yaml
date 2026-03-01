@@ -1,4 +1,10 @@
 services:
+  app:
+    environment:
+      OBS_OTEL_ENABLED: "true"
+      OBS_OTEL_EXPORTER_OTLP_ENDPOINT: ${OBS_OTEL_EXPORTER_OTLP_ENDPOINT:-http://127.0.0.1:4317}
+      OBS_OTEL_EXPORTER_OTLP_HEADERS: ${OBS_OTEL_EXPORTER_OTLP_HEADERS:-authorization=Bearer dev-otel-token}
+
   alert-webhook-sink:
     network_mode: host
     ports: []
@@ -44,7 +50,9 @@ services:
       GRAFANA_PROMETHEUS_URL: http://127.0.0.1:9090
       GRAFANA_PROMETHEUS_LTS_URL: http://127.0.0.1:8428
       GRAFANA_LOKI_URL: http://127.0.0.1:3100
-      GRAFANA_TEMPO_URL: http://127.0.0.1:3200
+      GF_PATHS_PROVISIONING: /etc/grafana/hostnet-provisioning
+    volumes:
+      - ../ops/grafana/hostnet/provisioning:/etc/grafana/hostnet-provisioning:ro
 
   alertmanager-1:
     network_mode: host
@@ -80,12 +88,18 @@ services:
     volumes:
       - ../ops/alloy/config.hostnet.alloy:/etc/alloy/config.alloy:ro
 
-  tempo:
+  postgres-exporter:
     network_mode: host
     ports: []
-    command: ["-config.file=/etc/tempo/tempo-hostnet.yml"]
-    volumes:
-      - ../ops/tempo/tempo.hostnet.yml:/etc/tempo/tempo-hostnet.yml:ro
+    environment:
+      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN_HOSTNET:-postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable}
+
+  pgbouncer-exporter:
+    image: prometheuscommunity/pgbouncer-exporter:v0.10.2
+    network_mode: host
+    ports: []
+    environment:
+      PGBOUNCER_EXPORTER_CONNECTION_STRING: ${PGBOUNCER_EXPORTER_DSN_HOSTNET:-postgres://postgres:postgres@127.0.0.1:6432/pgbouncer?sslmode=disable}
 
   victoria-metrics:
     network_mode: host
