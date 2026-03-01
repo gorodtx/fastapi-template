@@ -157,3 +157,57 @@ groups:
         annotations:
           summary: "Watchdog"
           description: "Always firing heartbeat alert for alerting pipeline checks."
+
+      - alert: PostgresConnectionsSaturation
+        expr: db:postgres_connections_usage_pct:5m > 80
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Postgres connections saturation"
+          description: "Postgres connection usage is above 80% for 10m."
+
+      - alert: PostgresDeadlocksDetected
+        expr: db:postgres_deadlocks_rate:5m > 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Postgres deadlocks detected"
+          description: "Deadlocks observed in Postgres during the last 5m."
+
+      - alert: PostgresTempBytesSpike
+        expr: db:postgres_temp_bytes_rate:5m > 10000000
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Postgres temp bytes spike"
+          description: "High temporary bytes rate in Postgres (>10MB/s) for 10m."
+
+      - alert: PgBouncerConnectionsSaturation
+        expr: db:pgbouncer_client_connections_usage_pct:5m > 80
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "PgBouncer client connections saturation"
+          description: "PgBouncer client connection usage is above 80% for 10m."
+
+      - alert: PgBouncerClientQueueWaiting
+        expr: db:pgbouncer_client_waiting_connections:max > 0
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "PgBouncer has waiting clients"
+          description: "At least one PgBouncer client connection is waiting for 10m."
+
+      - alert: PgBouncerClientMaxwaitHigh
+        expr: db:pgbouncer_client_maxwait_seconds:max > 1
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "PgBouncer client maxwait is high"
+          description: "Oldest waiting client in PgBouncer is above 1s for 10m."

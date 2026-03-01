@@ -1,0 +1,82 @@
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+memberlist:
+  abort_if_cluster_join_fails: false
+  bind_port: 7946
+  join_members:
+    - tempo-distributor:7946
+    - tempo-ingester:7946
+    - tempo-querier:7946
+    - tempo-query-frontend:7946
+    - tempo-compactor:7946
+    - tempo-metrics-generator:7946
+
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: memberlist
+      replication_factor: 1
+
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: 24h
+
+querier:
+  frontend_worker:
+    frontend_address: tempo-query-frontend:9095
+
+metrics_generator:
+  ring:
+    kvstore:
+      store: memberlist
+  registry:
+    external_labels:
+      source: tempo
+      cluster: compose
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://victoria-metrics:8428/api/v1/write
+        send_exemplars: true
+
+query_frontend:
+  search:
+    query_backend_after: 0s
+  metrics:
+    query_backend_after: 0s
+
+storage:
+  trace:
+    backend: s3
+    s3:
+      bucket: ${TEMPO_S3_BUCKET}
+      endpoint: ${TEMPO_S3_ENDPOINT}
+      access_key: ${TEMPO_S3_ACCESS_KEY}
+      secret_key: ${TEMPO_S3_SECRET_KEY}
+      insecure: ${TEMPO_S3_INSECURE}
+    wal:
+      path: /var/tempo/wal
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: ["span-metrics", "service-graphs"]
+      generate_native_histograms: both
+
+usage_report:
+  reporting_enabled: false

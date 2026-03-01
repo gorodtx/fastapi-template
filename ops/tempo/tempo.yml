@@ -1,8 +1,14 @@
+partition_ring_live_store: true
+stream_over_http_enabled: true
+
 server:
   http_listen_port: 3200
   log_level: info
 
 distributor:
+  ring:
+    kvstore:
+      store: inmemory
   receivers:
     otlp:
       protocols:
@@ -12,7 +18,35 @@ distributor:
           endpoint: 0.0.0.0:4318
 
 ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+  partition_ring:
+    kvstore:
+      store: inmemory
+    min_partition_owners_count: 1
+    min_partition_owners_duration: 0s
   max_block_duration: 5m
+
+querier:
+  query_live_store: true
+
+live_store:
+  partition_ring:
+    kvstore:
+      store: inmemory
+    min_partition_owners_count: 1
+    min_partition_owners_duration: 0s
+  readiness_target_lag: 0s
+  readiness_max_wait: 30s
+
+query_frontend:
+  search:
+    query_backend_after: 0s
+  metrics:
+    query_backend_after: 0s
 
 storage:
   trace:

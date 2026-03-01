@@ -32,6 +32,9 @@ limits_config:
   volume_enabled: true
   retention_period: ${LOKI_RETENTION_PERIOD}
 
+pattern_ingester:
+  enabled: true
+
 compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m

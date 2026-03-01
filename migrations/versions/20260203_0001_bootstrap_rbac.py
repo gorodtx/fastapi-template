@@ -4,6 +4,8 @@ Revision ID: 20260203_0001
 Revises:
 Create Date: 2026-02-03 00:00:00.000000
 """
+# migration-lint: allow-nonconcurrent-index
+# This bootstrap revision runs on empty schema during initial provisioning.
 
 import json
 import os
@@ -301,7 +303,7 @@ def upgrade() -> None:
     for user in bootstrap_users:
         user_id = _find_user_id(connection, users_table, user.login)
         if user_id is None:
-            user_id = uuid.uuid4()
+            user_id = uuid.uuid7()
             connection.execute(
                 users_table.insert().values(
                     id=user_id,

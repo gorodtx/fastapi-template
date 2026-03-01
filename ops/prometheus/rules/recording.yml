@@ -82,3 +82,43 @@ groups:
               )
             )
           )
+
+  - name: postgres-recording
+    interval: 30s
+    rules:
+      - record: db:postgres_connections_usage_pct:5m
+        expr: |
+          100 *
+          sum(pg_stat_activity_count{server=~".*"})
+          /
+          clamp_min(max(pg_settings_max_connections{server=~".*"}), 1)
+
+      - record: db:postgres_deadlocks_rate:5m
+        expr: |
+          sum(rate(pg_stat_database_deadlocks{datname!=""}[5m]))
+
+      - record: db:postgres_temp_bytes_rate:5m
+        expr: |
+          sum(rate(pg_stat_database_temp_bytes{datname!=""}[5m]))
+
+  - name: pgbouncer-recording
+    interval: 30s
+    rules:
+      - record: db:pgbouncer_client_connections_usage_pct:5m
+        expr: |
+          100 *
+          sum(
+            pgbouncer_pools_client_active_connections
+            +
+            pgbouncer_pools_client_waiting_connections
+          )
+          /
+          clamp_min(max(pgbouncer_config_max_client_connections), 1)
+
+      - record: db:pgbouncer_client_waiting_connections:max
+        expr: |
+          max(pgbouncer_pools_client_waiting_connections)
+
+      - record: db:pgbouncer_client_maxwait_seconds:max
+        expr: |
+          max(pgbouncer_pools_client_maxwait_seconds)

@@ -1,4 +1,12 @@
 services:
+  app:
+    environment:
+      OBS_OTEL_ENABLED: "true"
+      OBS_OTEL_EXPORTER_OTLP_ENDPOINT: ${OBS_OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      OBS_OTEL_EXPORTER_OTLP_HEADERS: ${OBS_OTEL_EXPORTER_OTLP_HEADERS:-authorization=Bearer dev-otel-token}
+      OBS_OTEL_TRACES_SAMPLER: ${OBS_OTEL_TRACES_SAMPLER:-always_on}
+      OBS_OTEL_TRACES_SAMPLER_ARG: ${OBS_OTEL_TRACES_SAMPLER_ARG:-1.0}
+
   alert-webhook-sink:
     image: hashicorp/http-echo:1.0.0
     command: ["-listen=:5678", "-text=ok"]
@@ -8,8 +16,16 @@ services:
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     environment:
       OBS_OTEL_AUTH_TOKEN: ${OBS_OTEL_AUTH_TOKEN:-dev-otel-token}
+      OBS_OTEL_COLLECTOR_MEMORY_LIMIT_MIB: ${OBS_OTEL_COLLECTOR_MEMORY_LIMIT_MIB:-512}
+      OBS_OTEL_TAIL_DECISION_WAIT: ${OBS_OTEL_TAIL_DECISION_WAIT:-5s}
+      OBS_OTEL_TAIL_NUM_TRACES: ${OBS_OTEL_TAIL_NUM_TRACES:-50000}
+      OBS_OTEL_TAIL_EXPECTED_NEW_TRACES_PER_SEC: ${OBS_OTEL_TAIL_EXPECTED_NEW_TRACES_PER_SEC:-500}
+      OBS_OTEL_TAIL_SLOW_THRESHOLD_MS: ${OBS_OTEL_TAIL_SLOW_THRESHOLD_MS:-1000}
+      OBS_OTEL_TAIL_BASELINE_SAMPLING_PERCENTAGE: ${OBS_OTEL_TAIL_BASELINE_SAMPLING_PERCENTAGE:-10}
+      OBS_OTEL_BATCH_TIMEOUT: ${OBS_OTEL_BATCH_TIMEOUT:-5s}
+      OBS_OTEL_BATCH_SEND_SIZE: ${OBS_OTEL_BATCH_SEND_SIZE:-1024}
     depends_on:
-      tempo:
+      tempo-distributor:
         condition: service_started
       loki:
         condition: service_started
@@ -35,7 +51,7 @@ services:
         condition: service_started
       loki:
         condition: service_started
-      tempo:
+      tempo-query-frontend:
         condition: service_started
       victoria-metrics:
         condition: service_started
@@ -63,7 +79,7 @@ services:
         condition: service_started
       loki:
         condition: service_started
-      tempo:
+      tempo-query-frontend:
         condition: service_started
       victoria-metrics:
         condition: service_started
@@ -83,7 +99,7 @@ services:
         condition: service_started
       loki:
         condition: service_started
-      tempo:
+      tempo-query-frontend:
         condition: service_started
       victoria-metrics:
         condition: service_started
@@ -99,7 +115,7 @@ services:
       GRAFANA_PROMETHEUS_URL: ${GRAFANA_PROMETHEUS_URL:-http://prometheus-1:9090}
       GRAFANA_PROMETHEUS_LTS_URL: ${GRAFANA_PROMETHEUS_LTS_URL:-http://victoria-metrics:8428}
       GRAFANA_LOKI_URL: ${GRAFANA_LOKI_URL:-http://loki:3100}
-      GRAFANA_TEMPO_URL: ${GRAFANA_TEMPO_URL:-http://tempo:3200}
+      GRAFANA_TEMPO_URL: ${GRAFANA_TEMPO_URL:-http://tempo-query-frontend:3200}
     ports:
       - "127.0.0.1:${OBS_GRAFANA_PORT:-3000}:3000"
     volumes:
@@ -180,14 +196,191 @@ services:
       - ../ops/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-  tempo:
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    command:
+      - "--collector.stat_statements"
+    environment:
+      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN:-postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${OBS_POSTGRES_EXPORTER_PORT:-9187}:9187"
+
+  pgbouncer-exporter:
+    image: prometheuscommunity/pgbouncer-exporter:v0.10.2
+    environment:
+      PGBOUNCER_EXPORTER_CONNECTION_STRING: ${PGBOUNCER_EXPORTER_DSN:-postgres://postgres:postgres@pgbouncer:5432/pgbouncer?sslmode=disable}
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${OBS_PGBOUNCER_EXPORTER_PORT:-9127}:9127"
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${TEMPO_S3_ACCESS_KEY:-tempo}
+      MINIO_ROOT_PASSWORD: ${TEMPO_S3_SECRET_KEY:-supersecret}
+    ports:
+      - "127.0.0.1:${OBS_MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${OBS_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      TEMPO_S3_BUCKET: ${TEMPO_S3_BUCKET:-tempo}
+      TEMPO_S3_ACCESS_KEY: ${TEMPO_S3_ACCESS_KEY:-tempo}
+      TEMPO_S3_SECRET_KEY: ${TEMPO_S3_SECRET_KEY:-supersecret}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        until mc alias set local http://minio:9000 "$${TEMPO_S3_ACCESS_KEY}" "$${TEMPO_S3_SECRET_KEY}"; do sleep 1; done;
+        mc mb --ignore-existing "local/$${TEMPO_S3_BUCKET}";
+        mc anonymous set download "local/$${TEMPO_S3_BUCKET}";
+    restart: "no"
+
+  tempo-distributor:
     image: grafana/tempo:latest
-    command: ["-config.file=/etc/tempo/tempo.yml"]
+    command:
+      [
+        "-target=distributor",
+        "-config.file=/etc/tempo/tempo.distributed.yml",
+        "-config.expand-env=true",
+      ]
+    environment:
+      TEMPO_S3_BUCKET: ${TEMPO_S3_BUCKET:-tempo}
+      TEMPO_S3_ENDPOINT: ${TEMPO_S3_ENDPOINT:-minio:9000}
+      TEMPO_S3_ACCESS_KEY: ${TEMPO_S3_ACCESS_KEY:-tempo}
+      TEMPO_S3_SECRET_KEY: ${TEMPO_S3_SECRET_KEY:-supersecret}
+      TEMPO_S3_INSECURE: ${TEMPO_S3_INSECURE:-true}
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${OBS_TEMPO_DISTRIBUTOR_OTLP_GRPC_PORT:-14317}:4317"
+      - "127.0.0.1:${OBS_TEMPO_DISTRIBUTOR_OTLP_HTTP_PORT:-14318}:4318"
+    volumes:
+      - ../ops/tempo/tempo.distributed.yml:/etc/tempo/tempo.distributed.yml:ro
+      - tempo_distributor_data:/var/tempo
+
+  tempo-ingester:
+    image: grafana/tempo:latest
+    command:
+      [
+        "-target=ingester",
+        "-config.file=/etc/tempo/tempo.distributed.yml",
+        "-config.expand-env=true",
+      ]
+    environment:
+      TEMPO_S3_BUCKET: ${TEMPO_S3_BUCKET:-tempo}
+      TEMPO_S3_ENDPOINT: ${TEMPO_S3_ENDPOINT:-minio:9000}
+      TEMPO_S3_ACCESS_KEY: ${TEMPO_S3_ACCESS_KEY:-tempo}
+      TEMPO_S3_SECRET_KEY: ${TEMPO_S3_SECRET_KEY:-supersecret}
+      TEMPO_S3_INSECURE: ${TEMPO_S3_INSECURE:-true}
+    depends_on:
+      tempo-distributor:
+        condition: service_started
+    volumes:
+      - ../ops/tempo/tempo.distributed.yml:/etc/tempo/tempo.distributed.yml:ro
+      - tempo_ingester_data:/var/tempo
+
+  tempo-compactor:
+    image: grafana/tempo:latest
+    command:
+      [
+        "-target=backend-scheduler",
+        "-config.file=/etc/tempo/tempo.distributed.yml",
+        "-config.expand-env=true",
+      ]
+    environment:
+      TEMPO_S3_BUCKET: ${TEMPO_S3_BUCKET:-tempo}
+      TEMPO_S3_ENDPOINT: ${TEMPO_S3_ENDPOINT:-minio:9000}
+      TEMPO_S3_ACCESS_KEY: ${TEMPO_S3_ACCESS_KEY:-tempo}
+      TEMPO_S3_SECRET_KEY: ${TEMPO_S3_SECRET_KEY:-supersecret}
+      TEMPO_S3_INSECURE: ${TEMPO_S3_INSECURE:-true}
+    depends_on:
+      tempo-distributor:
+        condition: service_started
+    volumes:
+      - ../ops/tempo/tempo.distributed.yml:/etc/tempo/tempo.distributed.yml:ro
+      - tempo_compactor_data:/var/tempo
+
+  tempo-querier:
+    image: grafana/tempo:latest
+    command:
+      [
+        "-target=querier",
+        "-config.file=/etc/tempo/tempo.distributed.yml",
+        "-config.expand-env=true",
+      ]
+    environment:
+      TEMPO_S3_BUCKET: ${TEMPO_S3_BUCKET:-tempo}
+      TEMPO_S3_ENDPOINT: ${TEMPO_S3_ENDPOINT:-minio:9000}
+      TEMPO_S3_ACCESS_KEY: ${TEMPO_S3_ACCESS_KEY:-tempo}
+      TEMPO_S3_SECRET_KEY: ${TEMPO_S3_SECRET_KEY:-supersecret}
+      TEMPO_S3_INSECURE: ${TEMPO_S3_INSECURE:-true}
+    depends_on:
+      tempo-ingester:
+        condition: service_started
+      tempo-compactor:
+        condition: service_started
+    volumes:
+      - ../ops/tempo/tempo.distributed.yml:/etc/tempo/tempo.distributed.yml:ro
+      - tempo_querier_data:/var/tempo
+
+  tempo-query-frontend:
+    image: grafana/tempo:latest
+    command:
+      [
+        "-target=query-frontend",
+        "-config.file=/etc/tempo/tempo.distributed.yml",
+        "-config.expand-env=true",
+      ]
+    environment:
+      TEMPO_S3_BUCKET: ${TEMPO_S3_BUCKET:-tempo}
+      TEMPO_S3_ENDPOINT: ${TEMPO_S3_ENDPOINT:-minio:9000}
+      TEMPO_S3_ACCESS_KEY: ${TEMPO_S3_ACCESS_KEY:-tempo}
+      TEMPO_S3_SECRET_KEY: ${TEMPO_S3_SECRET_KEY:-supersecret}
+      TEMPO_S3_INSECURE: ${TEMPO_S3_INSECURE:-true}
+    depends_on:
+      tempo-querier:
+        condition: service_started
     ports:
       - "127.0.0.1:${OBS_TEMPO_HTTP_PORT:-3200}:3200"
     volumes:
-      - ../ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
-      - tempo_data:/var/tempo
+      - ../ops/tempo/tempo.distributed.yml:/etc/tempo/tempo.distributed.yml:ro
+      - tempo_query_frontend_data:/var/tempo
+
+  tempo-metrics-generator:
+    image: grafana/tempo:latest
+    command:
+      [
+        "-target=metrics-generator",
+        "-config.file=/etc/tempo/tempo.distributed.yml",
+        "-config.expand-env=true",
+      ]
+    environment:
+      TEMPO_S3_BUCKET: ${TEMPO_S3_BUCKET:-tempo}
+      TEMPO_S3_ENDPOINT: ${TEMPO_S3_ENDPOINT:-minio:9000}
+      TEMPO_S3_ACCESS_KEY: ${TEMPO_S3_ACCESS_KEY:-tempo}
+      TEMPO_S3_SECRET_KEY: ${TEMPO_S3_SECRET_KEY:-supersecret}
+      TEMPO_S3_INSECURE: ${TEMPO_S3_INSECURE:-true}
+    depends_on:
+      tempo-distributor:
+        condition: service_started
+      victoria-metrics:
+        condition: service_started
+    volumes:
+      - ../ops/tempo/tempo.distributed.yml:/etc/tempo/tempo.distributed.yml:ro
+      - tempo_metrics_generator_data:/var/tempo
 
   victoria-metrics:
     image: victoriametrics/victoria-metrics:latest
@@ -208,5 +401,11 @@ volumes:
   alertmanager_data:
   alertmanager_2_data:
   loki_data:
-  tempo_data:
+  minio_data:
+  tempo_distributor_data:
+  tempo_ingester_data:
+  tempo_compactor_data:
+  tempo_querier_data:
+  tempo_query_frontend_data:
+  tempo_metrics_generator_data:
   victoria_metrics_data:
