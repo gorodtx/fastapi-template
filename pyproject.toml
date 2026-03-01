@@ -94,7 +94,6 @@ max-statements = 60
 
 
 [tool.ty.environment]
-# ty и так умеет брать минимум из project.requires-python, но фиксируем явно
 python-version = "3.13"
 python-platform = "linux"
 root = ["./src", "."]
@@ -110,7 +109,6 @@ exclude = [
 ]
 
 [tool.ty.rules]
-# аналог твоего reportMissingImports=true в pyright
 possibly-missing-import = "error"
 possibly-missing-attribute = "error"
 
