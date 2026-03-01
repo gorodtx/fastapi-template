@@ -48,8 +48,12 @@ docker compose -f compose/data.yaml -f compose/release.yaml up -d
 ### Option C: Core + Observability / Core + Observability
 
 ```bash
-OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f compose/obs.yaml up -d --build
+docker compose -f compose/data.yaml -f compose/app.yaml -f compose/obs.yaml up -d --build
 ```
+
+`compose/obs.yaml` (и `compose/obs.hostnet.yaml`) автоматически включает
+`OBS_OTEL_ENABLED=true` для `app`, чтобы метрики/трейсы начинали поступать
+сразу после поднятия observability-скоупа.
 
 ## Technology Stack / Стек технологий
 
@@ -61,6 +65,7 @@ OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f
 [![Dishka](https://img.shields.io/badge/Dishka-DI-4B5563)](https://github.com/reagento/dishka)
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PgBouncer](https://img.shields.io/badge/PgBouncer-connection%20pooling-2563EB)](https://www.pgbouncer.org/)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
 [![asyncpg](https://img.shields.io/badge/asyncpg-driver-2D3748)](https://github.com/MagicStack/asyncpg)
 [![Alembic](https://img.shields.io/badge/Alembic-migrations-8A2BE2)](https://alembic.sqlalchemy.org/)
@@ -103,16 +108,36 @@ OBS_OTEL_ENABLED=true docker compose -f compose/data.yaml -f compose/app.yaml -f
 
 ## Compose Scopes / Скоупы compose
 
-- `compose/data.yaml` -> Postgres + Redis
+- `compose/data.yaml` -> Postgres + PgBouncer + Redis
 - `compose/migrate.yaml` -> one-shot migrations/bootstrap
 - `compose/app.yaml` -> app + nginx (build path)
 - `compose/release.yaml` -> app + migrate + nginx (image-only path)
-- `compose/obs.yaml` -> OTel/Prometheus/Grafana/Loki/Tempo/Alertmanager/VictoriaMetrics
+- `compose/obs.yaml` -> OTel/Prometheus/Grafana/Loki/Tempo(distributed)/Alertmanager/VictoriaMetrics
 - `compose/core.hostnet.yaml`, `compose/app.hostnet.yaml`, `compose/migrate.hostnet.yaml`, `compose/obs.hostnet.yaml` -> Linux host-network fallback
+- `compose/obs.hostnet.yaml` uses a hostnet-specific Grafana provisioning set (Prometheus/Loki only). Tempo datasource and Tempo scrape are intentionally disabled in hostnet mode to avoid false `down`/`EOF` states on this runtime path; full trace UI is available in standard `compose/obs.yaml`.
 
 Observability log flow:
 - app logs -> OTLP gRPC -> OTel Collector -> Loki
 - container logs -> Alloy `loki.source.docker` (Docker API) -> Loki
+
+Tempo distributed topology in `compose/obs.yaml`:
+- `tempo-distributor` (OTLP ingest)
+- `tempo-ingester`
+- `tempo-querier`
+- `tempo-query-frontend` (Grafana datasource endpoint)
+- `tempo-compactor` (`backend-scheduler` target)
+- `tempo-metrics-generator` (span-metrics + service-graphs)
+
+Object storage for traces:
+- Local default: MinIO (`minio` + `minio-init` bucket bootstrap)
+- Production: set `TEMPO_S3_*` to external S3-compatible storage
+
+DB observability in `compose/obs.yaml`:
+- `postgres-exporter` (`:9187`) for Postgres saturation/locks/temp/deadlocks metrics
+- `pgbouncer-exporter` (`:9127`) for PgBouncer queue/maxwait/saturation metrics
+- Grafana dashboard: `Postgres Saturation`
+- Grafana dashboard: `PgBouncer Saturation`
+- Prometheus rules/alerts: `db:postgres_*`, `db:pgbouncer_*`, `PostgresConnectionsSaturation`, `PostgresDeadlocksDetected`, `PostgresTempBytesSpike`, `PgBouncerConnectionsSaturation`, `PgBouncerClientQueueWaiting`, `PgBouncerClientMaxwaitHigh`
 
 ## Release and CI / Релиз и CI
 
@@ -177,6 +202,49 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/system
 ### `OBS_OTEL_ENABLED=true` and app fails on startup
 
 If startup error contains `opentelemetry-instrumentation-logging`, install this runtime package in your app image/environment. Logging correlation is configured as a hard requirement for observability mode.
+
+### Live e2e matrix returns `429` via nginx
+
+`tests/test_e2e_endpoint_matrix_live.py` has dense auth calls; nginx rate-limits can produce `429`.
+For deterministic live matrix use app upstream directly:
+
+```bash
+RUN_LIVE_E2E=1 E2E_BASE_URL=http://127.0.0.1:8000 uv run pytest tests/test_e2e_endpoint_matrix_live.py -q
+```
+
+### Migration safety policy (expand/contract)
+
+- Non-bootstrap migrations must use `postgresql_concurrently=True` for `op.create_index` / `op.drop_index`.
+- Bootstrap-only exceptions must be documented in revision header with:
+  `# migration-lint: allow-nonconcurrent-index`
+- CI gate: `tests/test_migration_safety_gate.py`.
+- Release checklist:
+  1. `expand`: nullable/new columns, concurrent indexes, `NOT VALID` constraints.
+  2. Backfill in controlled batches.
+  3. Cutover application reads/writes.
+  4. `contract`: drop legacy structures only after stabilization.
+
+### DB connection routing / Маршрут DB-подключений
+
+- `app` и `release app` по умолчанию подключаются к БД через PgBouncer:
+  `postgresql+asyncpg://...@pgbouncer:5432/...`
+- `migrate` подключается напрямую к `postgres`, чтобы DDL-миграции не зависели от режима pooler.
+- Для asyncpg через PgBouncer включен `prepared_statement_cache_size=0` в дефолтном DSN.
+- Для PgBouncer-DSN SQLAlchemy использует `NullPool` (без двойного pooling в приложении).
+- Бюджет соединений валидируется на старте приложения:
+  `APP_INSTANCE_COUNT * (DB_POOL_SIZE + DB_MAX_OVERFLOW) <= PGBOUNCER_MAX_CLIENT_CONN`,
+  `PGBOUNCER_DEFAULT_POOL_SIZE + PGBOUNCER_RESERVE_POOL_SIZE <= PGBOUNCER_MAX_DB_CONNECTIONS`.
+  Дополнительно при явной передаче `POSTGRES_MAX_CONNECTIONS` проверяется:
+  `PGBOUNCER_MAX_DB_CONNECTIONS <= POSTGRES_MAX_CONNECTIONS - POSTGRES_SUPERUSER_RESERVED_CONNECTIONS`.
+- PgBouncer hardening defaults:
+  `PGBOUNCER_AUTH_TYPE=scram-sha-256`,
+  host bind для `6432` только на `127.0.0.1`,
+  pin image digest через `PGBOUNCER_IMAGE`.
+- TLS для PgBouncer настраивается env-парами:
+  `PGBOUNCER_CLIENT_TLS_SSLMODE`, `PGBOUNCER_SERVER_TLS_SSLMODE`
+  (+ `*_KEY_FILE`, `*_CERT_FILE`, `*_CA_FILE` при необходимости).
+- Redis guardrails задаются через:
+  `REDIS_MAX_CONNECTIONS`, `REDIS_MAXMEMORY`, `REDIS_MAXMEMORY_POLICY`.
 
 ## thks :)
 
