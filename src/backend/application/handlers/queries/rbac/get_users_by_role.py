@@ -16,6 +16,9 @@ from backend.application.common.presenters.rbac import (
     present_users_by_role,
 )
 from backend.application.common.presenters.users import present_user_response
+from backend.application.common.tools.read_tx_result import (
+    run_result_in_read_tx,
+)
 from backend.application.handlers.base import QueryHandler
 from backend.application.handlers.result import Err, Result, ResultImpl
 from backend.application.handlers.transform import handler
@@ -35,6 +38,15 @@ class GetUsersByRoleHandler(
         self: GetUsersByRoleHandler,
         query: GetUsersByRoleQuery,
         /,
+    ) -> Result[UsersByRoleResponseDTO, AppError]:
+        return await run_result_in_read_tx(
+            manager=self.gateway.manager,
+            action_factory=lambda: self._execute(query),
+        )
+
+    async def _execute(
+        self: GetUsersByRoleHandler,
+        query: GetUsersByRoleQuery,
     ) -> Result[UsersByRoleResponseDTO, AppError]:
         role: RoleCode = query.role
         map_storage_error = map_storage_error_to_app()

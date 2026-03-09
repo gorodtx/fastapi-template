@@ -8,6 +8,9 @@ from backend.application.common.exceptions.application import AppError
 from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
+from backend.application.common.tools.read_tx_result import (
+    run_result_in_read_tx,
+)
 from backend.application.common.tools.user_access import (
     fetch_user_and_permissions,
 )
@@ -29,6 +32,15 @@ class GetUserWithRolesHandler(
         self: GetUserWithRolesHandler,
         query: GetUserWithRolesQuery,
         /,
+    ) -> Result[UserWithRolesDTO, AppError]:
+        return await run_result_in_read_tx(
+            manager=self.gateway.manager,
+            action_factory=lambda: self._execute(query),
+        )
+
+    async def _execute(
+        self: GetUserWithRolesHandler,
+        query: GetUserWithRolesQuery,
     ) -> Result[UserWithRolesDTO, AppError]:
         data_result = await fetch_user_and_permissions(
             self.gateway, query.user_id

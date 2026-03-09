@@ -9,6 +9,9 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.users import present_user_response
+from backend.application.common.tools.read_tx_result import (
+    run_result_in_read_tx,
+)
 from backend.application.handlers.base import QueryHandler
 from backend.application.handlers.result import Result
 from backend.application.handlers.transform import handler
@@ -23,6 +26,15 @@ class GetUserHandler(QueryHandler[GetUserQuery, UserResponseDTO]):
 
     async def __call__(
         self: GetUserHandler, query: GetUserQuery, /
+    ) -> Result[UserResponseDTO, AppError]:
+        return await run_result_in_read_tx(
+            manager=self.gateway.manager,
+            action_factory=lambda: self._execute(query),
+        )
+
+    async def _execute(
+        self: GetUserHandler,
+        query: GetUserQuery,
     ) -> Result[UserResponseDTO, AppError]:
         return (
             (
