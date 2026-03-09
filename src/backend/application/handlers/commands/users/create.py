@@ -19,6 +19,7 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.users import present_user_response
+from backend.application.common.tools.normalize_email import normalize_email
 from backend.application.common.tools.tx_result import run_result_in_tx
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
@@ -65,7 +66,7 @@ class CreateUserHandler(CommandHandler[CreateUserCommand, UserResponseDTO]):
         user_result = capture(
             lambda: build_user(
                 id=uuid.uuid7(),
-                email=cmd.email,
+                email=normalize_email(cmd.email),
                 login=cmd.login,
                 username=cmd.username,
                 password_hash=hashed,

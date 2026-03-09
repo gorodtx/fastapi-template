@@ -17,6 +17,7 @@ from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
 from backend.application.common.presenters.users import present_user_response
+from backend.application.common.tools.normalize_email import normalize_email
 from backend.application.common.tools.tx_result import run_result_in_tx
 from backend.application.handlers.base import CommandHandler
 from backend.application.handlers.result import (
@@ -61,8 +62,12 @@ class UpdateUserHandler(CommandHandler[UpdateUserCommand, UserResponseDTO]):
         user = user_result.value
 
         if cmd.email is not None:
+            normalized_email = normalize_email(cmd.email)
             email_patch_result = capture(
-                lambda: apply_user_patch(user, email=cmd.email),
+                lambda: apply_user_patch(
+                    user,
+                    email=normalized_email,
+                ),
                 map_user_input_error(),
             )
             if isinstance(email_patch_result, Err):

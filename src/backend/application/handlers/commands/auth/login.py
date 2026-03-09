@@ -21,6 +21,7 @@ from backend.application.common.interfaces.auth.ports import (
 from backend.application.common.interfaces.ports.persistence.gateway import (
     PersistenceGateway,
 )
+from backend.application.common.tools.normalize_email import normalize_email
 from backend.application.common.tools.refresh_tokens import (
     RefreshTokenService,
 )
@@ -51,8 +52,9 @@ class LoginUserHandler(CommandHandler[LoginUserCommand, TokenPairDTO]):
         /,
     ) -> Result[TokenPairDTO, AppError]:
         invalid_credentials = UnauthenticatedError("Invalid email or password")
+        normalized_email = normalize_email(cmd.email)
         user_result = await self.gateway.users.get_by_email(
-            cmd.email,
+            normalized_email,
             include_roles=False,
         )
         if isinstance(user_result, Err):

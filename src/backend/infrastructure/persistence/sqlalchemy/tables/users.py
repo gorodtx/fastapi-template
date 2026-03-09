@@ -78,6 +78,10 @@ users_table: Table = Table(
         name="ck_users_email_format",
     ),
     CheckConstraint(
+        "email = lower(email)",
+        name="ck_users_email_lowercase",
+    ),
+    CheckConstraint(
         "char_length(username) >= 2 AND char_length(username) <= 20",
         name="ck_users_username_len",
     ),
