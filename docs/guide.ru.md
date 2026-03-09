@@ -84,7 +84,7 @@
 
 - `users`
   - `id` UUID PK
-  - `email` unique
+  - `email` unique (stored lowercase)
   - `login` unique
   - `username` unique
   - `password_hash`
@@ -104,6 +104,12 @@
   - PK: (`user_id`, `role_id`)
   - FK `user_id -> users.id` (CASCADE)
   - FK `role_id -> roles.id` (CASCADE)
+
+Email canonicalization:
+
+- Приложение нормализует `email` к lowercase при записи (register/update/login по email).
+- БД фиксирует инвариант `email = lower(email)` через CHECK constraint (миграция `20260309_0007`).
+- Миграция упадёт, если есть коллизии (разные email, которые совпадают после lowercasing).
 
 Цепочка для авторизации:
 
@@ -221,6 +227,12 @@ cp .env.example .env
   - `OBS_ALLOY_PORT`
   - `OBS_TEMPO_HTTP_PORT`
   - `OBS_LOKI_RETENTION_PERIOD`
+
+Postgres safety timeouts (DB-level, migration `20260309_0006`):
+
+- `statement_timeout = 30s`
+- `lock_timeout = 1s`
+- `idle_in_transaction_session_timeout = 30s`
 
 Для прода:
 

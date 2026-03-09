@@ -84,7 +84,7 @@ Core tables are created in bootstrap migration `20260203_0001`:
 
 - `users`
   - `id` UUID PK
-  - `email` unique
+  - `email` unique (stored lowercase)
   - `login` unique
   - `username` unique
   - `password_hash`
@@ -104,6 +104,12 @@ Core tables are created in bootstrap migration `20260203_0001`:
   - PK: (`user_id`, `role_id`)
   - FK `user_id -> users.id` (CASCADE)
   - FK `role_id -> roles.id` (CASCADE)
+
+Email canonicalization:
+
+- The application normalizes `email` to lowercase on write (register/update/login by email).
+- The DB enforces the invariant `email = lower(email)` via a CHECK constraint (migration `20260309_0007`).
+- The migration will fail if there are collisions (different emails that become equal after lowercasing).
 
 Relation chain for authorization:
 
@@ -221,6 +227,12 @@ Important variables:
   - `OBS_ALLOY_PORT`
   - `OBS_TEMPO_HTTP_PORT`
   - `OBS_LOKI_RETENTION_PERIOD`
+
+Postgres safety timeouts (DB-level, migration `20260309_0006`):
+
+- `statement_timeout = 30s`
+- `lock_timeout = 1s`
+- `idle_in_transaction_session_timeout = 30s`
 
 Production notes:
 

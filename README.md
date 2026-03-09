@@ -199,6 +199,8 @@ docker compose -f compose/data.yaml -f compose/app.yaml -f compose/core.hostnet.
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/system
 ```
 
+Note: in host-network mode nginx listens on `:8080` only (the upstream default vhost that binds `:80` is removed).
+
 ### `OBS_OTEL_ENABLED=true` and app fails on startup
 
 If startup error contains `opentelemetry-instrumentation-logging`, install this runtime package in your app image/environment. Logging correlation is configured as a hard requirement for observability mode.
@@ -230,7 +232,7 @@ RUN_LIVE_E2E=1 E2E_BASE_URL=http://127.0.0.1:8000 uv run pytest tests/test_e2e_e
   `postgresql+asyncpg://...@pgbouncer:5432/...`
 - `migrate` подключается напрямую к `postgres`, чтобы DDL-миграции не зависели от режима pooler.
 - Для asyncpg через PgBouncer включен `prepared_statement_cache_size=0` в дефолтном DSN.
-- Для PgBouncer-DSN SQLAlchemy использует `NullPool` (без двойного pooling в приложении).
+- SQLAlchemy pool в приложении остаётся включённым (bounded pool) и выступает как client-side лимитер; согласуй `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` с бюджетом PgBouncer, чтобы избежать oversubscription.
 - Бюджет соединений валидируется на старте приложения:
   `APP_INSTANCE_COUNT * (DB_POOL_SIZE + DB_MAX_OVERFLOW) <= PGBOUNCER_MAX_CLIENT_CONN`,
   `PGBOUNCER_DEFAULT_POOL_SIZE + PGBOUNCER_RESERVE_POOL_SIZE <= PGBOUNCER_MAX_DB_CONNECTIONS`.
