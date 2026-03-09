@@ -40,7 +40,8 @@ class InfrastructureSystemHealthProbe(SystemHealthPort):
         self: InfrastructureSystemHealthProbe,
     ) -> bool:
         try:
-            return await self.manager.send(_ping_database) == 1
+            async with self.manager.transaction():
+                return await self.manager.send(_ping_database) == 1
         except Exception:
             _LOGGER.exception("Database health check failed")
             return False

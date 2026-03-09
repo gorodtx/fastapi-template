@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
 import pytest
 
+from backend.application.common.interfaces.ports.persistence.manager import (
+    TransactionScope,
+)
 from backend.infrastructure.system_health import (
     InfrastructureSystemHealthProbe,
 )
@@ -13,6 +18,17 @@ from backend.infrastructure.system_health import (
 class _ManagerStub:
     result: int = 1
     fail: bool = False
+
+    def transaction(
+        self: _ManagerStub, *, nested: bool = False
+    ) -> TransactionScope:
+        _ = nested
+
+        @asynccontextmanager
+        async def _scope() -> AsyncIterator[_ManagerStub]:
+            yield self
+
+        return _scope()
 
     async def send(self: _ManagerStub, _query: object) -> int:
         if self.fail:
